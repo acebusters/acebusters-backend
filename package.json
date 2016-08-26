@@ -1,0 +1,28 @@
+{
+  "name": "chain.oracle",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@bitbucket.org/johba/chain.oracle.git"
+  },
+  "author": "Johann Barbie <johannbarbie@me.com> (http://johba.de/)",
+  "license": "MIT",
+  "homepage": "https://bitbucket.org/johba/chain.oracle#readme",
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.0.2",
+    "node-lambda": "^0.8.7",
+    "sinon": "^1.17.5",
+    "sinon-chai": "^2.8.0"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.5.3",
+    "dynamodb-doc": "^1.0.0",
+    "ethereumjs-util": "^4.5.0"
+  }
+}
