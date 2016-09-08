@@ -1,4 +1,5 @@
 const AWS = require('aws-sdk');
+const doc = require('dynamodb-doc');
 AWS.config.update({region: 'eu-west-1'});
 
 const Provider = require('./lib/provider');

@@ -265,13 +265,15 @@ describe('Oracle', function() {
 
   it('should allow to get preflop info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
-        deck: deck,
-        lineup: [],
-        handState: 'preflop'
+      handId: 0,
+      deck: deck,
+      lineup: [],
+      handState: 'preflop'
     }]});
 
     new Oracle(new Db(dynamo)).info(tableAddr).then(function(rsp) {
       expect(rsp).to.eql({
+        handId: 0,
         cards: [],
         lineup: [],
         state: 'preflop'
@@ -282,6 +284,7 @@ describe('Oracle', function() {
 
   it('should allow to get flop info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
+        handId: 0,
         deck: deck,
         lineup: [],
         handState: 'flop'
@@ -289,6 +292,7 @@ describe('Oracle', function() {
 
     new Oracle(new Db(dynamo)).info(tableAddr).then(function(rsp) {
       expect(rsp).to.eql({
+        handId: 0,
         cards: [20, 21, 22],
         lineup: [],
         state: 'flop'
@@ -299,6 +303,7 @@ describe('Oracle', function() {
 
   it('should allow to get river info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
+        handId: 0,
         deck: deck,
         lineup: [],
         handState: 'river'
@@ -306,6 +311,7 @@ describe('Oracle', function() {
 
     new Oracle(new Db(dynamo)).info(tableAddr).then(function(rsp) {
       expect(rsp).to.eql({
+        handId: 0,
         cards: [20, 21, 22, 23],
         lineup: [],
         state: 'river'
@@ -316,6 +322,7 @@ describe('Oracle', function() {
 
   it('should allow to get turn info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
+        handId: 0,
         deck: deck,
         lineup: [],
         handState: 'turn'
@@ -323,6 +330,7 @@ describe('Oracle', function() {
 
     new Oracle(new Db(dynamo)).info(tableAddr).then(function(rsp) {
       expect(rsp).to.eql({
+        handId: 0,
         cards: [20, 21, 22, 23, 24],
         lineup: [],
         state: 'turn'
