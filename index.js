@@ -1,6 +1,13 @@
 const AWS = require('aws-sdk');
 AWS.config.update({region: 'eu-west-1'});
 
+const Provider = require('./lib/provider');
+const Db = require('./lib/db');
+const Contract = require('./lib/blockchain');
+const TableManager = require('./lib/index');
+
+var dynamo = new doc.DynamoDB();
+var provider = new Provider('http://node.ambisafe.co');
 
 exports.handler = function(event, context, callback) {
 
@@ -8,20 +15,14 @@ exports.handler = function(event, context, callback) {
   console.log('Context received:\n', JSON.stringify(context));
   
   var handleRequest,
-    manager,
+    manager = new TableManager(new Db(dynamo), new Contract(provider)),
     path = event.context['resource-path'];
   if (path.indexOf('pay') > -1) {
-    handleRequest = manager.pay();
-  } else if (path.indexOf('deal') > -1) {
-    handleRequest = manager.deal();
-  } else if (path.indexOf('flop') > -1) {
-    handleRequest = manager.flop();
-  } else if (path.indexOf('turn') > -1) {
-    handleRequest = manager.turn();
-  } else if (path.indexOf('river') > -1) {
-    handleRequest = manager.turn();
+    handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
+  } else if (path.indexOf('info') > -1) {
+    handleRequest = manager.info(event.params.path.tableAddr);
   } else if (path.indexOf('show') > -1) {
-    handleRequest = manager.turn();
+    handleRequest = manager.show(event.params.path.tableAddr, event.params.header.Authorization, event.cards);
   } else {
     handleRequest = Promise.reject('Error: unexpected path: ' + path);
   }
