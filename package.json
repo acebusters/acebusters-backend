@@ -27,6 +27,7 @@
     "eth-lightwallet": "^2.5.1",
     "ethereum-web-token": "^0.1.6",
     "ethereumjs-util": "^4.5.0",
+    "pokersolver": "^2.1.2",
     "web3-provider-engine": "^8.0.4"
   }
 }
