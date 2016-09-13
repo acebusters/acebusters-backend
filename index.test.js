@@ -436,18 +436,9 @@ describe('Oracle info', function() {
 
 describe('Oracle show', function() {
 
-  beforeEach(function () {
-    sinon.stub(provider, 'getTable').returns(contract);
-  });
-
   afterEach(function () {
-    if (contract.lineup.restore) contract.lineup.restore();
-    if (contract.params.restore) contract.params.restore();
-    if (provider.getTable.restore) provider.getTable.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
-    if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
-    if (dynamo.query.restore) dynamo.query.restore();
   });
 
   it('should prevent show before showdown', function(done) {
@@ -455,8 +446,7 @@ describe('Oracle show', function() {
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       handState: 'river',
-      deck: deck,
-      dealer: 0
+      deck: deck
     }});
 
     var oracle = new Oracle(new Db(dynamo));
@@ -479,8 +469,7 @@ describe('Oracle show', function() {
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
       handState: 'showdown',
-      deck: deck,
-      dealer: 0
+      deck: deck
     }});
 
     var oracle = new Oracle(new Db(dynamo));
@@ -491,7 +480,7 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
-  it('should allow to show.', function(done) {
+  it('should allow to showdown with 1 winner.', function(done) {
     var bet1 = new EWT(ABI_BET).bet(0, 100).sign(P1_KEY);
     var bet2 = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
     var lineup = [
@@ -502,8 +491,36 @@ describe('Oracle show', function() {
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
       handState: 'showdown',
-      deck: deck,
-      dealer: 0
+      deck: [12,11,2,3,4,5,6,7,8,9,10,1,0,13,14,15,22,17,18,19,20,21,36,23,24,25]
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo));
+
+    var show = new EWT(ABI_SHOW).show(0, 100).sign(P1_KEY);
+
+    oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
+      var dist = EWT.parse(rsp);
+      expect(dist.signer).to.eql(P4_ADDR);
+      expect(dist.values[3]).to.eql([2, 198]);
+      expect(dist.values[2]).to.eql([P4_ADDR, P1_ADDR]);
+      //expect(dynamo.updateItem).calledWith({});
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to showdown with 2 winners.', function(done) {
+    var bet1 = new EWT(ABI_BET).bet(0, 100).sign(P1_KEY);
+    var bet2 = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var lineup = [
+      {address: P1_ADDR, last: bet1},
+      {address: P2_ADDR, last: bet2},
+    ];
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: lineup,
+      handState: 'showdown',
+      deck: deck
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
