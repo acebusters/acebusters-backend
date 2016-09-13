@@ -137,7 +137,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to pay small blind.', function(done) {
+  it('should allow to pay small blind for hand 0.', function(done) {
     var blind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
     var lineup = [P1_ADDR, P2_ADDR];
 
@@ -153,6 +153,34 @@ describe('Oracle pay', function() {
         deck: sinon.match.any,
         handState: 'dealing',
         handId: 0,
+        dealer: 0,
+        lineup: [{address: P1_ADDR, last: blind},{address: P2_ADDR}],
+        tableAddr: tableAddr
+      }, TableName: 'poker'});
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to pay small blind for next hand.', function(done) {
+    var blind = new EWT(ABI_BET).bet(2, 50).sign(P1_KEY);
+    var lineup = [P1_ADDR, P2_ADDR];
+
+    sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
+    sinon.stub(contract, 'lineup').yields(null, lineup);
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      lineup: [{address: P1_ADDR},{address: P2_ADDR}],
+      distribution: 'dist',
+      dealer: 1
+    }}).onFirstCall().yields(null, {});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider));
+
+    oracle.pay(tableAddr, blind).then(function(rsp) {
+      expect(dynamo.putItem).calledWith({Item: {
+        deck: sinon.match.any,
+        handState: 'dealing',
+        handId: 2,
         dealer: 0,
         lineup: [{address: P1_ADDR, last: blind},{address: P2_ADDR}],
         tableAddr: tableAddr
@@ -281,6 +309,15 @@ describe('Oracle info', function() {
     if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
+  });
+
+  it('should allow to get uninitialized info.', function(done) {
+    sinon.stub(dynamo, 'query').yields(null, { Items: []});
+
+    new Oracle(new Db(dynamo)).info(tableAddr).catch(function(err) {
+      expect(err).to.contain('Not Found:');
+      done();
+    }).catch(done);
   });
 
   it('should allow to get preflop info.', function(done) {
