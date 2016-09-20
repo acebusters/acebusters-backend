@@ -293,6 +293,32 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should prevent playing lower bet.', function(done) {
+    var smallBlind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var lowBet = new EWT(ABI_BET).bet(0, 0).sign(P1_KEY);
+    var lineup = [
+      {address: P1_ADDR, last: smallBlind},
+      {address: P2_ADDR, last: bigBlind}
+    ];
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: lineup,
+      handState: 'turn',
+      deck: deck,
+      dealer: 0
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo));
+
+    oracle.pay(tableAddr, lowBet).catch(function(err) {
+      expect(err).to.contain('Unauthorized');
+      expect(err).to.contain('match or raise');
+      done();
+    }).catch(done);
+  });
+
 });
 
 describe('Oracle info', function() {
