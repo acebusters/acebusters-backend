@@ -8,9 +8,32 @@ const Oracle = require('./lib/index');
 const Db = require('./lib/db');
 const Contract = require('./lib/blockchain');
 
-const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint112'}, {type: 'uint136'}]}];
-const ABI_SHOW = [{name: 'show', type: 'function', inputs: [{type: 'uint112'}, {type: 'uint136'}]}];
-const ABI_MUCK = [{name: 'muck', type: 'function', inputs: [{type: 'uint112'}, {type: 'uint136'}]}];
+// BET can replace lower bet
+// BET can replace SIT_OUT during dealing state
+const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+
+// ALL_IN can replace lower bet when all in
+const ABI_ALL_IN = [{name: 'allIn', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+// FOLD can replace all but SIT_OUT, SHOW, and MOCK, given same amount
+const ABI_FOLD = [{name: 'fold', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+// SIT_OUT can replace all receipts, given same amount
+const ABI_SIT_OUT = [{name: 'sitOut', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+
+// CHECK can replace BET with same amount in pre-flop
+const ABI_CHECK = [{name: 'check', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+// CHECK_FLOP can replace BET or CHECK with same amount in flop
+const ABI_CHECK_FLOP = [{name: 'checkFlop', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+// CHECK_TURN can replace BET or CHECK_FLOP with same amount in turn
+const ABI_CHECK_TURN = [{name: 'checkTurn', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+// CHECK_RIVER can replace BET or CHECK_TURN with same amount in river
+const ABI_CHECK_RIVER = [{name: 'checkRiver', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+// CHECK_SHOW can replace BET or CHECK_RIVER with same amount in showdown
+const ABI_CHECK_SHOW = [{name: 'checkShow', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+
+// SHOW can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
+const ABI_SHOW = [{name: 'show', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+// MUCK can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
+const ABI_MUCK = [{name: 'muck', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P1_KEY = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
