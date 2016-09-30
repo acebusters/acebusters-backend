@@ -14,7 +14,7 @@ const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type:
 
 // ALL_IN can replace lower bet when all in
 const ABI_ALL_IN = [{name: 'allIn', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
-// FOLD can replace all but SIT_OUT, SHOW, and MOCK, given same amount
+// FOLD can replace all but SIT_OUT, and SHOW, given same amount
 const ABI_FOLD = [{name: 'fold', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 // SIT_OUT can replace all receipts, given same amount
 const ABI_SIT_OUT = [{name: 'sitOut', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
@@ -32,8 +32,6 @@ const ABI_CHECK_SHOW = [{name: 'checkShow', type: 'function', inputs: [{type: 'u
 
 // SHOW can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
 const ABI_SHOW = [{name: 'show', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
-// MUCK can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
-const ABI_MUCK = [{name: 'muck', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P1_KEY = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
@@ -373,6 +371,7 @@ describe('Oracle info', function() {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 0,
       deck: deck,
+      dealer: 0,
       lineup: [],
       handState: 'preflop'
     }]});
@@ -381,6 +380,7 @@ describe('Oracle info', function() {
       expect(rsp).to.eql({
         handId: 0,
         cards: [],
+        dealer: 0,
         lineup: [],
         state: 'preflop'
       });
@@ -391,6 +391,7 @@ describe('Oracle info', function() {
   it('should allow to get flop info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
+        dealer: 0,
         deck: deck,
         lineup: [],
         handState: 'flop'
@@ -400,6 +401,7 @@ describe('Oracle info', function() {
       expect(rsp).to.eql({
         handId: 0,
         cards: [20, 21, 22],
+        dealer: 0,
         lineup: [],
         state: 'flop'
       });
@@ -410,6 +412,7 @@ describe('Oracle info', function() {
   it('should allow to get turn info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
+        dealer: 0,
         deck: deck,
         lineup: [],
         handState: 'turn'
@@ -419,6 +422,7 @@ describe('Oracle info', function() {
       expect(rsp).to.eql({
         handId: 0,
         cards: [20, 21, 22, 23],
+        dealer: 0,
         lineup: [],
         state: 'turn'
       });
@@ -429,6 +433,7 @@ describe('Oracle info', function() {
   it('should allow to get river info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
+        dealer: 0,
         deck: deck,
         lineup: [],
         handState: 'river'
@@ -438,6 +443,7 @@ describe('Oracle info', function() {
       expect(rsp).to.eql({
         handId: 0,
         cards: [20, 21, 22, 23, 24],
+        dealer: 0,
         lineup: [],
         state: 'river'
       });
@@ -447,7 +453,7 @@ describe('Oracle info', function() {
 
   it('should allow to get showdown info.', function(done) {
     var show1 = new EWT(ABI_SHOW).show(0, 50).sign(P1_KEY);
-    var muck2 = new EWT(ABI_MUCK).muck(0, 50).sign(P2_KEY);
+    var muck2 = new EWT(ABI_FOLD).fold(0, 50).sign(P2_KEY);
     var lineup = [
       {address: P1_ADDR, last: show1},
       {address: P2_ADDR, last: muck2}
@@ -455,6 +461,7 @@ describe('Oracle info', function() {
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
+        dealer: 0,
         deck: deck,
         lineup: lineup,
         distribution: 'dist',
@@ -465,6 +472,7 @@ describe('Oracle info', function() {
       expect(rsp).to.eql({
         handId: 0,
         cards: [20, 21, 22, 23, 24],
+        dealer: 0,
         lineup: [{
           address: P1_ADDR,
           cards: [0, 1],
