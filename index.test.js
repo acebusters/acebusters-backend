@@ -85,9 +85,9 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent new hand if old one not complete.', function(done) {
-    var blind = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    var blind = new EWT(ABI_BET).bet(2, 100).sign(P1_KEY);
 
-    sinon.stub(dynamo, 'getItem').yields(null, {Item:{handId: 0}}).onFirstCall().yields(null, {});
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{handId: 1}}).onFirstCall().yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo));
 
@@ -98,7 +98,7 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent small blind from player not in lineup.', function(done) {
-    var blind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
+    var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     var lineup = ['0x1256', '0x1234'];
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
@@ -114,7 +114,7 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent game with less than 2 players.', function(done) {
-    var blind = new EWT(ABI_BET).bet(0, 100).sign(P1_KEY);
+    var blind = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
     sinon.stub(contract, 'lineup').yields(null, [P1_ADDR]);
@@ -129,7 +129,7 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent blind with wrong value.', function(done) {
-    var blind = new EWT(ABI_BET).bet(0, 80).sign(P1_KEY);
+    var blind = new EWT(ABI_BET).bet(1, 80).sign(P1_KEY);
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
     sinon.stub(contract, 'lineup').yields(null, [P1_ADDR, P2_ADDR]);
@@ -144,7 +144,7 @@ describe('Oracle pay', function() {
   });
 
   it('should check turn for blind.', function(done) {
-    var blind = new EWT(ABI_BET).bet(0, 50).sign(P2_KEY);
+    var blind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
     sinon.stub(contract, 'lineup').yields(null, [P1_ADDR, P2_ADDR]);
@@ -159,7 +159,7 @@ describe('Oracle pay', function() {
   });
 
   it('should allow to pay small blind for hand 0.', function(done) {
-    var blind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
+    var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     var lineup = [P1_ADDR, P2_ADDR];
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
@@ -173,7 +173,7 @@ describe('Oracle pay', function() {
       expect(dynamo.putItem).calledWith({Item: {
         deck: sinon.match.any,
         handState: 'dealing',
-        handId: 0,
+        handId: 1,
         dealer: 0,
         lineup: [{address: P1_ADDR, last: blind},{address: P2_ADDR}],
         tableAddr: tableAddr
@@ -211,7 +211,7 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent big blind from not in lineup.', function(done) {
-    var blind = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [{address: '0x1256'}, {address: '0x1234'}];
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
@@ -227,8 +227,8 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent big blind too small.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(0, 80).sign(P2_KEY);
+    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(1, 80).sign(P2_KEY);
     var lineup = [{address: P1_ADDR, last: smallBlind}, {address: P2_ADDR}];
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
@@ -246,8 +246,8 @@ describe('Oracle pay', function() {
   });
 
   it('should allow to pay big blind.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [{address: P1_ADDR, last: smallBlind}, {address: P2_ADDR}];
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
@@ -270,7 +270,7 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent reusing receipts.', function(done) {
-    var blind = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: blind}];
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
@@ -286,9 +286,9 @@ describe('Oracle pay', function() {
   });
 
   it('should allow to deal.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
-    var zeroBlind = new EWT(ABI_BET).bet(0, 0).sign(P3_KEY);
+    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    var zeroBlind = new EWT(ABI_BET).bet(1, 0).sign(P3_KEY);
     var lineup = [
       {address: P1_ADDR, last: smallBlind},
       {address: P2_ADDR, last: bigBlind},
@@ -315,9 +315,9 @@ describe('Oracle pay', function() {
   });
 
   it('should prevent playing lower bet.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(0, 50).sign(P1_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
-    var lowBet = new EWT(ABI_BET).bet(0, 0).sign(P1_KEY);
+    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    var lowBet = new EWT(ABI_BET).bet(1, 0).sign(P1_KEY);
     var lineup = [
       {address: P1_ADDR, last: smallBlind},
       {address: P2_ADDR, last: bigBlind}
@@ -515,13 +515,13 @@ describe('Oracle show', function() {
   });
 
   it('should prevent bet in showdown', function(done) {
-    var bet1 = new EWT(ABI_BET).bet(0, 100).sign(P1_KEY);
-    var bet2 = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    var bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [
       {address: P1_ADDR, last: bet1},
       {address: P2_ADDR, last: bet2},
     ];
-    var bet = new EWT(ABI_BET).bet(0, 200).sign(P1_KEY);
+    var bet = new EWT(ABI_BET).bet(1, 200).sign(P1_KEY);
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
@@ -538,8 +538,8 @@ describe('Oracle show', function() {
   });
 
   it('should allow to showdown with 1 winner.', function(done) {
-    var bet1 = new EWT(ABI_BET).bet(0, 100).sign(P1_KEY);
-    var bet2 = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    var bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [
       {address: P1_ADDR, last: bet1},
       {address: P2_ADDR, last: bet2},
@@ -554,7 +554,7 @@ describe('Oracle show', function() {
 
     var oracle = new Oracle(new Db(dynamo));
 
-    var show = new EWT(ABI_SHOW).show(0, 100).sign(P1_KEY);
+    var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
       var dist = EWT.parse(rsp);
@@ -567,8 +567,8 @@ describe('Oracle show', function() {
   });
 
   it('should allow to showdown with 2 winners.', function(done) {
-    var bet1 = new EWT(ABI_BET).bet(0, 100).sign(P1_KEY);
-    var bet2 = new EWT(ABI_BET).bet(0, 100).sign(P2_KEY);
+    var bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    var bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [
       {address: P1_ADDR, last: bet1},
       {address: P2_ADDR, last: bet2},
@@ -583,7 +583,7 @@ describe('Oracle show', function() {
 
     var oracle = new Oracle(new Db(dynamo));
 
-    var show = new EWT(ABI_SHOW).show(0, 100).sign(P1_KEY);
+    var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     oracle.show(tableAddr, show, [0, 1]).then(function(rsp) {
       var dist = EWT.parse(rsp);
