@@ -12,8 +12,6 @@ const Contract = require('./lib/blockchain');
 // BET can replace SIT_OUT during dealing state
 const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 
-// ALL_IN can replace lower bet when all in
-const ABI_ALL_IN = [{name: 'allIn', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 // FOLD can replace all but SIT_OUT, and SHOW, given same amount
 const ABI_FOLD = [{name: 'fold', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 // SIT_OUT can replace all receipts, given same amount
@@ -27,8 +25,6 @@ const ABI_CHECK_FLOP = [{name: 'checkFlop', type: 'function', inputs: [{type: 'u
 const ABI_CHECK_TURN = [{name: 'checkTurn', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 // CHECK_RIVER can replace BET or CHECK_TURN with same amount in river
 const ABI_CHECK_RIVER = [{name: 'checkRiver', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
-// CHECK_SHOW can replace BET or CHECK_RIVER with same amount in showdown
-const ABI_CHECK_SHOW = [{name: 'checkShow', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 
 // SHOW can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
 const ABI_SHOW = [{name: 'show', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
@@ -281,6 +277,64 @@ describe('Oracle pay', function() {
 
     oracle.pay(tableAddr, blind).catch(function(err) {
       expect(err).to.contain('Unauthorized');
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent bet after fold.', function(done) {
+    var fold = new EWT(ABI_FOLD).fold(1, 100).sign(P2_KEY);
+    var bet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: [{ address: P1_ADDR}, {address: P2_ADDR, last: fold}]
+    }});
+
+    new Oracle(new Db(dynamo)).pay(tableAddr, bet).catch(function(err) {
+      expect(err).to.contain('no bet after fold.');
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent bet during sitout.', function(done) {
+    var sitout = new EWT(ABI_SIT_OUT).sitOut(1, 100).sign(P2_KEY);
+    var bet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      handState: 'flop',
+      lineup: [{ address: P1_ADDR}, {address: P2_ADDR, last: sitout}]
+    }});
+
+    new Oracle(new Db(dynamo)).pay(tableAddr, bet).catch(function(err) {
+      expect(err).to.contain('leave sitout only during dealing.');
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent check during wrong state.', function(done) {
+    var check = new EWT(ABI_CHECK).check(1, 100).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      handState: 'flop',
+      lineup: [{ address: P1_ADDR}, {address: P2_ADDR}]
+    }});
+
+    new Oracle(new Db(dynamo)).pay(tableAddr, check).catch(function(err) {
+      expect(err).to.contain('check only during preflop');
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent check to raise.', function(done) {
+    var bet = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    var check = new EWT(ABI_CHECK).check(1, 120).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      handState: 'flop',
+      lineup: [{ address: P1_ADDR}, {address: P2_ADDR, last: bet}]
+    }});
+
+    new Oracle(new Db(dynamo)).pay(tableAddr, check).catch(function(err) {
+      expect(err).to.contain('check should not raise');
       done();
     }).catch(done);
   });
