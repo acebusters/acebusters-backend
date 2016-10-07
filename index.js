@@ -25,8 +25,8 @@ exports.handler = function(event, context, callback) {
     handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
   } else if (path.indexOf('info') > -1) {
     handleRequest = manager.info(event.params.path.tableAddr);
-  } else if (path.indexOf('tables') > -1) {
-    handleRequest = manager.getTables(event['stage-variables']);
+  } else if (path.indexOf('config') > -1) {
+    handleRequest = manager.getConfig(event['stage-variables']);
   } else if (path.indexOf('show') > -1) {
     handleRequest = manager.show(event.params.path.tableAddr, event.params.header.Authorization, event.cards);
   } else {

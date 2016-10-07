@@ -1,0 +1,40 @@
+language: node_js
+
+env:
+  global:
+    - secure: 0TzXuzqKRwK/sDnaukBlnDaCZk+LZPNYT/ARvHDNyGk83ECfgnnYJLAy3LHNsCFoE8Kd5GeWbNDPGdA9n64+C87eTMzzwl3aGWfi68jXuul8LMNVanoLkhWsRRuwvYAG37cAxbeTKZ0uGN4HG4Jv6CBdlSHYKiMX6z08gFx8Z1IZLuNlACGXjqxBUaFz3LU3vDjH7nKsuPjqgjErSdEy19xr95i9wOWCpy08WU43IwYO1ZQeR8bd/+ua6Mie8Bo72CMruYeuamZQwpW1D+KhYgQDy44Oyr8YY2H59StVxWMQcsVoAOXfLKO6gCk4VpBT08o3Xec/lwbOb0GpLM6HuQ==
+    - AWS_ROLE_ARN=arn:aws:iam::105751009136:role/lambda_api_dynamo
+    - AWS_REGION=eu-west-1
+    - AWS_FUNCTION_NAME=poker
+    - AWS_HANDLER=index.handler
+    - AWS_MEMORY_SIZE=256
+    - AWS_TIMEOUT=14
+    - AWS_RUNTIME=nodejs4.3
+
+node_js:
+  - "6.2.2"
+
+build:
+  ci:
+    - echo $BUILD_URL
+    - npm --version
+    - npm install
+
+  on_success:
+    - if [ "$BRANCH" == "master" ]; then echo "Publishing to Production"; node-lambda deploy -a $AWS_ACCESS_KEY_ID -s $AWS_SECRET_ACCESS_KEY -o $AWS_ROLE_ARN -r $AWS_REGION -n $AWS_FUNCTION_NAME -H $AWS_HANDLER -m $AWS_MEMORY_SIZE -t $AWS_TIMEOUT -u $AWS_RUNTIME; fi
+    - if [ "$BRANCH" == "develop" ]; then echo "Deploying to Development"; node-lambda deploy -e "sandbox" -a $AWS_ACCESS_KEY_ID -s $AWS_SECRET_ACCESS_KEY -o $AWS_ROLE_ARN -r $AWS_REGION -n $AWS_FUNCTION_NAME -H $AWS_HANDLER -m $AWS_MEMORY_SIZE -t $AWS_TIMEOUT -u $AWS_RUNTIME; fi
+
+integrations:
+
+  notifications:
+    - integrationName: CINotification
+      type: slack
+      recipients:
+        - "#ci"
+      branches:
+        only:
+          - master
+          - develop
+      on_success: change
+      on_failure: always
+      on_start: never
