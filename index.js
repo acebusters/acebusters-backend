@@ -7,13 +7,16 @@ const Db = require('./lib/db');
 const Contract = require('./lib/blockchain');
 const TableManager = require('./lib/index');
 
-var dynamo = new doc.DynamoDB();
-var provider = new Provider('http://node.ambisafe.co');
+var provider, dynamo = new doc.DynamoDB();
 
 exports.handler = function(event, context, callback) {
 
   console.log('Request received:\n', JSON.stringify(event));
   console.log('Context received:\n', JSON.stringify(context));
+
+  if (!provider) {
+    provider = new Provider(event['stage-variables'].providerUrl);
+  }
   
   var handleRequest,
     manager = new TableManager(new Db(dynamo), new Contract(provider)),
@@ -22,6 +25,8 @@ exports.handler = function(event, context, callback) {
     handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
   } else if (path.indexOf('info') > -1) {
     handleRequest = manager.info(event.params.path.tableAddr);
+  } else if (path.indexOf('tables') > -1) {
+    handleRequest = manager.getTables(event['stage-variables']);
   } else if (path.indexOf('show') > -1) {
     handleRequest = manager.show(event.params.path.tableAddr, event.params.header.Authorization, event.cards);
   } else {

@@ -29,6 +29,8 @@ const ABI_CHECK_RIVER = [{name: 'checkRiver', type: 'function', inputs: [{type: 
 // SHOW can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
 const ABI_SHOW = [{name: 'show', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 
+const ABI_DIST = [{name: 'distribution', type: 'function', inputs: [{type: 'uint'},{type: 'uint'},{type: 'bytes32[]'}]}];
+
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P1_KEY = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
 
@@ -60,7 +62,7 @@ var provider = {
 }
 
 var contract = {
-  lineup: function(){},
+  getLineup: function(){},
   params: function(){}
 }
 
@@ -71,7 +73,7 @@ describe('Oracle pay', function() {
   });
 
   afterEach(function () {
-    if (contract.lineup.restore) contract.lineup.restore();
+    if (contract.getLineup.restore) contract.getLineup.restore();
     if (contract.params.restore) contract.params.restore();
     if (provider.getTable.restore) provider.getTable.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
@@ -95,10 +97,10 @@ describe('Oracle pay', function() {
 
   it('should prevent small blind from player not in lineup.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var lineup = ['0x1256', '0x1234'];
+    var lineup = [0, ['0x1256', '0x1234'], [50000, 50000], [0, 0]];
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
-    sinon.stub(contract, 'lineup').yields(null, lineup);
+    sinon.stub(contract, 'getLineup').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider));
@@ -113,7 +115,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
-    sinon.stub(contract, 'lineup').yields(null, [P1_ADDR]);
+    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider));
@@ -128,7 +130,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 80).sign(P1_KEY);
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
-    sinon.stub(contract, 'lineup').yields(null, [P1_ADDR, P2_ADDR]);
+    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider));
@@ -143,7 +145,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
-    sinon.stub(contract, 'lineup').yields(null, [P1_ADDR, P2_ADDR]);
+    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider));
@@ -156,10 +158,10 @@ describe('Oracle pay', function() {
 
   it('should allow to pay small blind for hand 0.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var lineup = [P1_ADDR, P2_ADDR];
+    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
-    sinon.stub(contract, 'lineup').yields(null, lineup);
+    sinon.stub(contract, 'getLineup').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {});//.onFirstCall().yields(null, {Item:[]});
     sinon.stub(dynamo, 'putItem').yields(null, {});
 
@@ -180,10 +182,10 @@ describe('Oracle pay', function() {
 
   it('should allow to pay small blind for next hand.', function(done) {
     var blind = new EWT(ABI_BET).bet(2, 50).sign(P1_KEY);
-    var lineup = [P1_ADDR, P2_ADDR];
+    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
 
     sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
-    sinon.stub(contract, 'lineup').yields(null, lineup);
+    sinon.stub(contract, 'getLineup').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
       lineup: [{address: P1_ADDR},{address: P2_ADDR}],
       distribution: 'dist',
@@ -242,25 +244,56 @@ describe('Oracle pay', function() {
   });
 
   it('should allow to pay big blind.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    var lineup = [{address: P1_ADDR, last: smallBlind}, {address: P2_ADDR}];
+    var smallBlind = new EWT(ABI_BET).bet(3, 50).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
+    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
+    var lastBet = new EWT(ABI_BET).bet(2, 10000).sign(P2_KEY);
+    var dist = new EWT(ABI_DIST).distribution(1, 0, [EWT.concat(P2_ADDR, 2000).toString('hex')]).sign(P1_KEY);
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
-      lineup: lineup,
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      lineup: [{address: P1_ADDR}, {address: P2_ADDR, last: lastBet}],
+      distribution: dist
+    }}).onFirstCall().yields(null, {Item:{
+      lineup: [{address: P1_ADDR, last: smallBlind}, {address: P2_ADDR}],
       deck: deck,
       handState: 'dealing',
       dealer: 0
     }});
+    sinon.stub(contract, 'getLineup').yields(null, lineup);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo));
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider));
 
     oracle.pay(tableAddr, bigBlind).then(function(rsp) {
       expect(rsp).to.eql({
         cards: [2, 3]
       });
       //expect(dynamo.updateItem).calledWith({});
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent betting more than balance.', function(done) {
+    var bet = new EWT(ABI_BET).bet(3, 10000).sign(P2_KEY);
+    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 25000], [0, 0]];
+    var lastBet = new EWT(ABI_BET).bet(2, 10000).sign(P2_KEY);
+    var dist = new EWT(ABI_DIST).distribution(1, 0, [EWT.concat(P1_ADDR, 20000).toString('hex')]).sign(P1_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      lineup: [{address: P1_ADDR}, {address: P2_ADDR, last: lastBet}],
+      distribution: dist
+    }}).onFirstCall().yields(null, {Item:{
+      lineup: [{address: P1_ADDR}, {address: P2_ADDR}],
+      handState: 'flop',
+      dealer: 0
+    }});
+    sinon.stub(contract, 'getLineup').yields(null, lineup);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider));
+
+    oracle.pay(tableAddr, bet).catch(function(err) {
+      expect(err).to.contain('can not bet more than balance');
       done();
     }).catch(done);
   });
@@ -403,7 +436,7 @@ describe('Oracle info', function() {
   });
 
   afterEach(function () {
-    if (contract.lineup.restore) contract.lineup.restore();
+    if (contract.getLineup.restore) contract.getLineup.restore();
     if (contract.params.restore) contract.params.restore();
     if (provider.getTable.restore) provider.getTable.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
@@ -613,8 +646,9 @@ describe('Oracle show', function() {
     oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
       var dist = EWT.parse(rsp);
       expect(dist.signer).to.eql(P4_ADDR);
-      expect(dist.values[3]).to.eql([2, 198]);
-      expect(dist.values[2]).to.eql([P4_ADDR, P1_ADDR]);
+      expect(dist.values[2]).to.eql([ 
+        '82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000000000000002',
+        'f3beac30c498d9e26865f34fcaa57dbb935b0d740000000000000000000000c6']);
       //expect(dynamo.updateItem).calledWith({});
       done();
     }).catch(done);
@@ -642,8 +676,10 @@ describe('Oracle show', function() {
     oracle.show(tableAddr, show, [0, 1]).then(function(rsp) {
       var dist = EWT.parse(rsp);
       expect(dist.signer).to.eql(P4_ADDR);
-      expect(dist.values[3]).to.eql([2, 99, 99]);
-      expect(dist.values[2]).to.eql([P4_ADDR, P1_ADDR, P2_ADDR]);
+      expect(dist.values[2]).to.eql([
+        '82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000000000000002',
+        'f3beac30c498d9e26865f34fcaa57dbb935b0d74000000000000000000000063',
+        'e10f3d125e5f4c753a6456fc37123cf17c6900f2000000000000000000000063']);
       //expect(dynamo.updateItem).calledWith({});
       done();
     }).catch(done);
