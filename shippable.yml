@@ -27,7 +27,7 @@ build:
 integrations:
 
   notifications:
-    - integrationName: CINotification
+    - integrationName: slack_chainfish
       type: slack
       recipients:
         - "#ci"
