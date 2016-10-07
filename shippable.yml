@@ -16,6 +16,7 @@ node_js:
 
 install:
   - npm install -g node-lambda
+  - yum install zip
 
 build:
   ci:
