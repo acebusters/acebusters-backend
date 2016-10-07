@@ -22,6 +22,7 @@ build:
     - echo $BUILD_URL
     - npm --version
     - npm install
+    - npm test
 
   on_success:
     - if [ "$BRANCH" == "master" ]; then echo "Publishing to Production"; node-lambda deploy -a $AWS_ACCESS_KEY_ID -s $AWS_SECRET_ACCESS_KEY -o $AWS_ROLE_ARN -r $AWS_REGION -n $AWS_FUNCTION_NAME -H $AWS_HANDLER -m $AWS_MEMORY_SIZE -t $AWS_TIMEOUT -u $AWS_RUNTIME; fi
