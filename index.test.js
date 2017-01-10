@@ -63,7 +63,7 @@ var provider = {
 
 var contract = {
   getLineup: function(){},
-  params: function(){}
+  smallBlind: function(){}
 }
 
 describe('Oracle pay', function() {
@@ -74,7 +74,7 @@ describe('Oracle pay', function() {
 
   afterEach(function () {
     if (contract.getLineup.restore) contract.getLineup.restore();
-    if (contract.params.restore) contract.params.restore();
+    if (contract.smallBlind.restore) contract.smallBlind.restore();
     if (provider.getTable.restore) provider.getTable.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
@@ -99,7 +99,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     var lineup = [0, ['0x1256', '0x1234'], [50000, 50000], [0, 0]];
 
-    sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
@@ -114,7 +114,7 @@ describe('Oracle pay', function() {
   it('should prevent game with less than 2 players.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
 
-    sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
@@ -129,7 +129,7 @@ describe('Oracle pay', function() {
   it('should prevent blind with wrong value.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 80).sign(P1_KEY);
 
-    sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
@@ -144,7 +144,7 @@ describe('Oracle pay', function() {
   it('should check turn for blind.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
 
-    sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
@@ -160,7 +160,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
 
-    sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {});//.onFirstCall().yields(null, {Item:[]});
     sinon.stub(dynamo, 'putItem').yields(null, {});
@@ -184,7 +184,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(2, 50).sign(P1_KEY);
     var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
 
-    sinon.stub(contract, 'params').yields(null, [new BigNumber(1000), new BigNumber(10000), new BigNumber(100), new BigNumber(10)]);
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
       lineup: [{address: P1_ADDR},{address: P2_ADDR}],
@@ -381,7 +381,7 @@ describe('Oracle pay', function() {
       {address: P2_ADDR, last: bigBlind},
       {address: P3_ADDR}
     ];
-
+    console.dir(lineup)
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
       handState: 'dealing',
@@ -437,7 +437,7 @@ describe('Oracle info', function() {
 
   afterEach(function () {
     if (contract.getLineup.restore) contract.getLineup.restore();
-    if (contract.params.restore) contract.params.restore();
+    if (contract.smallBlind.restore) contract.smallBlind.restore();
     if (provider.getTable.restore) provider.getTable.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
@@ -485,6 +485,7 @@ describe('Oracle info', function() {
     }]});
 
     new Oracle(new Db(dynamo)).info(tableAddr).then(function(rsp) {
+      console.dir(rsp)
       expect(rsp).to.eql({
         handId: 0,
         cards: [20, 21, 22],
