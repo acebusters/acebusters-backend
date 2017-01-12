@@ -381,7 +381,6 @@ describe('Oracle pay', function() {
       {address: P2_ADDR, last: bigBlind},
       {address: P3_ADDR}
     ];
-    console.dir(lineup)
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
       handState: 'dealing',
@@ -396,7 +395,65 @@ describe('Oracle pay', function() {
       expect(rsp).to.eql({
         cards: [4, 5]
       });
-      //expect(dynamo.updateItem).calledWith({});
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to deal with sitout', function(done) {
+    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    var sitoutReceipt = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
+    var lineup = [
+      {address: P1_ADDR, last: smallBlind},
+      {address: P2_ADDR},
+      {address: P3_ADDR, last: sitoutReceipt}
+    ];
+    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR, P3_ADDR], [50000, 50000, 50000], [0, 0]]);
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: lineup,
+      handState: 'dealing',
+      deck: deck,
+      dealer: 0
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider));
+
+    oracle.pay(tableAddr, bigBlind).then(function(rsp) {
+      expect(rsp).to.eql({
+        cards: [2, 3]
+      });
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to flop with sitout', function(done) {
+    var smallBlind = new EWT(ABI_BET).bet(1, 150).sign(P1_KEY);
+    var bigBlind = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
+    var sitoutReceipt = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
+    var lineup = [
+      {address: P1_ADDR, last: smallBlind},
+      {address: P2_ADDR, last: bigBlind},
+      {address: P3_ADDR, last: sitoutReceipt}
+    ];
+    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR, P3_ADDR], [50000, 50000, 50000], [0, 0]]);
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: lineup,
+      handState: 'preflop',
+      deck: deck,
+      dealer: 0
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider));
+
+    oracle.pay(tableAddr, new EWT(ABI_BET).bet(1, 200).sign(P1_KEY)).then(function(rsp) {
+      expect(rsp).to.eql({
+        cards: [0, 1]
+      });
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       done();
     }).catch(done);
   });
@@ -485,7 +542,6 @@ describe('Oracle info', function() {
     }]});
 
     new Oracle(new Db(dynamo)).info(tableAddr).then(function(rsp) {
-      console.dir(rsp)
       expect(rsp).to.eql({
         handId: 0,
         cards: [20, 21, 22],
