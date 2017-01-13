@@ -1,6 +1,6 @@
 {
   "name": "chain.oracle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -25,9 +25,9 @@
     "babel-runtime": "^6.11.6",
     "dynamodb-doc": "^1.0.0",
     "eth-lightwallet": "^2.5.1",
-    "ethereum-web-token": "^0.1.9",
     "ethereumjs-util": "^4.5.0",
     "pokersolver": "^2.1.2",
-    "web3-provider-engine": "^8.0.4"
+    "web3-provider-engine": "^8.0.4",
+    "poker-helper": "^0.1.1"
   }
 }

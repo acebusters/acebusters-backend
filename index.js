@@ -6,8 +6,11 @@ const Provider = require('./lib/provider');
 const Db = require('./lib/db');
 const Contract = require('./lib/blockchain');
 const TableManager = require('./lib/index');
+var ReceiptCache = require('poker-helper').ReceiptCache;
 
 var provider, dynamo = new doc.DynamoDB();
+
+var rc = new ReceiptCache();
 
 exports.handler = function(event, context, callback) {
 
@@ -19,7 +22,7 @@ exports.handler = function(event, context, callback) {
   }
   
   var handleRequest,
-    manager = new TableManager(new Db(dynamo), new Contract(provider)),
+    manager = new TableManager(new Db(dynamo), new Contract(provider), rc),
     path = event.context['resource-path'];
   if (path.indexOf('pay') > -1) {
     handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
