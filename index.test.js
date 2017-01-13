@@ -738,7 +738,11 @@ describe('Oracle show', function() {
       expect(dist.values[2]).to.eql([ 
         '82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000000000000002',
         'f3beac30c498d9e26865f34fcaa57dbb935b0d740000000000000000000000c6']);
-      //expect(dynamo.updateItem).calledWith({});
+      var trueIsh = sinon.match(function (value) {
+        var p = value.ExpressionAttributeValues[':l'][0];
+        return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show);
+      }, "trueIsh");
+      expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
       done();
     }).catch(done);
   });
@@ -773,7 +777,5 @@ describe('Oracle show', function() {
       done();
     }).catch(done);
   });
-
-  it('make showen cards available in lineup.')
 
 });
