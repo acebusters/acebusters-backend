@@ -14,8 +14,10 @@ var rc = new ReceiptCache();
 
 exports.handler = function(event, context, callback) {
 
-  console.log('Request received:\n', JSON.stringify(event));
-  console.log('Context received:\n', JSON.stringify(context));
+  if (event.context['http-method'] != 'GET') {
+    console.log('Request received:\n', JSON.stringify(event));
+    console.log('Context received:\n', JSON.stringify(context));
+  }
 
   if (!provider) {
     provider = new Provider(event['stage-variables'].providerUrl);
