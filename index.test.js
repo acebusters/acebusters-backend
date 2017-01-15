@@ -117,7 +117,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
-    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR], [50000, 50000], [0, 0]]);
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
@@ -132,7 +132,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 80).sign(P1_KEY);
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
-    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]]);
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
@@ -147,7 +147,7 @@ describe('Oracle pay', function() {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
-    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]]);
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
@@ -160,7 +160,7 @@ describe('Oracle pay', function() {
 
   it('should allow to pay small blind for hand 0.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
+    var lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, lineup);
@@ -184,7 +184,7 @@ describe('Oracle pay', function() {
 
   it('should allow to pay small blind for next hand.', function(done) {
     var blind = new EWT(ABI_BET).bet(2, 50).sign(P1_KEY);
-    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
+    var lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, lineup);
@@ -248,7 +248,7 @@ describe('Oracle pay', function() {
   it('should allow to pay big blind.', function(done) {
     var smallBlind = new EWT(ABI_BET).bet(3, 50).sign(P1_KEY);
     var bigBlind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
-    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 50000], [0, 0]];
+    var lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
     var lastBet = new EWT(ABI_BET).bet(2, 10000).sign(P2_KEY);
     var dist = new EWT(ABI_DIST).distribution(1, 0, [EWT.concat(P2_ADDR, 2000).toString('hex')]).sign(P1_KEY);
 
@@ -277,7 +277,7 @@ describe('Oracle pay', function() {
 
   it('should prevent betting more than balance.', function(done) {
     var bet = new EWT(ABI_BET).bet(3, 10000).sign(P2_KEY);
-    var lineup = [0, [P1_ADDR, P2_ADDR], [50000, 25000], [0, 0]];
+    var lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(25000)], [0, 0]];
     var lastBet = new EWT(ABI_BET).bet(2, 10000).sign(P2_KEY);
     var dist = new EWT(ABI_DIST).distribution(1, 0, [EWT.concat(P1_ADDR, 20000).toString('hex')]).sign(P1_KEY);
 
@@ -411,7 +411,7 @@ describe('Oracle pay', function() {
       {address: P2_ADDR},
       {address: P3_ADDR, last: sitoutReceipt}
     ];
-    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR, P3_ADDR], [50000, 50000, 50000], [0, 0]]);
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
       handState: 'dealing',
@@ -441,7 +441,7 @@ describe('Oracle pay', function() {
       {address: P3_ADDR, last: bet3}
     ];
     var check2 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P2_KEY);
-    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR, P3_ADDR], [50000, 50000, 50000], [0, 0]]);
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
       handState: 'flop',
@@ -470,7 +470,7 @@ describe('Oracle pay', function() {
       {address: P2_ADDR, last: bigBlind},
       {address: P3_ADDR, last: sitoutReceipt}
     ];
-    sinon.stub(contract, 'getLineup').yields(null, [0, [P1_ADDR, P2_ADDR, P3_ADDR], [50000, 50000, 50000], [0, 0]]);
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       lineup: lineup,
       handState: 'preflop',
