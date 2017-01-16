@@ -483,6 +483,36 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should allow to check multiple rounds', function(done) {
+    var check1 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P1_KEY);
+    var check2 = new EWT(ABI_CHECK_TURN).checkTurn(1, 150).sign(P2_KEY);
+    var check3 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P3_KEY);
+    var lineup = [
+      {address: P1_ADDR, last: check1},
+      {address: P2_ADDR, last: check2},
+      {address: P3_ADDR, last: check3}
+    ];
+    var check3a = new EWT(ABI_CHECK_TURN).checkTurn(1, 150).sign(P3_KEY);
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: lineup,
+      handState: 'turn',
+      deck: deck,
+      dealer: 0
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), null, rc);
+
+    oracle.pay(tableAddr, check3a).then(function(rsp) {
+      expect(rsp).to.eql({
+        cards: [4, 5]
+      });
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'turn')));
+      done();
+    }).catch(done);
+  });
+
   it('should allow to flop with sitout', function(done) {
     var smallBlind = new EWT(ABI_BET).bet(1, 150).sign(P1_KEY);
     var bigBlind = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
