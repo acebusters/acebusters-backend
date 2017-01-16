@@ -316,6 +316,28 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should allow to fold.', function(done) {
+    var bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    var bet2 = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
+    var lineup = [{ address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}];
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: lineup
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P2_KEY);
+
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.pay(tableAddr, fold).then(function(rsp) {
+      expect(rsp).to.eql({});
+      lineup[1].last = fold;
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', lineup)));
+      done();
+    }).catch(done);
+  });
+
   it('should prevent bet after fold.', function(done) {
     var fold = new EWT(ABI_FOLD).fold(1, 100).sign(P2_KEY);
     var bet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
