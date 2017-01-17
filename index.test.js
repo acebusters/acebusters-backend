@@ -198,6 +198,33 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('increase dealer after wrap around');
+
+  it('should wait for all 0 receipts', function(done) {
+    var bet2 = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
+    var bet3 = new EWT(ABI_BET).bet(1, 100).sign(P3_KEY);
+    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: bet2}, {address: P3_ADDR, last: bet3}, {address: P4_ADDR}];
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      dealer: 0,
+      handState: 'dealing',
+      lineup: lineup,
+      deck: deck
+    }});
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var bet4 = new EWT(ABI_BET).bet(1, 0).sign(P4_KEY);
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
+
+    oracle.pay(tableAddr, bet4).then(function(rsp) {
+      expect(rsp.cards.length).to.eql(2);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
+      done();
+    }).catch(done);
+  });
+
   it('should check position for small blind with 3+ players in flop.');
   // , function(done) {
   //   var bet1 = new EWT(ABI_BET).bet(1, 150).sign(P1_KEY);
