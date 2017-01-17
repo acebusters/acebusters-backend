@@ -99,7 +99,7 @@ describe('Oracle pay', function() {
 
   it('should prevent small blind from player not in lineup.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var lineup = [0, ['0x1256', '0x1234'], [50000, 50000], [0, 0]];
+    var lineup = [0, [P2_KEY, P3_KEY], [50000, 50000], [0, 0]];
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, lineup);
@@ -143,8 +143,8 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should check turn for blind.', function(done) {
-    var blind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
+  it('should check position for small blind with 2 players.', function(done) {
+    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
     sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
@@ -152,11 +152,56 @@ describe('Oracle pay', function() {
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
 
-    oracle.pay(tableAddr, blind).catch(function(err) {
+    oracle.pay(tableAddr, smallBlind).catch(function(err) {
       expect(err).to.contain('not your turn');
       done();
     }).catch(done);
   });
+
+  it('should check position for small blind with 3+ players in dealing.', function(done) {
+    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
+
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
+    sinon.stub(dynamo, 'getItem').yields(null, {});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
+
+    oracle.pay(tableAddr, smallBlind).then(function(rsp) {
+      expect(rsp.cards.length).to.eql(2);
+      done();
+    }).catch(done);
+  });
+
+  it('should check position for small blind with 3+ players in flop.');
+  // , function(done) {
+  //   var bet1 = new EWT(ABI_BET).bet(1, 150).sign(P1_KEY);
+  //   var bet2 = new EWT(ABI_BET).bet(1, 150).sign(P2_KEY);
+  //   var bet3 = new EWT(ABI_BET).bet(1, 150).sign(P3_KEY);
+  //   var lineup = [{ address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}, {address: P3_ADDR, last: bet3}];
+
+  //   sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
+  //   sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
+  //   sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+  //     lineup: lineup,
+  //     deck: deck,
+  //     handState: 'flop',
+  //     dealer: 0
+  //   }});
+  //   sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+  //   var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
+
+  //   //var check2 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P1_KEY);
+  //   var bet2a = new EWT(ABI_BET).bet(1, 250).sign(P1_KEY);
+
+  //   oracle.pay(tableAddr, bet2a).then(function(rsp) {
+  //     console.dir(rsp);
+  //     expect(rsp.cards.length).to.eql(2);
+  //     done();
+  //   }).catch(done);
+  // });
 
   it('should allow to pay small blind for hand 0.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
