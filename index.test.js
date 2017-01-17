@@ -300,6 +300,28 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should prevent betting more than balance in same hand.', function(done) {
+    var bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    var bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      lineup: [{address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}],
+      handState: 'flop',
+      dealer: 0
+    }});
+    var lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(500), new BigNumber(150)], [0, 0]];
+    sinon.stub(contract, 'getLineup').yields(null, lineup);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
+
+    var tooMuchBet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
+    oracle.pay(tableAddr, tooMuchBet).catch(function(err) {
+      expect(err).to.contain('can not bet more than balance');
+      done();
+    }).catch(done);
+  });
+
   it('should prevent reusing receipts.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: blind}];
@@ -322,18 +344,45 @@ describe('Oracle pay', function() {
     var lineup = [{ address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}];
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      dealer: 0,
       lineup: lineup
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P2_KEY);
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
 
     oracle.pay(tableAddr, fold).then(function(rsp) {
       expect(rsp).to.eql({});
       lineup[1].last = fold;
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', lineup)));
+      done();
+    }).catch(done);
+  });
+
+  it('should switch to flop after fold when remaining pl. are even', function(done) {
+    var bet1 = new EWT(ABI_BET).bet(1, 150).sign(P1_KEY);
+    var bet2 = new EWT(ABI_BET).bet(1, 150).sign(P2_KEY);
+    var bet3 = new EWT(ABI_BET).bet(1, 100).sign(P3_KEY);
+    var fold4 = new EWT(ABI_FOLD).fold(1, 0).sign(P4_KEY);
+    var lineup = [{ address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}, {address: P3_ADDR, last: bet3}, {address: P4_ADDR, last: fold4}];
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      dealer: 3,
+      handState: 'preflop',
+      lineup: lineup
+    }});
+    sinon.stub(contract, 'getLineup').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var fold3 = new EWT(ABI_FOLD).fold(1, 100).sign(P3_KEY);
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
+
+    oracle.pay(tableAddr, fold3).then(function(rsp) {
+      expect(rsp).to.eql({});
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       done();
     }).catch(done);
   });
