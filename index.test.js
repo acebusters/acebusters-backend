@@ -198,8 +198,6 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('increase dealer after wrap around');
-
   it('should wait for all 0 receipts', function(done) {
     var bet2 = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
     var bet3 = new EWT(ABI_BET).bet(1, 100).sign(P3_KEY);
@@ -254,8 +252,7 @@ describe('Oracle pay', function() {
   //   }).catch(done);
   // });
 
-  it('should allow to pay small blind for hand 0.', function(done) {
-    var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
+  it('should allow to pay small blind for hand 0.', function(done) {    
     var lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
 
     sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
@@ -264,6 +261,8 @@ describe('Oracle pay', function() {
     sinon.stub(dynamo, 'putItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
+
+    var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
 
     oracle.pay(tableAddr, blind).then(function(rsp) {
       expect(dynamo.putItem).calledWith({Item: {
@@ -306,6 +305,36 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+
+  it('should increase dealer for new hand.', function(done) {
+    var lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
+
+    sinon.stub(contract, 'smallBlind').yields(null, new BigNumber(50));
+    sinon.stub(contract, 'getLineup').yields(null, lineup);
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      lineup: [{address: P1_ADDR},{address: P2_ADDR}],
+      distribution: 'dist',
+      dealer: 0
+    }}).onFirstCall().yields(null, {});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
+
+    var blind = new EWT(ABI_BET).bet(2, 50).sign(P2_KEY);
+
+    oracle.pay(tableAddr, blind).then(function(rsp) {
+      expect(dynamo.putItem).calledWith({Item: {
+        deck: sinon.match.any,
+        handState: 'dealing',
+        handId: 2,
+        dealer: 1,
+        lineup: [{address: P1_ADDR},{address: P2_ADDR, last: blind}],
+        tableAddr: tableAddr
+      }, TableName: 'poker'});
+      done();
+    }).catch(done);
+  });
+
   it('should prevent big blind from not in lineup.', function(done) {
     var blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     var lineup = [{address: '0x1256'}, {address: '0x1234'}];
@@ -337,7 +366,6 @@ describe('Oracle pay', function() {
     var bigBlind = new EWT(ABI_BET).bet(1, 80).sign(P2_KEY);
 
     oracle.pay(tableAddr, bigBlind).catch(function(err) {
-      console.dir(err);
       expect(err).to.contain('not valid');
       done();
     }).catch(done);
