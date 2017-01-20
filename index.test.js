@@ -387,7 +387,6 @@ describe('Oracle pay', function() {
       dealer: 0
     }});
     sinon.stub(contract, 'getLineup').yields(null, lineup);
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
 
@@ -408,7 +407,6 @@ describe('Oracle pay', function() {
     }});
     var lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(500), new BigNumber(150)], [0, 0]];
     sinon.stub(contract, 'getLineup').yields(null, lineup);
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
 
@@ -492,7 +490,9 @@ describe('Oracle pay', function() {
       lineup: [{ address: P1_ADDR}, {address: P2_ADDR, last: fold}]
     }});
 
-    new Oracle(new Db(dynamo), null, rc).pay(tableAddr, bet).catch(function(err) {
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.pay(tableAddr, bet).catch(function(err) {
       expect(err).to.contain('no bet after fold.');
       done();
     }).catch(done);
@@ -588,7 +588,7 @@ describe('Oracle pay', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new Contract(provider), null, rc);
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
 
     oracle.pay(tableAddr, bigBlind).then(function(rsp) {
       expect(rsp).to.eql({
@@ -618,7 +618,7 @@ describe('Oracle pay', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new Contract(provider), null, rc);
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
 
     oracle.pay(tableAddr, check2).then(function(rsp) {
       expect(rsp).to.eql({
@@ -648,7 +648,7 @@ describe('Oracle pay', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new Contract(provider), null, rc);
+    var oracle = new Oracle(new Db(dynamo), new Contract(provider), rc);
 
     oracle.pay(tableAddr, check3a).then(function(rsp) {
       expect(rsp).to.eql({
