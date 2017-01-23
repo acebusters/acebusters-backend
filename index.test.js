@@ -920,7 +920,7 @@ describe('Oracle get Hand', function() {
 
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
-    oracle.hand(tableAddr, 1).then(function(rsp) {
+    oracle.hand(tableAddr, "1").then(function(rsp) {
       expect(rsp.distribution).to.eql('dist');
       done();
     }).catch(done);
