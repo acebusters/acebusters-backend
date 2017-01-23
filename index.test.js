@@ -894,6 +894,39 @@ describe('Oracle info', function() {
 
 });
 
+describe('Oracle get Hand', function() {
+
+  beforeEach(function () {
+    sinon.stub(provider, 'getTable').returns(contract);
+  });
+
+  afterEach(function () {
+    if (contract.getLineup.restore) contract.getLineup.restore();
+    if (contract.smallBlind.restore) contract.smallBlind.restore();
+    if (provider.getTable.restore) provider.getTable.restore();
+    if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.putItem.restore) dynamo.putItem.restore();
+    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+    if (dynamo.query.restore) dynamo.query.restore();
+  });
+
+  it('should allow to get hand.', function(done) {
+  
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      handState: 'river',
+      lineup: [],
+      distribution: 'dist'
+    }});
+
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.hand(tableAddr, 1).then(function(rsp) {
+      expect(rsp.distribution).to.eql('dist');
+      done();
+    }).catch(done);
+  });
+});
+
 
 describe('Oracle show', function() {
 

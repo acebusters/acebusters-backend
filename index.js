@@ -30,6 +30,8 @@ exports.handler = function(event, context, callback) {
     handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
   } else if (path.indexOf('info') > -1) {
     handleRequest = manager.info(event.params.path.tableAddr);
+  } else if (path.indexOf('hand') > -1) {
+    handleRequest = manager.hand(event.params.path.tableAddr, event.params.path.handId);
   } else if (path.indexOf('config') > -1) {
     handleRequest = manager.getConfig(event['stage-variables']);
   } else if (path.indexOf('show') > -1) {
