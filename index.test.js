@@ -451,7 +451,7 @@ describe('Oracle pay', function() {
     oracle.pay(tableAddr, fold).then(function(rsp) {
       expect(rsp).to.eql({});
       lineup[1].last = fold;
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', lineup)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', lineup[1])));
       done();
     }).catch(done);
   });
