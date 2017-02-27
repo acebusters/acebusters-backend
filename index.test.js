@@ -30,6 +30,8 @@ const ABI_CHECK_RIVER = [{name: 'checkRiver', type: 'function', inputs: [{type: 
 // SHOW can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
 const ABI_SHOW = [{name: 'show', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 
+const ABI_LEAVE = [{name: 'leave', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
+
 const ABI_DIST = [{name: 'distribution', type: 'function', inputs: [{type: 'uint'},{type: 'uint'},{type: 'bytes32[]'}]}];
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
@@ -47,7 +49,7 @@ const P3_KEY = '0x71d2b12dad610fc929e0596b6e887dfb711eec286b7b8b0bdd742c0421a9c4
 const P4_ADDR = '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f';
 const P4_KEY = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
 
-const tableAddr = '0x123';
+const tableAddr = '0x00112233445566778899aabbccddeeff00112233';
 
 const deck = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
 
@@ -785,11 +787,6 @@ describe('Oracle pay', function() {
 
 describe('Oracle info', function() {
 
-  beforeEach(function () {
-    sinon.stub(web3.eth, 'contract').returns(web3);
-    sinon.stub(web3, 'at').returns(contract);
-  });
-
   it('should allow to get uninitialized info.', function(done) {
     sinon.stub(dynamo, 'query').yields(null, { Items: []});
 
@@ -933,24 +930,12 @@ describe('Oracle info', function() {
   });
 
   afterEach(function () {
-    if (contract.getLineup.call.restore) contract.getLineup.call.restore();
-    if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
-    if (web3.eth.contract.restore) web3.eth.contract.restore();
-    if (web3.at.restore) web3.at.restore();
-    if (dynamo.getItem.restore) dynamo.getItem.restore();
-    if (dynamo.putItem.restore) dynamo.putItem.restore();
-    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
   });
 
 });
 
 describe('Oracle get Hand', function() {
-
-  beforeEach(function () {
-    sinon.stub(web3.eth, 'contract').returns(web3);
-    sinon.stub(web3, 'at').returns(contract);
-  });
 
   it('should allow to get hand.', function(done) {
   
@@ -969,25 +954,13 @@ describe('Oracle get Hand', function() {
   });
 
   afterEach(function () {
-    if (contract.getLineup.call.restore) contract.getLineup.call.restore();
-    if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
-    if (web3.eth.contract.restore) web3.eth.contract.restore();
-    if (web3.at.restore) web3.at.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
-    if (dynamo.putItem.restore) dynamo.putItem.restore();
-    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
-    if (dynamo.query.restore) dynamo.query.restore();
   });
 
 });
 
 
 describe('Oracle show', function() {
-
-  afterEach(function () {
-    if (dynamo.getItem.restore) dynamo.getItem.restore();
-    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
-  });
 
   it('should prevent show before showdown', function(done) {
     var show1 = new EWT(ABI_SHOW).show(0, 100).sign(P1_KEY);
@@ -1091,6 +1064,59 @@ describe('Oracle show', function() {
       //expect(dynamo.updateItem).calledWith({});
       done();
     }).catch(done);
+  });
+
+  afterEach(function () {
+    if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+  });
+
+});
+
+describe('Oracle leave', function() {
+
+  it('should prevent leaving in active hand.', function(done) {
+    var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
+    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
+
+    sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
+      handId: 2,
+      lineup: lineup
+    }]});
+
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.leave(tableAddr, leave).catch(function(err) {
+      expect(err).to.contain('already started');
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to leave.', function(done) {
+    var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
+    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
+
+    sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
+      handId: 1,
+      lineup: lineup
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.leave(tableAddr, leave).then(function(rsp) {
+      var leaveReceipt = '0x00000000000000000000000200112233445566778899aabbccddeeff00112233f3beac30c498d9e26865f34fcaa57dbb935b0d7479762e0f6f962622a8fef43d6ab407d4ca374e4f2c4debd0c6c7d571bfb3b8c615ea51e844d7d322cbde65eb6a123155cae5fee0d210610ab65fee1b50fa75df1c';
+      expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
+      lineup[0].lastHand = 2;
+      lineup[0].leaveReceipt = leaveReceipt;
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', lineup[0])));
+      done();
+    }).catch(done);
+  });
+
+  afterEach(function () {
+    if (dynamo.query.restore) dynamo.query.restore();
+    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
   });
 
 });

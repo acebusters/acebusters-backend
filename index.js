@@ -36,6 +36,8 @@ exports.handler = function(event, context, callback) {
     handleRequest = manager.getConfig(event['stage-variables']);
   } else if (path.indexOf('show') > -1) {
     handleRequest = manager.show(event.params.path.tableAddr, event.params.header.Authorization, event.cards);
+  } else if (path.indexOf('leave') > -1) {
+    handleRequest = manager.leave(event.params.path.tableAddr, event.params.header.Authorization);
   } else {
     handleRequest = Promise.reject('Error: unexpected path: ' + path);
   }
