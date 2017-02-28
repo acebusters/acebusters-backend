@@ -28,6 +28,9 @@ var contract = {
   leave: {
     sendTransaction: function(){}, 
   },
+  settle: {
+    sendTransaction: function(){}, 
+  },
   getLineup: {
     call: function(){}
   },
@@ -157,11 +160,62 @@ describe('Stream worker', function() {
     }).catch(done);
   });
 
+  it('should submit when netting complete.', (done) => {
+    const event = {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: {
+          tableAddr: {
+            S: "0xa2decf075b96c8e5858279b31f644501a140e8a7"
+          }
+        },
+        OldImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR } } },
+            { M: { address: { S: P2_ADDR } } }
+          ]},
+          netting: { M: {
+            newBalances: { S: '0x112233' },
+            [ORACLE_ADDR]:  { S: '0x223344' },
+            [P1_ADDR]: { S: '0x334455' },
+          }}
+        },
+        NewImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR } } },
+            { M: { address: { S: P2_ADDR } } }
+          ]},
+          netting: { M: {
+            newBalances: { S: '0x112233' },
+            [ORACLE_ADDR]:  { S: '0x223344' },
+            [P1_ADDR]: { S: '0x334455' },
+            [P2_ADDR]: { S: '0x445566' },
+          }}
+        }
+      }
+    };
+    sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(provider, 'getAddress').returns('0x7777');
+
+    const worker = new StreamWorker(new TableContract(provider));
+    worker.process(event).then(function(rsp) {
+      expect(rsp).to.eql('0x123456');
+      expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', {from: '0x7777', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
   afterEach(function () {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
+    if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (provider.getTable.restore) provider.getTable.restore();
+    if (provider.getAddress.restore) provider.getAddress.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
   });
