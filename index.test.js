@@ -1120,3 +1120,33 @@ describe('Oracle leave', function() {
   });
 
 });
+
+describe('Oracle netting', function() {
+
+  it('should allow to deliver netting.', function(done) {
+    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}, {address: P4_ADDR}];
+
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      lineup: lineup,
+      netting: {
+        newBalances: '0x000000025b96c8e5858279b31f644501a140e8a7000000000000000082e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000e86cf3beac30c498d9e26865f34fcaa57dbb935b0d740000000000009e34e10f3d125e5f4c753a6456fc37123cf17c6900f2'
+      }
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    const nettingSig = '0x306f6bc2348440582ca694d4998b082d3b77ad25b62fcf2f22e526a14e50ecf45bdb61d92d77bce6b5c7bce2800ddda525af1622af6b3d6f918993431fff18551c';
+
+    oracle.netting(tableAddr, 2, nettingSig).then(function(rsp) {
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', nettingSig )));
+      done();
+    }).catch(done);
+  });
+
+  afterEach(function () {
+    if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+  });
+
+});
