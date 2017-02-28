@@ -1,5 +1,6 @@
 const AWS = require('aws-sdk');
 const doc = require('dynamodb-doc');
+const Web3 = require('web3');
 
 const Db = require('./lib/db');
 const StreamWorker = require('./lib/index');
@@ -30,6 +31,7 @@ exports.handler = function(event, context, callback) {
       requests.push(worker.process(event.Records[i]));
     }
     Promise.all(requests).then(function(data) {
+      console.log(JSON.stringify(data));
       callback(null, data);
     }).catch(function(err) {
       console.log(JSON.stringify(err));
