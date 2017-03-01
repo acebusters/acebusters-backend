@@ -1,5 +1,5 @@
 {
-  "name": "ab-event-scanner",
+  "name": "ab-contract-scanner",
   "version": "0.1.0",
   "description": "scanning contract events and sending notifications.",
   "main": "index.js",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@bitbucket.org:johba/ab-event-scanner.git"
+    "url": "git+ssh://git@bitbucket.org:johba/ab-contract-scanner.git"
   },
   "author": "acebusters",
   "license": "MIT",
