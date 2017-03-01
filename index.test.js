@@ -5,7 +5,8 @@ const EWT = require('ethereum-web-token');
 const BigNumber = require('bignumber.js');
 
 const EventWorker = require('./lib/index');
-const TableContract = require('./lib/tableContract');
+const Table = require('./lib/tableContract');
+const Factory = require('./lib/factoryContract');
 const Db = require('./lib/db');
 
 const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
@@ -30,31 +31,33 @@ var contract = {
   settle: {
     sendTransaction: function(){}, 
   },
+  create: {
+    sendTransaction: function(){}, 
+  },
   getLineup: {
     call: function(){}
   },
   smallBlind: {
     call: function(){}
   }
-}
+};
 
-var provider = {
-  getTable: function(){},
-  getAddress: function(){},
-}
+var web3 = { eth: {
+  contract: function(){},
+  at: function(){}
+}};
 
 var dynamo = {
   getItem: function(){},
   updateItem: function(){}
 };
 
+sinon.stub(web3.eth, 'contract').returns(web3.eth);
+sinon.stub(web3.eth, 'at').returns(contract);
+
 describe('Stream worker', function() {
 
-  beforeEach(function () {
-    sinon.stub(provider, 'getTable').returns(contract);
-  });
-
-  it('should send tx on new leave receipt.', (done) => {
+  it('should handle TableLeave event.', (done) => {
     const event = {
       Subject: 'TableLeave::0x1234',
       Message: JSON.stringify({
@@ -63,18 +66,18 @@ describe('Stream worker', function() {
       })
     };
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x123456');
-    sinon.stub(provider, 'getAddress').returns('0x7777');
 
-    const worker = new EventWorker(new TableContract(provider));
+    const worker = new EventWorker(new Table(web3, '0x1255'));
     worker.process(event).then(function(tx) {
       expect(tx).to.eql('0x123456');
-      expect(contract.leave.sendTransaction).calledWith('0x99', {from: '0x7777', gas: sinon.match.any}, sinon.match.any);
+      expect(contract.leave.sendTransaction).calledWith('0x99', {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
 
   });
 
-  it('should create netting when hand with leaving player turns complete.', (done) => {
+  // create netting when hand with leaving player turns complete.
+  it('should handle TableNettingRequest event.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
     const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
     const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
@@ -113,7 +116,7 @@ describe('Stream worker', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const worker = new EventWorker(new TableContract(provider), new Db(dynamo), ORACLE_PRIV);
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV);
     worker.process(event).then(function(rsp) {
       const netting = {
         '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x306f6bc2348440582ca694d4998b082d3b77ad25b62fcf2f22e526a14e50ecf45bdb61d92d77bce6b5c7bce2800ddda525af1622af6b3d6f918993431fff18551c',
@@ -124,7 +127,8 @@ describe('Stream worker', function() {
     }).catch(done);
   });
 
-  it('should submit when netting complete.', (done) => {
+  // submit netting when netting complete.
+  it('should handle TableNettingComplete event.', (done) => {
     const event = {
       Subject: 'TableNettingComplete::0x1234',
       Message: JSON.stringify({
@@ -139,12 +143,29 @@ describe('Stream worker', function() {
       })
     };
     sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
-    sinon.stub(provider, 'getAddress').returns('0x7777');
 
-    const worker = new EventWorker(new TableContract(provider));
+    const worker = new EventWorker(new Table(web3, '0x1255'));
     worker.process(event).then(function(rsp) {
       expect(rsp).to.eql('0x123456');
-      expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', {from: '0x7777', gas: sinon.match.any}, sinon.match.any);
+      expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
+  it('should handle EmailConfirmed event.', (done) => {
+    const event = {
+      Subject: 'EmailConfirmed::0x1234',
+      Message: JSON.stringify({
+        signerAddr: '0x551100003300',
+        accountId: 'someuuid'
+      })
+    };
+    sinon.stub(contract.create, 'sendTransaction').yields(null, '0x123456');
+
+    const worker = new EventWorker(null, new Factory(web3, '0x1255', '0x1234'));
+    worker.process(event).then(function(rsp) {
+      expect(rsp).to.eql('0x123456');
+      expect(contract.create.sendTransaction).calledWith('0x551100003300', '0x1255', 259200, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
   });
@@ -152,10 +173,9 @@ describe('Stream worker', function() {
   afterEach(function () {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
     if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
+    if (contract.create.sendTransaction.restore) contract.create.sendTransaction.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
-    if (provider.getTable.restore) provider.getTable.restore();
-    if (provider.getAddress.restore) provider.getAddress.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
   });
