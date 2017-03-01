@@ -161,7 +161,7 @@ describe('Contract Event Scanner', function() {
       });
       expect(sns.publish).calledWith({
         Message: JSON.stringify(event1),
-        Subject: 'ContractEvent::' + event1.address + '::' + event1.transactionHash,
+        Subject: 'ContractEvent::' + event1.address,
         TopicArn: set.topicArn
       });
       expect(sdb.putAttributes).calledWith({
@@ -197,12 +197,12 @@ describe('Contract Event Scanner', function() {
       });
       expect(sns.publish).calledWith({
         Message: JSON.stringify(event1),
-        Subject: 'ContractEvent::' + event1.address + '::' + event1.transactionHash,
+        Subject: 'ContractEvent::' + event1.address,
         TopicArn: set.topicArn
       });
       expect(sns.publish).calledWith({
         Message: JSON.stringify(event2),
-        Subject: 'ContractEvent::' + event2.address + '::' + event2.transactionHash,
+        Subject: 'ContractEvent::' + event2.address,
         TopicArn: set.topicArn
       });
       expect(sdb.putAttributes).calledWith({
@@ -242,17 +242,17 @@ describe('Contract Event Scanner', function() {
       });
       expect(sns.publish).calledWith({
         Message: JSON.stringify(event1),
-        Subject: 'ContractEvent::' + event1.address + '::' + event1.transactionHash,
+        Subject: 'ContractEvent::' + event1.address,
         TopicArn: set.topicArn
       });
       expect(sns.publish).calledWith({
         Message: JSON.stringify(event2),
-        Subject: 'ContractEvent::' + event2.address + '::' + event2.transactionHash,
+        Subject: 'ContractEvent::' + event2.address,
         TopicArn: set.topicArn
       });
       expect(sns.publish).calledWith({
         Message: JSON.stringify(event3),
-        Subject: 'ContractEvent::' + event3.address + '::' + event3.transactionHash,
+        Subject: 'ContractEvent::' + event3.address,
         TopicArn: set.topicArn
       });
       expect(sdb.putAttributes).calledWith({
