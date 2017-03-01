@@ -18,8 +18,8 @@ exports.handler = function(event, context, callback) {
       web3Provider = new web3.providers.HttpProvider(process.env.PROVIDER_URL);
     }
     web3 = new Web3(web3Provider);
-    const table = new Table(web3, process.env.ACCOUNT_ADDR);
-    const factory = new Factory(web3, process.env.ACCOUNT_ADDR, process.env.SENDER_ADDR);
+    const table = new Table(web3, process.env.SENDER_ADDR);
+    const factory = new Factory(web3, process.env.SENDER_ADDR, process.env.FACTORY_ADDR);
 
     if (!dynamo) {
       dynamo = new doc.DynamoDB();
