@@ -1,4 +1,4 @@
-## stream worker
+## stream scanner
 
 checks dynamo stream and takes actions
 

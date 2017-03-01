@@ -1,13 +1,9 @@
 const expect = require('chai').expect;
 const sinon = require('sinon');
 require('chai').use(require('sinon-chai'));
-const ethUtil = require('ethereumjs-util');
 const EWT = require('ethereum-web-token');
-const BigNumber = require('bignumber.js');
 
 const StreamWorker = require('./lib/index');
-const TableContract = require('./lib/tableContract');
-const Db = require('./lib/db');
 
 const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 const ABI_FOLD = [{name: 'fold', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
@@ -24,36 +20,13 @@ const P2_PRIV = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717b
 const ORACLE_ADDR = '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f';
 const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
 
-var contract = {
-  leave: {
-    sendTransaction: function(){}, 
-  },
-  settle: {
-    sendTransaction: function(){}, 
-  },
-  getLineup: {
-    call: function(){}
-  },
-  smallBlind: {
-    call: function(){}
-  }
-}
+const topicArn = 'arn:aws:sns:eu-west-1:123:ab-events';
 
-var provider = {
-  getTable: function(){},
-  getAddress: function(){},
-}
-
-var dynamo = {
-  getItem: function(){},
-  updateItem: function(){}
+const sns = {
+  publish: function(){}
 };
 
 describe('Stream worker', function() {
-
-  beforeEach(function () {
-    sinon.stub(provider, 'getTable').returns(contract);
-  });
 
   it('should send tx on new leave receipt.', (done) => {
 
@@ -61,7 +34,7 @@ describe('Stream worker', function() {
       eventName: "MODIFY",
       dynamodb: {
         Keys: {
-          tableAddr: { S: "0xa2decf075b96c8e5858279b31f644501a140e8a7" }
+          tableAddr: { S: "0x77aabb11ee" }
         },
         NewImage: {
           lineup: { L: [
@@ -87,14 +60,21 @@ describe('Stream worker', function() {
         }
       }
     };
-    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x123456');
-    sinon.stub(provider, 'getAddress').returns('0x7777');
 
-    const worker = new StreamWorker(new TableContract(provider));
+    sinon.stub(sns, 'publish').yields(null, {});
+
+    const worker = new StreamWorker(sns, topicArn);
 
     worker.process(event).then(function(tx) {
-      expect(tx).to.eql('0x123456');
-      expect(contract.leave.sendTransaction).calledWith('0x99', {from: '0x7777', gas: sinon.match.any}, sinon.match.any);
+      expect(sns.publish).callCount(1);
+      expect(sns.publish).calledWith({
+        Subject: 'TableLeave::0x77aabb11ee',
+        Message: JSON.stringify({
+          leaveReceipt: '0x99',
+          tableAddr: '0x77aabb11ee'
+        }),
+        TopicArn: topicArn
+      });
       done();
     }).catch(done);
 
@@ -111,7 +91,7 @@ describe('Stream worker', function() {
       dynamodb: {
         Keys: {
           tableAddr: {
-            S: "0xa2decf075b96c8e5858279b31f644501a140e8a7"
+            S: "0x77aabb11ee0000"
           }
         },
         OldImage: {
@@ -134,28 +114,20 @@ describe('Stream worker', function() {
       }
     };
 
-    const lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 2]];
-    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
-    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
-      lineup: [{
-        address: P1_ADDR,
-        last: new EWT(ABI_BET).bet(1, 10000).sign(P1_PRIV)
-      }, {
-        address: P2_ADDR,
-        last: new EWT(ABI_BET).bet(1, 10000).sign(P2_PRIV)
-      }],
-      distribution: new EWT(ABI_DIST).distribution(1, 0, [EWT.concat(P1_ADDR, 20000).toString('hex')]).sign(ORACLE_PRIV)
-    }});
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(new TableContract(provider), new Db(dynamo), ORACLE_PRIV);
+    const worker = new StreamWorker(sns, topicArn);
+
     worker.process(event).then(function(rsp) {
-      const netting = {
-        '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x306f6bc2348440582ca694d4998b082d3b77ad25b62fcf2f22e526a14e50ecf45bdb61d92d77bce6b5c7bce2800ddda525af1622af6b3d6f918993431fff18551c',
-        newBalances: '0x000000025b96c8e5858279b31f644501a140e8a7000000000000000082e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000e86cf3beac30c498d9e26865f34fcaa57dbb935b0d740000000000009e34e10f3d125e5f4c753a6456fc37123cf17c6900f2'
-      };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':n', netting)));
+      expect(sns.publish).callCount(1);
+      expect(sns.publish).calledWith({
+        Subject: 'TableNettingRequest::0x77aabb11ee0000',
+        Message: JSON.stringify({
+          tableAddr: '0x77aabb11ee0000',
+          handId: 2
+        }),
+        TopicArn: topicArn
+      });
       done();
     }).catch(done);
   });
@@ -166,7 +138,7 @@ describe('Stream worker', function() {
       dynamodb: {
         Keys: {
           tableAddr: {
-            S: "0xa2decf075b96c8e5858279b31f644501a140e8a7"
+            S: "0x77aabb11ee00"
           }
         },
         OldImage: {
@@ -198,26 +170,32 @@ describe('Stream worker', function() {
         }
       }
     };
-    sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
-    sinon.stub(provider, 'getAddress').returns('0x7777');
+    sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(new TableContract(provider));
+    const worker = new StreamWorker(sns, topicArn);
+
     worker.process(event).then(function(rsp) {
-      expect(rsp).to.eql('0x123456');
-      expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', {from: '0x7777', gas: sinon.match.any}, sinon.match.any);
+      expect(sns.publish).callCount(1);
+      expect(sns.publish).calledWith({
+        Subject: 'TableNettingComplete::0x77aabb11ee00',
+        Message: JSON.stringify({
+          tableAddr: '0x77aabb11ee00',
+          handId: 2,
+          netting: {
+            newBalances: '0x112233',
+            [ORACLE_ADDR]: '0x223344',
+            [P1_ADDR]: '0x334455',
+            [P2_ADDR]: '0x445566'
+          }
+        }),
+        TopicArn: topicArn
+      });
       done();
     }).catch(done);
   });
 
   afterEach(function () {
-    if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
-    if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
-    if (contract.getLineup.call.restore) contract.getLineup.call.restore();
-    if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
-    if (provider.getTable.restore) provider.getTable.restore();
-    if (provider.getAddress.restore) provider.getAddress.restore();
-    if (dynamo.getItem.restore) dynamo.getItem.restore();
-    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+    if (sns.publish.restore) sns.publish.restore();
   });
 
 });
