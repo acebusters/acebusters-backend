@@ -793,7 +793,9 @@ describe('Oracle info', function() {
     new Oracle(new Db(dynamo), null, rc).info(tableAddr, tableAddr).then(function(rsp) {
       expect(rsp).to.eql({
         dealer: 0,
+        distribution: '0x1234',
         handId: 0,
+        state: 'showdown'
       });
       done();
     }).catch(done);
