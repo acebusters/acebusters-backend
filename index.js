@@ -40,6 +40,8 @@ exports.handler = function(event, context, callback) {
     handleRequest = manager.leave(event.params.path.tableAddr, event.params.header.Authorization);
   } else if (path.indexOf('netting') > -1) {
     handleRequest = manager.netting(event.params.path.tableAddr, event.params.path.handId, event.nettingSig);
+  } else if (path.indexOf('timeout') > -1) {
+    handleRequest = manager.timeout(event.params.path.tableAddr);
   } else {
     handleRequest = Promise.reject('Error: unexpected path: ' + path);
   }
