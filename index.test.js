@@ -31,6 +31,9 @@ var contract = {
   settle: {
     sendTransaction: function(){}, 
   },
+  payout: {
+    sendTransaction: function(){}, 
+  },
   create: {
     sendTransaction: function(){}, 
   },
@@ -90,7 +93,7 @@ describe('Stream worker', function() {
         handId: 2
       })
     };
-    const lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 2]];
+    const lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(2)]];
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
@@ -170,9 +173,59 @@ describe('Stream worker', function() {
     }).catch(done);
   });
 
+  // payout players after Netted event.
+  it('should handle Netted event in table.', (done) => {
+    const event = {
+      Subject: 'ContractEvent::0x77aabb11ee00',
+      Message: JSON.stringify({
+        address: '0x77aabb11ee00',
+        event : 'Netted',
+        args: {}
+      })
+    };
+    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(2)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.payout, 'sendTransaction').yields(null, '0x123456');
+
+    const worker = new EventWorker(new Table(web3, '0x1255'));
+    worker.process(event).then(function(rsp) {
+      expect(rsp).to.eql(['0x123456']);
+      expect(contract.payout.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
+  // payout multiple players after Netted event.
+  it('should handle Netted event in table for multiple players.', (done) => {
+    const event = {
+      Subject: 'ContractEvent::0x77aabb11ee00',
+      Message: JSON.stringify({
+        address: '0x77aabb11ee00',
+        event : 'Netted',
+        args: {}
+      })
+    };
+    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(1), new BigNumber(2)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.payout, 'sendTransaction')
+      .yields(null, '0x123456')
+      .onFirstCall().yields(null, '0x789abc');
+
+    const worker = new EventWorker(new Table(web3, '0x1255'));
+    worker.process(event).then(function(rsp) {
+      expect(rsp).to.eql(['0x789abc', '0x123456']);
+      expect(contract.payout.sendTransaction).callCount(2);
+      expect(contract.payout.sendTransaction).calledWith(P1_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      expect(contract.payout.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
+
   afterEach(function () {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
     if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
+    if (contract.payout.sendTransaction.restore) contract.payout.sendTransaction.restore();
     if (contract.create.sendTransaction.restore) contract.create.sendTransaction.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
