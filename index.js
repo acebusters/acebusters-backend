@@ -16,7 +16,7 @@ exports.handler = function(event, context, callback) {
     }).catch(function(err) {
       console.log(JSON.stringify(err));
       console.log(err.stack);
-      callback(err);
+      callback(null, err);
     });
   } else {
     console.log('Request received:\n', JSON.stringify(event));
