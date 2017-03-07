@@ -52,6 +52,8 @@ var web3 = { eth: {
 
 var dynamo = {
   getItem: function(){},
+  putItem: function(){},
+  query: function(){},
   updateItem: function(){}
 };
 
@@ -78,6 +80,50 @@ describe('Stream worker', function() {
     }).catch(done);
 
   });
+
+  // create netting when hand with leaving player turns complete.
+  it('should handle HandComplete event.', (done) => {
+    const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
+    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
+    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+    const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV);
+
+    const event = {
+      Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
+      Message: JSON.stringify({
+        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
+        handId: 2
+      })
+    };
+    const lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 2,
+      lineup: [{
+        address: P1_ADDR,
+        last: fold
+      }, {
+        address: P2_ADDR,
+        last: bet2
+      }],
+      distribution: distHand2
+    }]});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    Promise.all(worker.process(event)).then(function(rsp) {
+     expect(dynamo.putItem).calledWith({Item: {
+        deck: sinon.match.any,
+        state: 'waiting',
+        handId: 3,
+        dealer: 0,
+        lineup: [{address: P1_ADDR},{address: P2_ADDR}],
+        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7'
+      }, TableName: 'poker'});
+      done();
+    }).catch(done);
+  });
+
 
   // create netting when hand with leaving player turns complete.
   it('should handle TableNettingRequest event.', (done) => {
@@ -230,6 +276,7 @@ describe('Stream worker', function() {
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
   });
 
