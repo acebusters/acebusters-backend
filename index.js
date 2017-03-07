@@ -26,9 +26,9 @@ exports.handler = function(event, context, callback) {
     }
 
     var requests = [];
-    var worker = new EventWorker(table, factory, new Db(dynamo), process.env.ORACLE_PRIV);
+    const worker = new EventWorker(table, factory, new Db(dynamo), process.env.ORACLE_PRIV);
     for (var i = 0; i < event.Records.length; i++) {
-      requests.push(worker.process(event.Records[i].Sns));
+      requests = requests.concat(worker.process(event.Records[i].Sns));
     }
     Promise.all(requests).then(function(data) {
       console.log(JSON.stringify(data));

@@ -71,8 +71,8 @@ describe('Stream worker', function() {
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x123456');
 
     const worker = new EventWorker(new Table(web3, '0x1255'));
-    worker.process(event).then(function(tx) {
-      expect(tx).to.eql('0x123456');
+    Promise.all(worker.process(event)).then(function(tx) {
+      expect(tx[0]).to.eql('0x123456');
       expect(contract.leave.sendTransaction).calledWith('0x99', {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
@@ -120,7 +120,7 @@ describe('Stream worker', function() {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV);
-    worker.process(event).then(function(rsp) {
+    Promise.all(worker.process(event)).then(function(rsp) {
       const netting = {
         '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x306f6bc2348440582ca694d4998b082d3b77ad25b62fcf2f22e526a14e50ecf45bdb61d92d77bce6b5c7bce2800ddda525af1622af6b3d6f918993431fff18551c',
         newBalances: '0x000000025b96c8e5858279b31f644501a140e8a7000000000000000082e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000e86cf3beac30c498d9e26865f34fcaa57dbb935b0d740000000000009e34e10f3d125e5f4c753a6456fc37123cf17c6900f2'
@@ -148,8 +148,8 @@ describe('Stream worker', function() {
     sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
 
     const worker = new EventWorker(new Table(web3, '0x1255'));
-    worker.process(event).then(function(rsp) {
-      expect(rsp).to.eql('0x123456');
+    Promise.all(worker.process(event)).then(function(rsp) {
+      expect(rsp[0]).to.eql('0x123456');
       expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
@@ -166,8 +166,8 @@ describe('Stream worker', function() {
     sinon.stub(contract.create, 'sendTransaction').yields(null, '0x123456');
 
     const worker = new EventWorker(null, new Factory(web3, '0x1255', '0x1234'));
-    worker.process(event).then(function(rsp) {
-      expect(rsp).to.eql('0x123456');
+    Promise.all(worker.process(event)).then(function(rsp) {
+      expect(rsp[0]).to.eql('0x123456');
       expect(contract.create.sendTransaction).calledWith('0x551100003300', '0x1255', 259200, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
@@ -188,8 +188,8 @@ describe('Stream worker', function() {
     sinon.stub(contract.payout, 'sendTransaction').yields(null, '0x123456');
 
     const worker = new EventWorker(new Table(web3, '0x1255'));
-    worker.process(event).then(function(rsp) {
-      expect(rsp).to.eql(['0x123456']);
+    Promise.all(worker.process(event)).then(function(rsp) {
+      expect(rsp[0]).to.eql(['0x123456']);
       expect(contract.payout.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
@@ -212,8 +212,8 @@ describe('Stream worker', function() {
       .onFirstCall().yields(null, '0x789abc');
 
     const worker = new EventWorker(new Table(web3, '0x1255'));
-    worker.process(event).then(function(rsp) {
-      expect(rsp).to.eql(['0x789abc', '0x123456']);
+    Promise.all(worker.process(event)).then(function(rsp) {
+      expect(rsp[0]).to.eql(['0x789abc', '0x123456']);
       expect(contract.payout.sendTransaction).callCount(2);
       expect(contract.payout.sendTransaction).calledWith(P1_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       expect(contract.payout.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
