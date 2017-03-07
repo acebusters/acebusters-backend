@@ -80,6 +80,58 @@ describe('Stream worker', function() {
 
   });
 
+  it('should send event when hand turns complete.', (done) => {
+    const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
+    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
+    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+    const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV);
+
+    const event = {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: {
+          tableAddr: {
+            S: "0x77aabb11ee0000"
+          }
+        },
+        OldImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR }, last: { S: bet1 } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 } } }
+          ]}
+        },
+        NewImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR }, last: { S: fold } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 } } }
+          ]},
+          distribution: { S: distHand2 }
+        }
+      }
+    };
+
+    sinon.stub(sns, 'publish').yields(null, {});
+
+    const worker = new StreamWorker(sns, topicArn);
+
+    worker.process(event).then(function(rsp) {
+      expect(sns.publish).callCount(1);
+      expect(sns.publish).calledWith({
+        Subject: 'HandComplete::0x77aabb11ee0000',
+        Message: JSON.stringify({
+          tableAddr: '0x77aabb11ee0000',
+          handId: 2
+        }),
+        TopicArn: topicArn
+      });
+      done();
+    }).catch(done);
+  });
+
   it('should create netting when hand with leaving player turns complete.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
     const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
@@ -119,7 +171,15 @@ describe('Stream worker', function() {
     const worker = new StreamWorker(sns, topicArn);
 
     worker.process(event).then(function(rsp) {
-      expect(sns.publish).callCount(1);
+      expect(sns.publish).callCount(2);
+      expect(sns.publish).calledWith({
+        Subject: 'HandComplete::0x77aabb11ee0000',
+        Message: JSON.stringify({
+          tableAddr: '0x77aabb11ee0000',
+          handId: 2
+        }),
+        TopicArn: topicArn
+      });
       expect(sns.publish).calledWith({
         Subject: 'TableNettingRequest::0x77aabb11ee0000',
         Message: JSON.stringify({
