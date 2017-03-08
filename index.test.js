@@ -753,8 +753,8 @@ describe('Oracle pay', function() {
     oracle.pay(tableAddr, fold).then(function(rsp) {
       var dist = EWT.parse(rsp.distribution);
       expect(dist.signer).to.eql(P4_ADDR);
-      lineup[1].last = fold;
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', lineup)));
+      lineup[0].last = fold;
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', lineup[0])));
       done();
     }).catch(done);
   });
@@ -1014,7 +1014,7 @@ describe('Oracle show', function() {
         '82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000000000000002',
         'f3beac30c498d9e26865f34fcaa57dbb935b0d740000000000000000000000c6']);
       var trueIsh = sinon.match(function (value) {
-        var p = value.ExpressionAttributeValues[':l'][0];
+        var p = value.ExpressionAttributeValues[':s'];
         return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show);
       }, "trueIsh");
       expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
@@ -1098,7 +1098,7 @@ describe('Oracle leave', function() {
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
       lineup[0].lastHand = 2;
       lineup[0].leaveReceipt = leaveReceipt;
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', lineup[0])));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', lineup[0])));
       done();
     }).catch(done);
   });
@@ -1148,14 +1148,13 @@ describe('Oracle timing', function() {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 1,
       dealer: 0,
+      changed: Math.floor(Date.now() / 1000) - 20,
       lineup: [{
         address: P1_ADDR,
-        last: bet1,
-        time: Math.floor(Date.now() / 1000) - 40
+        last: bet1
       }, {
         address: P2_ADDR,
-        last: new EWT(ABI_BET).bet(1, 100).sign(P2_KEY),
-        time: Math.floor(Date.now() / 1000) - 20
+        last: new EWT(ABI_BET).bet(1, 100).sign(P2_KEY)
       }]
     }]});
 
@@ -1187,8 +1186,7 @@ describe('Oracle timing', function() {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
         address: P1_ADDR,
         last: bet1,
-        sitout: true,
-        time: sinon.match.any
+        sitout: true
       } )));
       done();
     }).catch(done);
@@ -1216,8 +1214,7 @@ describe('Oracle timing', function() {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
         address: P1_ADDR,
         last: bet1,
-        sitout: true,
-        time: sinon.match.any
+        sitout: true
       } )));
       done();
     }).catch(done);
