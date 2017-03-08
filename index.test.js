@@ -136,6 +136,7 @@ describe('Stream worker', function() {
   it('should handle new Table.', (done) => {
     const event = { Subject: 'HandComplete::0xa2de', Message: '' };
     const lineup = [new BigNumber(0), [EMPTY_ADDR, EMPTY_ADDR], [new BigNumber(0), new BigNumber(0)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(dynamo, 'query').yields(null, { Items: []});
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
     sinon.stub(dynamo, 'putItem').yields(null, {});
 
