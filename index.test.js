@@ -20,9 +20,15 @@ const P1_PRIV = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d253
 const P2_ADDR = '0xe10f3d125e5f4c753a6456fc37123cf17c6900f2';
 const P2_PRIV = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
 
+//secretSeed: 'erosion warm student north injury good evoke river despair critic wrestle unveil' }
+const P3_ADDR = '0xc3ccb3902a164b83663947aff0284c6624f3fbf2';
+const P3_KEY = '0x71d2b12dad610fc929e0596b6e887dfb711eec286b7b8b0bdd742c0421a9c425';
+
 //secretSeed: 'erode melody nature bounce sample deny spend give craft alcohol supply roof' }
 const ORACLE_ADDR = '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f';
 const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
+
+const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 var contract = {
   leave: {
@@ -267,6 +273,68 @@ describe('Stream worker', function() {
     }).catch(done);
   });
 
+  it('should handle Table join.', (done) => {
+    const event = {
+      Subject: 'ContractEvent::0x77aabb11ee00',
+      Message: JSON.stringify({
+        address: '0x77aabb11ee00',
+        event : 'Join',
+        args: {}
+      })
+    };
+    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(dynamo, 'query').yields(null, {Items:[{
+      handId: 3,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        // empty
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    Promise.all(worker.process(event)).then(function(rsp) {
+      const seat = { address: P2_ADDR };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('should handle Table join after game started.', (done) => {
+    const event = {
+      Subject: 'ContractEvent::0x77aabb11ee00',
+      Message: JSON.stringify({
+        address: '0x77aabb11ee00',
+        event : 'Join',
+        args: {}
+      })
+    };
+    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(dynamo, 'query').yields(null, {Items:[{
+      handId: 3,
+      state: 'flop',
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR
+      }, {
+        // empty
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    Promise.all(worker.process(event)).then(function(rsp) {
+      const seat = { address: P3_ADDR, sitout: true };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      done();
+    }).catch(done);
+  });
+
 
   afterEach(function () {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
@@ -277,6 +345,7 @@ describe('Stream worker', function() {
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
+    if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
   });
 
