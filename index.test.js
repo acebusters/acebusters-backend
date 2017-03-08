@@ -37,7 +37,7 @@ var contract = {
   settle: {
     sendTransaction: function(){}, 
   },
-  payout: {
+  payoutFrom: {
     sendTransaction: function(){}, 
   },
   create: {
@@ -263,12 +263,12 @@ describe('Stream worker', function() {
     };
     const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(2)]];
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
-    sinon.stub(contract.payout, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x123456');
 
     const worker = new EventWorker(new Table(web3, '0x1255'));
     Promise.all(worker.process(event)).then(function(rsp) {
       expect(rsp[0]).to.eql(['0x123456']);
-      expect(contract.payout.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      expect(contract.payoutFrom.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
   });
@@ -285,16 +285,16 @@ describe('Stream worker', function() {
     };
     const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(1), new BigNumber(2)]];
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
-    sinon.stub(contract.payout, 'sendTransaction')
+    sinon.stub(contract.payoutFrom, 'sendTransaction')
       .yields(null, '0x123456')
       .onFirstCall().yields(null, '0x789abc');
 
     const worker = new EventWorker(new Table(web3, '0x1255'));
     Promise.all(worker.process(event)).then(function(rsp) {
       expect(rsp[0]).to.eql(['0x789abc', '0x123456']);
-      expect(contract.payout.sendTransaction).callCount(2);
-      expect(contract.payout.sendTransaction).calledWith(P1_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
-      expect(contract.payout.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      expect(contract.payoutFrom.sendTransaction).callCount(2);
+      expect(contract.payoutFrom.sendTransaction).calledWith(P1_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      expect(contract.payoutFrom.sendTransaction).calledWith(P2_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
   });
@@ -365,7 +365,7 @@ describe('Stream worker', function() {
   afterEach(function () {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
     if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
-    if (contract.payout.sendTransaction.restore) contract.payout.sendTransaction.restore();
+    if (contract.payoutFrom.sendTransaction.restore) contract.payoutFrom.sendTransaction.restore();
     if (contract.create.sendTransaction.restore) contract.create.sendTransaction.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
