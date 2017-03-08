@@ -803,6 +803,7 @@ describe('Oracle info', function() {
       deck: deck,
       dealer: 0,
       lineup: [],
+      changed: 123,
       state: 'preflop'
     }]});
 
@@ -812,6 +813,7 @@ describe('Oracle info', function() {
         cards: [],
         dealer: 0,
         lineup: [],
+        changed: 123,
         state: 'preflop'
       });
       done();
@@ -824,6 +826,7 @@ describe('Oracle info', function() {
         dealer: 0,
         deck: deck,
         lineup: [],
+        changed: 123,
         state: 'flop'
     }]});
 
@@ -833,6 +836,7 @@ describe('Oracle info', function() {
         cards: [20, 21, 22],
         dealer: 0,
         lineup: [],
+        changed: 123,
         state: 'flop'
       });
       done();
@@ -845,6 +849,7 @@ describe('Oracle info', function() {
         dealer: 0,
         deck: deck,
         lineup: [],
+        changed: 123,
         state: 'turn'
     }]});
 
@@ -854,6 +859,7 @@ describe('Oracle info', function() {
         cards: [20, 21, 22, 23],
         dealer: 0,
         lineup: [],
+        changed: 123,
         state: 'turn'
       });
       done();
@@ -866,6 +872,7 @@ describe('Oracle info', function() {
         dealer: 0,
         deck: deck,
         lineup: [],
+        changed: 123,
         state: 'river'
     }]});
 
@@ -875,6 +882,7 @@ describe('Oracle info', function() {
         cards: [20, 21, 22, 23, 24],
         dealer: 0,
         lineup: [],
+        changed: 123,
         state: 'river'
       });
       done();
@@ -894,6 +902,7 @@ describe('Oracle info', function() {
         dealer: 0,
         deck: deck,
         lineup: lineup,
+        changed: 123,
         distribution: 'dist',
         state: 'showdown'
     }]});
@@ -911,6 +920,7 @@ describe('Oracle info', function() {
           address: P2_ADDR,
           last: muck2
         }],
+        changed: 123,
         distribution: 'dist',
         state: 'showdown'
       });
