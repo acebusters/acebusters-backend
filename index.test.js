@@ -52,6 +52,8 @@ const P4_KEY = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2c
 const tableAddr = '0x00112233445566778899aabbccddeeff00112233';
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
+const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
+
 const deck = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
 
 var dynamo = {
@@ -746,7 +748,7 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
     var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P1_KEY);
 
@@ -1003,7 +1005,7 @@ describe('Oracle show', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
     var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
@@ -1037,7 +1039,7 @@ describe('Oracle show', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
     var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
@@ -1062,24 +1064,25 @@ describe('Oracle show', function() {
 
 describe('Oracle leave', function() {
 
-  it('should prevent leaving in active hand.', function(done) {
+  it('should prevent leaving in completed hand.', function(done) {
     var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
     var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
-      handId: 2,
+      handId: 3,
+      state: 'flop',
       lineup: lineup
     }]});
 
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.leave(tableAddr, leave).catch(function(err) {
-      expect(err).to.contain('already started');
+      expect(err).to.contain('forbidden');
       done();
     }).catch(done);
   });
 
-  it('should allow to leave.', function(done) {
+  it('should allow to leave in next hand.', function(done) {
     var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
     var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
 
@@ -1091,7 +1094,31 @@ describe('Oracle leave', function() {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
+
+    oracle.leave(tableAddr, leave).then(function(rsp) {
+      var leaveReceipt = '0x00000000000000000000000200112233445566778899aabbccddeeff00112233f3beac30c498d9e26865f34fcaa57dbb935b0d7479762e0f6f962622a8fef43d6ab407d4ca374e4f2c4debd0c6c7d571bfb3b8c615ea51e844d7d322cbde65eb6a123155cae5fee0d210610ab65fee1b50fa75df1c';
+      expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
+      lineup[0].lastHand = 2;
+      lineup[0].leaveReceipt = leaveReceipt;
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', lineup[0])));
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to leave in last hand, if this hand hasn\'t started.', function(done) {
+    var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
+    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
+
+    sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
+      handId: 3,
+      state: 'waiting',
+      lineup: lineup
+    }]});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
     oracle.leave(tableAddr, leave).then(function(rsp) {
       var leaveReceipt = '0x00000000000000000000000200112233445566778899aabbccddeeff00112233f3beac30c498d9e26865f34fcaa57dbb935b0d7479762e0f6f962622a8fef43d6ab407d4ca374e4f2c4debd0c6c7d571bfb3b8c615ea51e844d7d322cbde65eb6a123155cae5fee0d210610ab65fee1b50fa75df1c';
@@ -1106,6 +1133,7 @@ describe('Oracle leave', function() {
   afterEach(function () {
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+    if (contract.getLineup.call.restore) contract.getLineup.call.restore();
   });
 
 });

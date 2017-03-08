@@ -24,7 +24,7 @@ exports.handler = function(event, context, callback) {
   }
   
   var handleRequest,
-    manager = new TableManager(new Db(dynamo), new TableContract(web3), rc),
+    manager = new TableManager(new Db(dynamo), new TableContract(web3), rc, process.env.ORACLE_PRIV),
     path = event.context['resource-path'];
   if (path.indexOf('pay') > -1) {
     handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
