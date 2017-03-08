@@ -119,16 +119,41 @@ describe('Stream worker', function() {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
     Promise.all(worker.process(event)).then(function(rsp) {
      expect(dynamo.putItem).calledWith({Item: {
+        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
+        handId: 3,
         deck: sinon.match.any,
         state: 'waiting',
-        handId: 3,
         dealer: 0,
         lineup: [{address: P1_ADDR},{address: P2_ADDR}],
-        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7'
+        changed: sinon.match.any
       }, TableName: 'poker'});
       done();
     }).catch(done);
   });
+
+
+  // create netting when hand with leaving player turns complete.
+  it('should handle new Table.', (done) => {
+    const event = { Subject: 'HandComplete::0xa2de', Message: '' };
+    const lineup = [new BigNumber(0), [EMPTY_ADDR, EMPTY_ADDR], [new BigNumber(0), new BigNumber(0)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    Promise.all(worker.process(event)).then(function(rsp) {
+     expect(dynamo.putItem).calledWith({Item: {
+        tableAddr: '0xa2de',
+        handId: 1,
+        deck: sinon.match.any,
+        state: 'waiting',
+        dealer: 0,
+        lineup: [{address: EMPTY_ADDR},{address: EMPTY_ADDR}],
+        changed: sinon.match.any,
+      }, TableName: 'poker'});
+      done();
+    }).catch(done);
+  });
+
 
 
   // create netting when hand with leaving player turns complete.
