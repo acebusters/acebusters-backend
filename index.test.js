@@ -1107,7 +1107,7 @@ describe('Oracle leave', function() {
     var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
     oracle.leave(tableAddr, leave).then(function(rsp) {
-      var leaveReceipt = '0x00000000000000000000000200112233445566778899aabbccddeeff00112233f3beac30c498d9e26865f34fcaa57dbb935b0d7479762e0f6f962622a8fef43d6ab407d4ca374e4f2c4debd0c6c7d571bfb3b8c615ea51e844d7d322cbde65eb6a123155cae5fee0d210610ab65fee1b50fa75df1c';
+      var leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
       lineup[0].lastHand = 2;
       lineup[0].leaveReceipt = leaveReceipt;
@@ -1131,7 +1131,7 @@ describe('Oracle leave', function() {
     var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
     oracle.leave(tableAddr, leave).then(function(rsp) {
-      var leaveReceipt = '0x00000000000000000000000200112233445566778899aabbccddeeff00112233f3beac30c498d9e26865f34fcaa57dbb935b0d7479762e0f6f962622a8fef43d6ab407d4ca374e4f2c4debd0c6c7d571bfb3b8c615ea51e844d7d322cbde65eb6a123155cae5fee0d210610ab65fee1b50fa75df1c';
+      var leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
       lineup[0].lastHand = 2;
       lineup[0].leaveReceipt = leaveReceipt;
