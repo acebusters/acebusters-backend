@@ -399,6 +399,35 @@ describe('Stream worker', function() {
     }).catch(done);
   });
 
+  it('should handle Table leave.', (done) => {
+    const event = {
+      Subject: 'ContractEvent::0x77aabb11ee00',
+      Message: JSON.stringify({
+        address: '0x77aabb11ee00',
+        event : 'Leave',
+        args: {}
+      })
+    };
+    const lineup = [new BigNumber(2), [P1_ADDR, EMPTY_ADDR], [new BigNumber(50000), new BigNumber(0)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(dynamo, 'query').yields(null, {Items:[{
+      handId: 3,
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR,
+        last: '0x11'
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    Promise.all(worker.process(event)).then(function(rsp) {
+      const seat = { address: EMPTY_ADDR };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      done();
+    }).catch(done);
+  });
 
   afterEach(function () {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
