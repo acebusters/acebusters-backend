@@ -3,6 +3,7 @@ const sinon = require('sinon');
 require('chai').use(require('sinon-chai'));
 const EWT = require('ethereum-web-token');
 const BigNumber = require('bignumber.js');
+const Receipt = require('poker-helper').Receipt;
 
 const EventWorker = require('./lib/index');
 const Table = require('./lib/tableContract');
@@ -69,19 +70,56 @@ sinon.stub(web3.eth, 'at').returns(contract);
 describe('Stream worker', function() {
 
   it('should handle TableLeave event.', (done) => {
+    const handId = 2;
+    const tableAddr = EMPTY_ADDR;
+    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV);
+    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV);
+
     const event = {
-      Subject: 'TableLeave::0x1234',
+      Subject: 'TableLeave::' + tableAddr,
       Message: JSON.stringify({
-        tableAddr: '0x77aabb11ee00',
-        leaveReceipt: '0x99'
+        tableAddr: tableAddr,
+        leaveReceipt: leaveReceipt
       })
     };
-    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x123456');
+    const lineup = [new BigNumber(handId-1), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
 
     const worker = new EventWorker(new Table(web3, '0x1255'));
+
     Promise.all(worker.process(event)).then(function(tx) {
-      expect(tx[0]).to.eql('0x123456');
-      expect(contract.leave.sendTransaction).calledWith('0x99', {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      expect(tx[0]).to.eql([ '0x112233', '' ]);
+      expect(contract.leave.sendTransaction).calledWith(leaveHex, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+
+  });
+
+ it('should handle TableLeave and Payout if netting not needed.', (done) => {
+    const handId = 2;
+    const tableAddr = EMPTY_ADDR;
+    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV);
+    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV);
+
+    const event = {
+      Subject: 'TableLeave::' + tableAddr,
+      Message: JSON.stringify({
+        tableAddr: tableAddr,
+        leaveReceipt: leaveReceipt
+      })
+    };
+    const lineup = [new BigNumber(handId), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
+
+    const worker = new EventWorker(new Table(web3, '0x1255'));
+
+    Promise.all(worker.process(event)).then(function(tx) {
+      expect(tx[0]).to.eql([ '0x112233', '0x445566' ]);
+      expect(contract.leave.sendTransaction).calledWith(leaveHex, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      expect(contract.payoutFrom.sendTransaction).calledWith(P1_ADDR, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
 
