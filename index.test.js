@@ -1111,9 +1111,12 @@ describe('Oracle leave', function() {
     oracle.leave(tableAddr, leave).then(function(rsp) {
       var leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
-      lineup[0].lastHand = 2;
-      lineup[0].leaveReceipt = leaveReceipt;
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', lineup[0])));
+      const seat = {
+        address: P1_ADDR,
+        lastHand: 2,
+        leaveReceipt: leaveReceipt
+      }
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
       done();
     }).catch(done);
   });
@@ -1135,9 +1138,13 @@ describe('Oracle leave', function() {
     oracle.leave(tableAddr, leave).then(function(rsp) {
       var leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
-      lineup[0].lastHand = 2;
-      lineup[0].leaveReceipt = leaveReceipt;
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', lineup[0])));
+      const seat = {
+        address: P1_ADDR,
+        lastHand: 2,
+        sitout: true,
+        leaveReceipt: leaveReceipt
+      }
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
       done();
     }).catch(done);
   });
