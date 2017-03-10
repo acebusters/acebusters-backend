@@ -337,6 +337,41 @@ describe('Stream worker', function() {
     }).catch(done);
   });
 
+  it('should handle Table join as first player.', (done) => {
+    const event = {
+      Subject: 'ContractEvent::0x77aabb11ee00',
+      Message: JSON.stringify({
+        address: '0x77aabb11ee00',
+        event : 'Join',
+        args: {}
+      })
+    };
+    const lineup = [new BigNumber(2), [EMPTY_ADDR, P2_ADDR], [new BigNumber(0), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(dynamo, 'query').yields(null, {Items:[{
+      handId: 3,
+      state: 'waiting',
+      lineup: [{
+        address: EMPTY_ADDR
+      }, {
+        address: EMPTY_ADDR
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    Promise.all(worker.process(event)).then(function(rsp) {
+      const trueIsh = sinon.match(function (value) {
+        const hasSeat = value.ExpressionAttributeValues[':s'].address === P2_ADDR;
+        const hasDealer = value.ExpressionAttributeValues[':d'] === 1;
+        return hasSeat && hasDealer;
+      }, "trueIsh");
+      expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
+      //expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      done();
+    }).catch(done);
+  });
+
   it('should handle Table join.', (done) => {
     const event = {
       Subject: 'ContractEvent::0x77aabb11ee00',
