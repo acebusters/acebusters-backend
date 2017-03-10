@@ -277,10 +277,9 @@ describe('Oracle pay', function() {
 
   it('should set state preflop after last 0 receipts.', function(done) {
     const bet1 = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     const bet3 = new EWT(ABI_BET).bet(1, 0).sign(P3_KEY);
 
-    var lineup = [{ address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}, {address: P3_ADDR, last: bet3}, {address: P4_ADDR}];
+    var lineup = [{ address: P1_ADDR, last: bet1}, {address: EMPTY_ADDR}, {address: P3_ADDR, last: bet3}, {address: P4_ADDR}];
 
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, {Items:[{
       dealer: 3,
