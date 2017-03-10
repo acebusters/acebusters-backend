@@ -219,6 +219,7 @@ describe('Oracle pay', function() {
 
     oracle.pay(tableAddr, smallBlind).then(function(rsp) {
       expect(rsp.cards.length).to.eql(2);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
       done();
     }).catch(done);
   });
