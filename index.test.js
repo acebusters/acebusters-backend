@@ -344,11 +344,12 @@ describe('Oracle pay', function() {
   it('should allow to pay big blind.', function(done) {
     var smallBlind = new EWT(ABI_BET).bet(3, 50).sign(P1_KEY);
     var bigBlind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
-    var lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
+    var lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
     var lastBet = new EWT(ABI_BET).bet(2, 10000).sign(P2_KEY);
-    var dist = new EWT(ABI_DIST).distribution(1, 0, [EWT.concat(P2_ADDR, 2000).toString('hex')]).sign(P1_KEY);
+    var dist = new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 2000).toString('hex')]).sign(P1_KEY);
 
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      handId: 2,
       lineup: [{address: P1_ADDR}, {address: P2_ADDR, last: lastBet}],
       distribution: dist
     }});
@@ -368,7 +369,7 @@ describe('Oracle pay', function() {
       expect(rsp).to.eql({
         cards: [2, 3]
       });
-      //expect(dynamo.updateItem).calledWith({});
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
       done();
     }).catch(done);
   });
