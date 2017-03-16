@@ -2,7 +2,7 @@ const expect = require('chai').expect;
 const sinon = require('sinon');
 require('chai').use(require('sinon-chai'));
 const EWT = require('ethereum-web-token');
-
+var ReceiptCache = require('poker-helper').ReceiptCache;
 const StreamWorker = require('./lib/index');
 
 const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
@@ -25,6 +25,12 @@ const topicArn = 'arn:aws:sns:eu-west-1:123:ab-events';
 const sns = {
   publish: function(){}
 };
+
+const pusher = {
+  trigger: function(){}
+};
+
+var rc = new ReceiptCache();
 
 describe('Stream worker', function() {
 
@@ -63,7 +69,7 @@ describe('Stream worker', function() {
 
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
 
     worker.process(event).then(function(tx) {
       expect(sns.publish).callCount(1);
@@ -116,7 +122,7 @@ describe('Stream worker', function() {
 
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
 
     worker.process(event).then(function(rsp) {
       expect(sns.publish).callCount(1);
@@ -168,7 +174,7 @@ describe('Stream worker', function() {
 
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
 
     worker.process(event).then(function(rsp) {
       expect(sns.publish).callCount(2);
@@ -232,7 +238,7 @@ describe('Stream worker', function() {
     };
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
 
     worker.process(event).then(function(rsp) {
       expect(sns.publish).callCount(1);
@@ -252,6 +258,53 @@ describe('Stream worker', function() {
       });
       done();
     }).catch(done);
+  });
+
+  it('should send hand state to websocket.', (done) => {
+
+    const event = {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: {
+          tableAddr: { S: "0x77aabb11ee" },
+          handId: { N: 3}
+        },
+        NewImage: {
+          state: { S: "waiting" },
+          handId: { N: 3},
+          dealer: { N: 0},
+          changed: { N: 123},
+          deck: { L: [{ N: 0},{ N: 1},{ N: 2},{ N: 3}]},
+          lineup: { L: [
+            { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
+            { M: {
+              address: {
+                S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2'
+              }
+            }},
+          ]}
+        },
+        OldImage: {}
+      }
+    };
+
+    sinon.stub(pusher, 'trigger').returns(null);
+
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+
+    worker.process(event).then(function() {
+      expect(pusher.trigger).callCount(1);
+      expect(pusher.trigger).calledWith('0x77aabb11ee', 'update', {
+        cards: [],
+        changed: 123,
+        dealer: 0,
+        handId: 3,
+        lineup: [{ address: "0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f" }, { address: "0xc3ccb3902a164b83663947aff0284c6624f3fbf2" }],
+        state: "waiting"
+      });
+      done();
+    }).catch(done);
+
   });
 
   afterEach(function () {
