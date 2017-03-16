@@ -26,6 +26,7 @@
     "dynamodb-data-types": "^3.0.0",
     "ethereum-web-token": "^0.1.11",
     "poker-helper": "^0.2.4",
+    "pusher": "^1.5.1",
     "utf8": "^2.1.2"
   }
 }
