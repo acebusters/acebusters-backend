@@ -469,6 +469,7 @@ describe('Oracle pay', function() {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       dealer: 0,
+      state: 'dealing',
       lineup: lineup
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
