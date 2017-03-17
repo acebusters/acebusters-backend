@@ -756,7 +756,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow pre-showdown distribution.', function(done) {
+  it('should keep hand state if game ends.', function(done) {
     const bet1 = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
 
@@ -779,10 +779,9 @@ describe('Oracle pay', function() {
     var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P1_KEY);
 
     oracle.pay(tableAddr, fold).then(function(rsp) {
-      var dist = EWT.parse(rsp.distribution);
-      expect(dist.signer).to.eql(P4_ADDR);
-      lineup[0].last = fold;
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', lineup[0])));
+      const seat = {address: P1_ADDR, last: fold};
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'turn')));
       done();
     }).catch(done);
   });
@@ -1046,13 +1045,8 @@ describe('Oracle show', function() {
     var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
-      var dist = EWT.parse(rsp);
-      expect(dist.signer).to.eql(P4_ADDR);
-      expect(dist.values[2]).to.eql([ 
-        '82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000000000000002',
-        'f3beac30c498d9e26865f34fcaa57dbb935b0d740000000000000000000000c6']);
       var trueIsh = sinon.match(function (value) {
-        var p = value.ExpressionAttributeValues[':s'];
+        var p = value.ExpressionAttributeValues[':l'];
         return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show);
       }, "trueIsh");
       expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
@@ -1080,13 +1074,15 @@ describe('Oracle show', function() {
     var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     oracle.show(tableAddr, show, [0, 1]).then(function(rsp) {
-      var dist = EWT.parse(rsp);
-      expect(dist.signer).to.eql(P4_ADDR);
-      expect(dist.values[2]).to.eql([
-        '82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000000000000002',
-        'f3beac30c498d9e26865f34fcaa57dbb935b0d74000000000000000000000063',
-        'e10f3d125e5f4c753a6456fc37123cf17c6900f2000000000000000000000063']);
+      // var dist = EWT.parse(rsp);
+      // expect(dist.signer).to.eql(P4_ADDR);
+      // expect(dist.values[2]).to.eql([
+      //   '82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000000000000002',
+      //   'f3beac30c498d9e26865f34fcaa57dbb935b0d74000000000000000000000063',
+      //   'e10f3d125e5f4c753a6456fc37123cf17c6900f2000000000000000000000063']);
       //expect(dynamo.updateItem).calledWith({});
+      const seat = {address: P1_ADDR, last: show, cards: [0, 1]};
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
       done();
     }).catch(done);
   });
