@@ -1252,7 +1252,7 @@ describe('Oracle timing', function() {
     }).catch(done);
   });
 
-  it('should timout sb of next hand if not started on time.', function(done) {
+  it('should deal with hand complete.', function(done) {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P2_KEY);
 
@@ -1267,15 +1267,10 @@ describe('Oracle timing', function() {
         last: fold
       }]
     }]});
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
-    oracle.timeout(tableAddr).then(function(rsp) {
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
-        address: P1_ADDR,
-        last: bet1,
-        sitout: true
-      } )));
+    oracle.timeout(tableAddr).catch(function(err) {
+      expect(err).to.contain('hand 1 completed');
       done();
     }).catch(done);
   });
