@@ -25,7 +25,8 @@
     "dynamodb-doc": "^1.0.0",
     "ethereum-web-token": "^0.1.11",
     "ethereumjs-util": "^4.5.0",
-    "poker-helper": "^0.2.4",
+    "poker-helper": "^0.2.7",
+    "pokersolver": "^2.1.2",
     "web3": "^0.18.2"
   }
 }
