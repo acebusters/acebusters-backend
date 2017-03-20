@@ -462,6 +462,70 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should allow to go all in.', function(done) {
+    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    const bet2 = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
+    var lineup = [{ address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}];
+
+    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
+      handId: 1,
+      state: 'flop',
+      dealer: 0,
+      lineup: lineup
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(1000), new BigNumber(1000)], [0, 0]]);
+
+    var allin = new EWT(ABI_BET).bet(1, 1000).sign(P2_KEY);
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    oracle.pay(tableAddr, allin).then(function(rsp) {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P2_ADDR,
+        last: allin,
+        sitout: 'allin'
+      }
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('should advance to showdown when last active player calls all-in.', function(done) {
+    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    const allin = new EWT(ABI_BET).bet(1, 1000).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
+      handId: 1,
+      state: 'flop',
+      dealer: 0,
+      lineup: [{
+        address: P1_ADDR,
+        last: bet1
+      }, {
+        address: P2_ADDR,
+        last: allin,
+        sitout: 'allin'
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(2000), new BigNumber(1000)], [0, 0]]);
+
+    var call = new EWT(ABI_BET).bet(1, 1000).sign(P1_KEY);
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    oracle.pay(tableAddr, call).then(function(rsp) {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P1_ADDR,
+        last: call
+      }
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'showdown')));
+      done();
+    }).catch(done);
+  });
+
   it('should allow to sitout if BB.', function(done) {
     const sb = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
     var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: sb},{address: P3_ADDR}];
@@ -1054,6 +1118,97 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
+  it('should allow to show for all-in player.', function(done) {
+    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: [{
+        address: P1_ADDR,
+        last: bet1,
+        sitout: 'allin'
+      }, {
+        address: P2_ADDR, 
+        last: bet2
+      }],
+      state: 'showdown',
+      deck: [12,11,2,3,4,5,6,7,8,9,10,1,0,13,14,15,22,17,18,19,20,21,36,23,24,25]
+    }});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+
+    var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
+
+    oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
+      var trueIsh = sinon.match(function (value) {
+        var p = value.ExpressionAttributeValues[':l'];
+        return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show);
+      }, "trueIsh");
+      expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent show by timedout player.', function(done) {
+    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    const bet3 = new EWT(ABI_BET).bet(1, 50).sign(P3_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: [{
+        address: P1_ADDR,
+        last: bet1
+      }, {
+        address: P2_ADDR,
+        last: bet2
+      }, {
+        address: P3_ADDR,
+        last: bet3,
+        sitout: 'timeout'
+      }],
+      state: 'showdown',
+      deck: deck
+    }});
+
+    var show = new EWT(ABI_SHOW).show(1, 100).sign(P3_KEY);
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
+      expect(err).to.contain('not allowed in showdown');
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent show by folded player.', function(done) {
+    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    const fold = new EWT(ABI_FOLD).fold(1, 50).sign(P3_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: [{
+        address: P1_ADDR,
+        last: bet1
+      }, {
+        address: P2_ADDR,
+        last: bet2
+      }, {
+        address: P3_ADDR,
+        last: fold,
+      }],
+      state: 'showdown',
+      deck: deck
+    }});
+
+    var show = new EWT(ABI_SHOW).show(1, 100).sign(P3_KEY);
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
+      expect(err).to.contain('last receipt not bet, not allowed in showdown');
+      done();
+    }).catch(done);
+  });
+
   it('should allow to showdown with 2 winners.', function(done) {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
@@ -1134,7 +1289,7 @@ describe('Oracle leave', function() {
     }).catch(done);
   });
 
-  it('should allow to leave in last hand, if this hand hasn\'t started.', function(done) {
+  it('should allow to leave in previous hand, if this hand hasn\'t started.', function(done) {
     var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
     var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
 
@@ -1154,7 +1309,7 @@ describe('Oracle leave', function() {
       const seat = {
         address: P1_ADDR,
         lastHand: 2,
-        sitout: true,
+        sitout: 'leave',
         leaveReceipt: leaveReceipt
       }
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
@@ -1225,7 +1380,7 @@ describe('Oracle timing', function() {
     }).catch(done);
   });
 
-  it('should allow to put user into sitout.', function(done) {
+  it('should allow to put player into sitout.', function(done) {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
@@ -1246,13 +1401,13 @@ describe('Oracle timing', function() {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
         address: P1_ADDR,
         last: bet1,
-        sitout: true
+        sitout: 'timeout'
       } )));
       done();
     }).catch(done);
   });
 
-  it('should deal with hand complete.', function(done) {
+  it('should handle sitout on hand state complete.', function(done) {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P2_KEY);
 
@@ -1270,7 +1425,7 @@ describe('Oracle timing', function() {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).catch(function(err) {
-      expect(err).to.contain('hand 1 completed');
+      expect(err).to.contain('Bad Request');
       done();
     }).catch(done);
   });
