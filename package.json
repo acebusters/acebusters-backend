@@ -1,0 +1,27 @@
+{
+  "name": "ab-interval-scanner",
+  "version": "0.1.0",
+  "description": "checking certain condition in regular intervals.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha index.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@bitbucket.org:johba/ab-interval-scanner.git"
+  },
+  "author": "acebusters",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.22.0",
+    "web3": "^0.18.2",
+    "dynamodb-doc": "^1.0.0"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^2.5.3",
+    "node-lambda": "^0.8.3",
+    "sinon": "^1.17.4",
+    "sinon-chai": "^2.8.0"
+  }
+}
