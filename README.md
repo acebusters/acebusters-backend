@@ -7,10 +7,11 @@ if lastNettingRequestHandId == lastHandNetted
 
 if lastNettingRequestTime + 10 min > now
 	&& lastNettingRequestHandId > lastHandNetted
-	&& receipts not submitted
 		=> HandleDispute
-    		-> submit receipts and distributions of all hands between
-    			lastHandNetted + 1 to lastNettingRequestHandId
+		
+			if && receipts not submitted
+    			-> submit receipts and distributions of all hands between
+    				lastHandNetted + 1 to lastNettingRequestHandId
 
 if lastNettingRequestTime + 10 min <= now
 	&& lastNettingRequestHandId > lastHandNetted
