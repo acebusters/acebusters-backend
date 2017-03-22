@@ -23,7 +23,7 @@
     "buffer-shims": "^1.0.0",
     "crypto": "0.0.3",
     "dynamodb-doc": "^1.0.0",
-    "ethereum-web-token": "^0.1.11",
+    "ethereum-web-token": "^0.1.12",
     "ethereumjs-util": "^4.5.0",
     "poker-helper": "^0.2.7",
     "pokersolver": "^2.1.2",

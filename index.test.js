@@ -47,6 +47,15 @@ var contract = {
   payoutFrom: {
     sendTransaction: function(){}, 
   },
+  net: {
+    sendTransaction: function(){}, 
+  },
+  submitBets: {
+    sendTransaction: function(){}, 
+  },
+  submitDists: {
+    sendTransaction: function(){}, 
+  },
   create: {
     sendTransaction: function(){}, 
   },
@@ -357,6 +366,7 @@ describe('Stream worker HandComplete event', function() {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
     if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
     if (contract.payoutFrom.sendTransaction.restore) contract.payoutFrom.sendTransaction.restore();
+    if (contract.net.sendTransaction.restore) contract.net.sendTransaction.restore();
     if (contract.create.sendTransaction.restore) contract.create.sendTransaction.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
@@ -394,10 +404,81 @@ describe('Stream worker other events', function() {
       expect(contract.leave.sendTransaction).calledWith(leaveHex, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
       done();
     }).catch(done);
-
   });
 
- it('should handle TableLeave and Payout if netting not needed.', (done) => {
+  it('should handle ProgressNettingRequest event.', (done) => {
+    const handId = 5;
+    const tableAddr = EMPTY_ADDR;
+    const leaveHex = Receipt.leave(tableAddr, handId, ORACLE_ADDR).signToHex(ORACLE_PRIV);
+
+    const event = {
+      Subject: 'ProgressNettingRequest::' + tableAddr,
+      Message: JSON.stringify({ handId: handId })
+    };
+    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV);
+
+    Promise.all(worker.process(event)).then(function(tx) {
+      expect(tx[0]).to.eql('0x112233');
+      expect(contract.leave.sendTransaction).calledWith(leaveHex, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
+  it('should handle ProgressNetting event.', (done) => {
+    const tableAddr = EMPTY_ADDR;
+
+    const event = { Subject: 'ProgressNetting::' + tableAddr };
+    sinon.stub(contract.net, 'sendTransaction').yields(null, '0x112233');
+
+    const worker = new EventWorker(new Table(web3, '0x1255'));
+
+    Promise.all(worker.process(event)).then(function(tx) {
+      expect(tx[0]).to.eql('0x112233');
+      expect(contract.net.sendTransaction).calledWith({from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
+  it('should handle HandleDispute event.', (done) => {
+    const tableAddr = EMPTY_ADDR;
+    const event = {
+      Subject: 'HandleDispute::' + tableAddr,
+      Message: JSON.stringify({
+        tableAddr: tableAddr,
+        lastHandNetted: 5,
+        lastNettingRequest: 6
+      })
+    };
+    sinon.stub(dynamo, 'getItem').yields(null, {Item:{
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(6, 500).sign(P1_PRIV)
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(6, 1000).sign(P2_PRIV),
+      }],
+      distribution: new EWT(ABI_DIST).distribution(6, 0, [EWT.concat(P2_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV)
+    }})
+    sinon.stub(contract.submitDists, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.submitBets, 'sendTransaction').yields(null, '0x445566');
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+
+    Promise.all(worker.process(event)).then(function(tx) {
+      expect(tx[0]).to.eql(['0x112233', '0x445566']);
+      const distHex = '0x3a10de590000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001e10f3d125e5f4c753a6456fc37123cf17c6900f20000000000000000000005dc';
+      const distSig = '0x6d34f174751a6abe871b531647be82c0b39055a451d12d193f9672c7acd474b25f62166d8a1e0999932892c65f303054f483ca44513f6a6333c50b75a9ac404f1c';
+      expect(contract.submitDists.sendTransaction).calledWith(distHex, distSig, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      const betsHex = '0x6ffcc719000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000001f46ffcc719000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000003e8';
+      const betSigs = '0x165d657d180e5e3f31a68791532b0fb5be389e91b88c8b34e4f78c264cf1639214593a897dac8bdf05b3a4324c17fd03520774ff2b1a2f64417683db00ce30281caffe3c1e8c6617b8e82ab789f5f6f2c5330749db275eff8f657f81ce3ac6fcea5b939d5a000107dd46d159f8752c3ba479634f5de7d264a01e86bd3e0c7f0f291b';
+      expect(contract.submitBets.sendTransaction).calledWith(betsHex, betSigs, {from: '0x1255', gas: sinon.match.any}, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
+  it('should handle TableLeave and Payout if netting not needed.', (done) => {
     const handId = 2;
     const tableAddr = EMPTY_ADDR;
     const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV);
@@ -447,8 +528,6 @@ describe('Stream worker other events', function() {
       done();
     }).catch(done);
   });
-
-
 
   // create netting when hand with leaving player turns complete.
   it('should handle TableNettingRequest event.', (done) => {
@@ -723,6 +802,7 @@ describe('Stream worker other events', function() {
     if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
     if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
     if (contract.payoutFrom.sendTransaction.restore) contract.payoutFrom.sendTransaction.restore();
+    if (contract.net.sendTransaction.restore) contract.net.sendTransaction.restore();
     if (contract.create.sendTransaction.restore) contract.create.sendTransaction.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
