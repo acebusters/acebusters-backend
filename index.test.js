@@ -85,41 +85,97 @@ sinon.stub(web3.eth, 'at').returns(contract);
 describe('Stream worker HandComplete event', function() {
 
   it('should handle HandComplete event.', (done) => {
-    const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
-    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
-    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
-    const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV);
-
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7'
     };
-    const lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
+      /*addresses:  */[P1_ADDR,               P2_ADDR],
+      /*balances:   */[new BigNumber(50000),  new BigNumber(50000)],
+      /*exitHands:  */[new BigNumber(0),      new BigNumber(0)]
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 2,
+      dealer: 0,
+      state: 'preflop',
       lineup: [{
         address: P1_ADDR,
-        last: fold
+        last: new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV)
       }, {
         address: P2_ADDR,
-        last: bet2
+        last: new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV)
       }],
-      distribution: distHand2
+      deck: deck
     }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'putItem').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV);
     Promise.all(worker.process(event)).then(function(rsp) {
       expect(dynamo.putItem).calledWith({Item: {
         tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
         handId: 3,
         deck: sinon.match.any,
         state: 'waiting',
-        dealer: 0,
+        dealer: 1,
         lineup: [{address: P1_ADDR},{address: P2_ADDR}],
         changed: sinon.match.any
       }, TableName: 'poker'});
+      const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
+        EWT.concat(P2_ADDR, 1485).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 15).toString('hex'),
+      ]).sign(ORACLE_PRIV);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
+      done();
+    }).catch(done);
+  });
+
+  it('should handle HandComplete event with empty seats.', (done) => {
+    const event = {
+      Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7'
+    };
+    const lineup = [new BigNumber(1), [EMPTY_ADDR, P1_ADDR, P2_ADDR, P3_ADDR, EMPTY_ADDR], [new BigNumber(0), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(0)], [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)]];
+    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(500));
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 2,
+      dealer: 2,
+      state: 'preflop',
+      lineup: [{
+        address: EMPTY_ADDR
+      }, {
+        address: P1_ADDR,
+        last: 'eyJ0eXBlIjoiRVdUIiwiYWxnIjoiRVMyNTZrIn0.eyJmb2xkIjpbeyJ1aW50IjoyfSx7InVpbnQiOjEwMDB9XSwidiI6MX0.-fvwojvYXTskrQpfQMPib9qQqXsAMZ27apanwmOBtv0J5RJ-bHUUdmKIZIdouXYfQIwFUy2Gra9RmtdvOcdN0g'
+      }, {
+        address: P2_ADDR,
+        last: 'eyJ0eXBlIjoiRVdUIiwiYWxnIjoiRVMyNTZrIn0.eyJiZXQiOlt7InVpbnQiOjJ9LHsidWludCI6MTAwMDB9XSwidiI6MX0.8cJiJN6zJvu4yq3RbdETIo6Iz3LAJsfU2glwCR96xAdFbLwSc4-lLE5Va9SXiffjJQiyYlyXPiCAZnQyJbbeOA'
+      }, {
+        address: P3_ADDR,
+        last: 'eyJ0eXBlIjoiRVdUIiwiYWxnIjoiRVMyNTZrIn0.eyJmb2xkIjpbeyJ1aW50IjoyfSx7InVpbnQiOjUwMH1dLCJ2IjoxfQ.9pp-TgK9HJsK18M6L54wZ-eiwJO6GwpsFHc-jQ5hTT4pSuXIUn9a4L0Pmy9__sQh3SI8bMCxuRbS4Tb-hJBFtQ'
+      }, {
+        address: EMPTY_ADDR
+      }],
+      deck: [26,47,39,33,20,50,28,6,32,10,7,42,46,0,24,9,4,37,51,14,22,30,48,43,3,41,25,5,2,15,45,13,40,17,29,38,18,11,21,12,49,36,16,34,1,19,44,27,8,23,31,35]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV);
+    Promise.all(worker.process(event)).then(function(rsp) {
+      expect(dynamo.putItem).calledWith({Item: {
+        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
+        handId: 3,
+        deck: sinon.match.any,
+        state: 'waiting',
+        dealer: 3,
+        lineup: [ { address: EMPTY_ADDR }, { address: P1_ADDR }, { address: P2_ADDR }, { address: P3_ADDR }, { address: EMPTY_ADDR } ],
+        changed: sinon.match.any
+      }, TableName: 'poker'});
+      const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
+        EWT.concat(P2_ADDR, 11385).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 115).toString('hex'),
+      ]).sign(ORACLE_PRIV);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
       done();
     }).catch(done);
   });
@@ -165,9 +221,6 @@ describe('Stream worker HandComplete event', function() {
   });
 
   it('should put broke players into sitout.', (done) => {
-    const bet31 = new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV);
-    const bet32 = new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV);
-
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7'
     };
@@ -179,10 +232,10 @@ describe('Stream worker HandComplete event', function() {
       state: 'showdown',
       lineup: [{
         address: P1_ADDR,
-        last: bet31
+        last: new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV)
       }, {
         address: P2_ADDR,
-        last: bet32
+        last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV)
       }],
       deck: [24,25,0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,2,3]
     }]});
@@ -206,7 +259,7 @@ describe('Stream worker HandComplete event', function() {
           address: P1_ADDR
         },{
           address: P2_ADDR,
-          sitout: true
+          sitout: 'bankrupt'
         }],
         changed: sinon.match.any
       }, TableName: 'poker'});
@@ -353,7 +406,7 @@ describe('Stream worker HandComplete event', function() {
           address: P1_ADDR
         },{
           address: P2_ADDR,
-          sitout: true
+          sitout: 'bankrupt'
         }],
         changed: sinon.match.any
       }, TableName: 'poker'});
