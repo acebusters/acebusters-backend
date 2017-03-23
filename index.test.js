@@ -237,6 +237,7 @@ describe('Stream worker HandComplete event', function() {
         address: P2_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV)
       }],
+      changed: 234,
       deck: [24,25,0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,2,3]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
@@ -259,7 +260,7 @@ describe('Stream worker HandComplete event', function() {
           address: P1_ADDR
         },{
           address: P2_ADDR,
-          sitout: 'bankrupt'
+          sitout: 234
         }],
         changed: sinon.match.any
       }, TableName: 'poker'});
@@ -390,6 +391,7 @@ describe('Stream worker HandComplete event', function() {
         address: P2_ADDR,
         last: bet42
       }],
+      changed: 123,
       distribution: distHand4
     }]});
     sinon.stub(dynamo, 'putItem').yields(null, {});
@@ -406,7 +408,7 @@ describe('Stream worker HandComplete event', function() {
           address: P1_ADDR
         },{
           address: P2_ADDR,
-          sitout: 'bankrupt'
+          sitout: 123
         }],
         changed: sinon.match.any
       }, TableName: 'poker'});
@@ -815,7 +817,7 @@ describe('Stream worker other events', function() {
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
     Promise.all(worker.process(event)).then(function(rsp) {
-      const seat = { address: P3_ADDR, sitout: true };
+      const seat = { address: P3_ADDR, sitout: sinon.match.number };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
       done();
     }).catch(done);
