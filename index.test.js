@@ -1143,7 +1143,7 @@ describe('Oracle show', function() {
     oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
       var trueIsh = sinon.match(function (value) {
         var p = value.ExpressionAttributeValues[':l'];
-        return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show);
+        return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show && !p.sitout);
       }, "trueIsh");
       expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
       done();
