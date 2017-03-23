@@ -1309,7 +1309,7 @@ describe('Oracle leave', function() {
       const seat = {
         address: P1_ADDR,
         lastHand: 2,
-        sitout: 'leave',
+        sitout: 1,
         leaveReceipt: leaveReceipt
       }
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
@@ -1403,7 +1403,7 @@ describe('Oracle timing', function() {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
         address: P1_ADDR,
         last: bet1,
-        sitout: 'timeout'
+        sitout: sinon.match.number
       } )));
       done();
     }).catch(done);
