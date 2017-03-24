@@ -1204,7 +1204,7 @@ describe('Oracle show', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
-      expect(err).to.contain('last receipt not bet, not allowed in showdown');
+      expect(err).to.contain('is not an active player');
       done();
     }).catch(done);
   });
