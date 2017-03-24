@@ -1180,6 +1180,31 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
+  it('should prevent show with smaller amount.', function(done) {
+    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+
+    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
+      lineup: [{
+        address: P1_ADDR,
+        last: bet1
+      }, {
+        address: P2_ADDR,
+        last: bet2
+      }],
+      state: 'showdown',
+      deck: deck
+    }});
+
+    var show = new EWT(ABI_SHOW).show(1, 20).sign(P2_KEY);
+    var oracle = new Oracle(new Db(dynamo), null, rc);
+
+    oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
+      expect(err).to.contain('same or highter amount');
+      done();
+    }).catch(done);
+  });
+
   it('should prevent show by folded player.', function(done) {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
