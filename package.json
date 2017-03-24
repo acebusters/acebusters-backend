@@ -16,7 +16,7 @@
   "devDependencies": {
     "chai": "^3.5.0",
     "mocha": "^3.0.2",
-    "node-lambda": "^0.8.7",
+    "node-lambda": "^0.8.13",
     "sinon": "^1.17.5",
     "sinon-chai": "^2.8.0"
   },
@@ -25,7 +25,7 @@
     "babel-runtime": "^6.11.6",
     "dynamodb-data-types": "^3.0.0",
     "ethereum-web-token": "^0.1.11",
-    "poker-helper": "^0.2.4",
+    "poker-helper": "^0.2.11",
     "pusher": "^1.5.1",
     "utf8": "^2.1.2"
   }

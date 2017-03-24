@@ -34,7 +34,7 @@ var rc = new ReceiptCache();
 
 describe('Stream worker', function() {
 
-  it('should send tx on new leave receipt.', (done) => {
+  it('should send tx on new leave receipt for prev hand.', (done) => {
 
     const event = {
       eventName: "MODIFY",
@@ -43,6 +43,7 @@ describe('Stream worker', function() {
           tableAddr: { S: "0x77aabb11ee" }
         },
         NewImage: {
+          handId: { N: '3' },
           lineup: { L: [
             { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
             { M: {
@@ -50,7 +51,7 @@ describe('Stream worker', function() {
                 S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2'
               },
               lastHand: {
-                N: '0'
+                N: '2'
               },
               leaveReceipt: {
                 S: '0x99'
@@ -59,6 +60,69 @@ describe('Stream worker', function() {
           ]}
         },
         OldImage: {
+          handId: { N: '3' },
+          lineup: { L: [
+            { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
+            { M: { address: { S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' } } }
+          ]}
+        }
+      }
+    };
+
+    sinon.stub(sns, 'publish').yields(null, {});
+
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+
+    worker.process(event).then(function(tx) {
+      expect(sns.publish).callCount(2);
+      expect(sns.publish).calledWith({
+        Subject: 'TableLeave::0x77aabb11ee',
+        Message: JSON.stringify({
+          leaveReceipt: '0x99',
+          tableAddr: '0x77aabb11ee'
+        }),
+        TopicArn: topicArn
+      });
+      expect(sns.publish).calledWith({
+        Subject: 'TableNettingRequest::0x77aabb11ee',
+        Message: JSON.stringify({
+          tableAddr: '0x77aabb11ee',
+          handId: 2
+        }),
+        TopicArn: topicArn
+      });
+      done();
+    }).catch(done);
+
+  });
+
+  it('should send tx on new leave receipt for this hand.', (done) => {
+
+    const event = {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: {
+          tableAddr: { S: "0x77aabb11ee" }
+        },
+        NewImage: {
+          handId: { N: '3' },
+          lineup: { L: [
+            { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
+            { M: {
+              address: {
+                S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2'
+              },
+              lastHand: {
+                N: '3'
+              },
+              leaveReceipt: {
+                S: '0x99'
+              }
+            }},
+          ]}
+        },
+        OldImage: {
+          handId: { N: '3' },
           lineup: { L: [
             { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
             { M: { address: { S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' } } }
@@ -114,8 +178,7 @@ describe('Stream worker', function() {
           lineup: { L: [
             { M: { address: { S: P1_ADDR }, last: { S: fold } } },
             { M: { address: { S: P2_ADDR }, last: { S: bet2 } } }
-          ]},
-          distribution: { S: distHand2 }
+          ]}
         }
       }
     };
@@ -134,6 +197,92 @@ describe('Stream worker', function() {
         }),
         TopicArn: topicArn
       });
+      done();
+    }).catch(done);
+  });
+
+  it('should send event when hand turns complete with incomplete old Hand.', (done) => {
+    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
+    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+
+    const event = {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: {
+          tableAddr: {
+            S: "0x77aabb11ee0000"
+          }
+        },
+        OldImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' }
+        },
+        NewImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR }, last: { S: fold } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 } } }
+          ]}
+        }
+      }
+    };
+
+    sinon.stub(sns, 'publish').yields(null, {});
+
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+
+    worker.process(event).then(function(rsp) {
+      expect(sns.publish).callCount(1);
+      expect(sns.publish).calledWith({
+        Subject: 'HandComplete::0x77aabb11ee0000',
+        Message: JSON.stringify({
+          tableAddr: '0x77aabb11ee0000',
+          handId: 2
+        }),
+        TopicArn: topicArn
+      });
+      done();
+    }).catch(done);
+  });
+
+  it('should not send event when hand was complete already.', (done) => {
+    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
+    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+
+    const event = {
+      eventName: "MODIFY",
+      dynamodb: {
+        Keys: {
+          tableAddr: {
+            S: "0x77aabb11ee0000"
+          }
+        },
+        OldImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR }, last: { S: fold } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 } } }
+          ]}
+        },
+        NewImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR }, last: { S: fold } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 } } }
+          ]}
+        }
+      }
+    };
+
+    sinon.stub(sns, 'publish').yields(null, {});
+
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+
+    worker.process(event).then(function(rsp) {
+      expect(sns.publish).callCount(0);
       done();
     }).catch(done);
   });
@@ -167,7 +316,6 @@ describe('Stream worker', function() {
             { M: { address: { S: P1_ADDR }, last: { S: fold } } },
             { M: { address: { S: P2_ADDR }, last: { S: bet2 }, lastHand: { N: '2' }, leaveReceipt: { S: '0x99' } } }
           ]},
-          distribution: { S: distHand2 }
         }
       }
     };
