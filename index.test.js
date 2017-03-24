@@ -598,7 +598,7 @@ describe('Stream worker other events', function() {
         handId: 2
       })
     };
-    const lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(2)]];
+    const lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR, EMPTY_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(0)], [new BigNumber(0), new BigNumber(2), new BigNumber(0),]];
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
@@ -610,6 +610,8 @@ describe('Stream worker other events', function() {
         last: bet2,
         lastHand: 2,
         leaveReceipt: '0x99'
+      }, {
+        address: EMPTY_ADDR
       }],
       distribution: distHand2
     }}).onFirstCall().yields(null, {Item:{
@@ -619,6 +621,8 @@ describe('Stream worker other events', function() {
       }, {
         address: P2_ADDR,
         last: new EWT(ABI_BET).bet(1, 10000).sign(P2_PRIV)
+      }, {
+        address: EMPTY_ADDR,
       }],
       distribution: new EWT(ABI_DIST).distribution(1, 0, [EWT.concat(P1_ADDR, 20000).toString('hex')]).sign(ORACLE_PRIV)
     }});
