@@ -24,7 +24,7 @@
     "aws-sdk": "^2.5.3",
     "babel-runtime": "^6.11.6",
     "dynamodb-doc": "^1.0.0",
-    "poker-helper": "^0.2.11",
+    "poker-helper": "^0.2.12",
     "ethereumjs-util": "^4.5.0",
     "web3": "^0.18.2"
   }
