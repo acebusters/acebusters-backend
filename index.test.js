@@ -20,6 +20,8 @@ const P2_PRIV = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717b
 const ORACLE_ADDR = '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f';
 const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
 
+const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
+
 const topicArn = 'arn:aws:sns:eu-west-1:123:ab-events';
 
 const sns = {
@@ -359,8 +361,10 @@ describe('Stream worker', function() {
           dealer: { N: '0' },
           handId: { N: '2' },
           lineup: { L: [
+            { M: { address: { S: EMPTY_ADDR } } },
             { M: { address: { S: P1_ADDR } } },
-            { M: { address: { S: P2_ADDR } } }
+            { M: { address: { S: P2_ADDR } } },
+            { M: { address: { S: EMPTY_ADDR } } }
           ]},
           netting: { M: {
             newBalances: { S: '0x112233' },
@@ -372,8 +376,10 @@ describe('Stream worker', function() {
           dealer: { N: '0' },
           handId: { N: '2' },
           lineup: { L: [
+            { M: { address: { S: EMPTY_ADDR } } },
             { M: { address: { S: P1_ADDR } } },
-            { M: { address: { S: P2_ADDR } } }
+            { M: { address: { S: P2_ADDR } } },
+            { M: { address: { S: EMPTY_ADDR } } }
           ]},
           netting: { M: {
             newBalances: { S: '0x112233' },
