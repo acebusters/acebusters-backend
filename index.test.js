@@ -89,9 +89,9 @@ describe('Stream worker HandComplete event', function() {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7'
     };
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
-      /*addresses:  */[P1_ADDR,               P2_ADDR],
-      /*balances:   */[new BigNumber(50000),  new BigNumber(50000)],
-      /*exitHands:  */[new BigNumber(0),      new BigNumber(0)]
+      /*addresses:  */[EMPTY_ADDR, P1_ADDR,               P2_ADDR],
+      /*balances:   */[new BigNumber(0), new BigNumber(50000),  new BigNumber(50000)],
+      /*exitHands:  */[new BigNumber(0), new BigNumber(0),      new BigNumber(0)]
     ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
@@ -99,6 +99,8 @@ describe('Stream worker HandComplete event', function() {
       dealer: 0,
       state: 'preflop',
       lineup: [{
+        address: EMPTY_ADDR
+      }, {
         address: P1_ADDR,
         last: new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV)
       }, {
@@ -118,7 +120,7 @@ describe('Stream worker HandComplete event', function() {
         deck: sinon.match.any,
         state: 'waiting',
         dealer: 1,
-        lineup: [{address: P1_ADDR},{address: P2_ADDR}],
+        lineup: [{address: EMPTY_ADDR},{address: P1_ADDR},{address: P2_ADDR}],
         changed: sinon.match.any
       }, TableName: 'poker'});
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
