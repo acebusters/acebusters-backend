@@ -563,7 +563,11 @@ EventWorker.prototype.calcDistribution = function(tableAddr, hand) {
 }
 
 EventWorker.prototype.putNextHand = function(tableAddr) {
-  var self = this, prevHand, lineup, smallBlind, balances;
+  let self = this
+  let prevHand;
+  let lineup;
+  let smallBlind;
+  let balances;
   const hand = self.db.getLastHand(tableAddr);
   const table = self.table.getLineup(tableAddr);
   const sb = self.table.getSmallBlind(tableAddr);
@@ -588,9 +592,9 @@ EventWorker.prototype.putNextHand = function(tableAddr) {
       if (prevHand.lineup[pos].last)
         balances[prevHand.lineup[pos].address] -= EWT.parse(prevHand.lineup[pos].last).values[1];
     }
-    var dists = EWT.parse(prevHand.distribution).values[2];
-    for (var j = 0; j < dists.length; j ++) {
-      var dist = EWT.separate(dists[j]);
+    const dists = EWT.parse(prevHand.distribution).values[2];
+    for (let j = 0; j < dists.length; j ++) {
+      const dist = EWT.separate(dists[j]);
       balances[dist.address] += dist.amount;
     }
     //create new lineup
@@ -621,24 +625,27 @@ EventWorker.prototype.putNextHand = function(tableAddr) {
         }
       }
     }
-    var prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1): 0;
+    let prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1): 0;
     const newDealer = self.helper.nextActivePlayer(lineup, prevDealer);
     const deck = shuffle();
     const changed = Math.floor(Date.now() / 1000);
-    return self.db.putHand(tableAddr, prevHand.handId + 1, lineup, newDealer, deck, changed);
+    return self.db.putHand(tableAddr, prevHand.handId + 1, lineup, newDealer, deck, smallBlind, changed);
   }).catch(function(err) {
     if (!err.indexOf || err.indexOf('Not Found') == -1) {
       throw err;
     }
-    return self.table.getLineup(tableAddr).then(function(rsp) {
-      const lineup = rsp.lineup;
+    const sbProm = self.table.getSmallBlind(tableAddr);
+    const lineupProm = self.table.getLineup(tableAddr);
+    return Promise.all([sbProm, lineupProm]).then(function(rsp) {
+      smallBlind = rsp[0];
+      const lineup = rsp[1].lineup;
       for (var i = 0; i < lineup.length; i++) {
         delete lineup[i].amount;
         delete lineup[i].exitHand;
       }
       const deck = shuffle();
       const changed = Math.floor(Date.now() / 1000);
-      return self.db.putHand(tableAddr, rsp.lastHandNetted + 1, lineup, 0, deck, changed);
+      return self.db.putHand(tableAddr, rsp[1].lastHandNetted + 1, lineup, 0, deck, smallBlind, changed);
     });
   });
 }

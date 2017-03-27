@@ -13,10 +13,7 @@ Db.prototype.getHand = function(tableAddr, handId) {
     }
     self.dynamo.getItem({
       TableName: self.tableName,
-      Key: {
-        tableAddr: tableAddr,
-        handId: handId
-      }
+      Key: { tableAddr, handId }
     }, function(err, data){
       if (err) {
         reject(err);
@@ -37,7 +34,7 @@ Db.prototype.getLastHand = function(tableAddr) {
     self.dynamo.query({
       TableName: self.tableName,
       KeyConditionExpression: 'tableAddr = :a',
-      ExpressionAttributeValues: {':a': tableAddr},
+      ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
       ScanIndexForward: false
     }, function(err, rsp) {
@@ -59,10 +56,7 @@ Db.prototype.updateSeat = function(tableAddr, handId, seat, pos, time, dealer) {
   return new Promise(function (fulfill, reject) {
     var params = {
       TableName: self.tableName,
-      Key:{
-        tableAddr: tableAddr,
-        handId: handId
-      },
+      Key: { tableAddr, handId },
       UpdateExpression: 'set lineup['+pos+'] = :s, changed = :t, dealer = :d',
       ExpressionAttributeValues: {
         ':s': seat,
@@ -85,10 +79,7 @@ Db.prototype.updateNetting = function(tableAddr, handId, netting) {
   return new Promise(function (fulfill, reject) {
     var params = {
       TableName: self.tableName,
-      Key:{
-        tableAddr: tableAddr,
-        handId: handId
-      },
+      Key: { tableAddr, handId },
       UpdateExpression: 'set netting = :n',
       ExpressionAttributeValues: {
         ':n': netting
@@ -103,20 +94,21 @@ Db.prototype.updateNetting = function(tableAddr, handId, netting) {
   });
 }
 
-Db.prototype.putHand = function(tableAddr, handId, lineup, dealer, deck, changed) {
+Db.prototype.putHand = function(tableAddr, handId, lineup, dealer, deck, sb, changed) {
   var self = this;
   return new Promise(function (fulfill, reject) {
 
     self.dynamo.putItem({
       TableName: self.tableName,
       Item: {
-        tableAddr: tableAddr,
-        handId: handId, 
-        lineup: lineup,
-        dealer: dealer,
+        tableAddr,
+        handId,
+        lineup,
+        dealer,
         state: 'waiting',
-        deck: deck,
-        changed: changed
+        deck,
+        sb,
+        changed
       }
     }, function(err, data) {
       if (err) {
@@ -133,10 +125,7 @@ Db.prototype.updateDistribution = function(tableAddr, handId, distribution) {
   return new Promise(function (fulfill, reject) {
     var params = {
       TableName: self.tableName,
-      Key:{
-          tableAddr: tableAddr,
-          handId: handId
-      },
+      Key: { tableAddr, handId },
       UpdateExpression: 'set distribution = :d',
       ExpressionAttributeValues: {
         ':d': distribution
