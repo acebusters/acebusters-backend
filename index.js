@@ -1,18 +1,18 @@
-const AWS = require('aws-sdk');
-const doc = require('dynamodb-doc');
-const Web3 = require('web3');
+import doc from 'dynamodb-doc';
+import Web3 from 'web3';
 
-const Db = require('./lib/db');
-const EventWorker = require('./lib/index');
-const Table = require('./lib/tableContract');
-const Factory = require('./lib/factoryContract');
+import Db from './src/db';
+import EventWorker from './src/index';
+import Table from './src/tableContract';
+import Factory from './src/factoryContract';
 
-var web3Provider, dynamo;
+let web3Provider;
+let dynamo;
 
 exports.handler = function(event, context, callback) {
   console.log('Request received:\n', JSON.stringify(event));
   if (event.Records && event.Records instanceof Array) {
-    var web3;
+    let web3;
     if (!web3Provider) {
       web3 = new Web3();
       web3Provider = new web3.providers.HttpProvider(process.env.PROVIDER_URL);
@@ -25,15 +25,15 @@ exports.handler = function(event, context, callback) {
       dynamo = new doc.DynamoDB();
     }
 
-    var requests = [];
+    let requests = [];
     const worker = new EventWorker(table, factory, new Db(dynamo), process.env.ORACLE_PRIV);
-    for (var i = 0; i < event.Records.length; i++) {
+    for (let i = 0; i < event.Records.length; i+=1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }
-    Promise.all(requests).then(function(data) {
+    Promise.all(requests).then((data) => {
       console.log(JSON.stringify(data));
       callback(null, data);
-    }).catch(function(err) {
+    }).catch((err) => {
       console.log(JSON.stringify(err));
       console.log(err.stack);
       callback(err);
@@ -42,4 +42,4 @@ exports.handler = function(event, context, callback) {
     console.log('Context received:\n', JSON.stringify(context));
     console.log('taking no action.');
   }
-}
+};

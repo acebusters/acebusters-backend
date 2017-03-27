@@ -211,7 +211,7 @@ EventWorker.prototype.kickPlayer = function(tableAddr, pos) {
 }
 
 EventWorker.prototype.progressNettingRequest = function(tableAddr, handId) {
-  leaveHex = Receipt.leave(tableAddr, handId, this.oracleAddr).signToHex(this.oraclePriv);
+  const leaveHex = Receipt.leave(tableAddr, handId, this.oracleAddr).signToHex(this.oraclePriv);
   return this.table.leave(tableAddr, leaveHex);
 }
 
@@ -335,7 +335,7 @@ EventWorker.prototype.addPlayer = function(tableAddr) {
   const ddp = self.db.getLastHand(tableAddr);
   return Promise.all([lup, ddp]).then(function(responses) {
     hand = responses[1];
-    params = responses[0];
+    const params = responses[0];
     if (params.lastHandNetted > hand.handId)
       return Promise.reject('contract handId ' + params.lastHandNetted + ' ahead of table handId ' + hand.handId);
     if (!hand.lineup || hand.lineup.length != params.lineup.length)
@@ -379,7 +379,7 @@ EventWorker.prototype.removePlayer = function(tableAddr) {
   const ddp = self.db.getLastHand(tableAddr);
   return Promise.all([lup, ddp]).then(function(responses) {
     hand = responses[1];
-    params = responses[0];
+    const params = responses[0];
     if (params.lastHandNetted > hand.handId)
       return Promise.reject('contract handId ' + params.lastHandNetted + ' ahead of table handId ' + hand.handId);
     if (!hand.lineup || hand.lineup.length != params.lineup.length)
@@ -471,7 +471,7 @@ EventWorker.prototype.calcDistribution = function(tableAddr, hand) {
       });
     }
   }
-  console.log(JSON.stringify(pots));
+  //console.log(JSON.stringify(pots));
 
   // sort the pots
   pots.sort(function(a, b) {
@@ -495,7 +495,7 @@ EventWorker.prototype.calcDistribution = function(tableAddr, hand) {
       }
     }
   }
-  console.log(JSON.stringify(evals));
+  //console.log(JSON.stringify(evals));
 
   // solve hands
   const deck = [];
@@ -523,7 +523,7 @@ EventWorker.prototype.calcDistribution = function(tableAddr, hand) {
       evals[i].winners.push(pos);
     }
   }
-  console.log(JSON.stringify(evals));
+  //console.log(JSON.stringify(evals));
 
   // sum up pots by players and calc rake
   const winners = {};
@@ -543,7 +543,7 @@ EventWorker.prototype.calcDistribution = function(tableAddr, hand) {
     }
     winners[self.oracleAddr] += total;
   }
-  console.dir(winners);
+  //console.dir(winners);
 
   //distribute pots
   var dists = [];
