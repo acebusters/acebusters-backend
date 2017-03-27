@@ -120,6 +120,7 @@ describe('Stream worker HandComplete event', function() {
         deck: sinon.match.any,
         state: 'waiting',
         dealer: 1,
+        sb: 50,
         lineup: [{address: EMPTY_ADDR},{address: P1_ADDR},{address: P2_ADDR}],
         changed: sinon.match.any
       }, TableName: 'poker'});
@@ -171,6 +172,7 @@ describe('Stream worker HandComplete event', function() {
         deck: sinon.match.any,
         state: 'waiting',
         dealer: 0,
+        sb: 50,
         lineup: [ { address: P1_ADDR }, { address: P2_ADDR }, { address: P3_ADDR }, { address: P4_ADDR }, { address: EMPTY_ADDR } ],
         changed: sinon.match.any
       }, TableName: 'poker'});
@@ -259,6 +261,7 @@ describe('Stream worker HandComplete event', function() {
         deck: sinon.match.any,
         state: 'waiting',
         dealer: 0,
+        sb: 50,
         lineup: [{
           address: P1_ADDR
         },{
@@ -407,6 +410,7 @@ describe('Stream worker HandComplete event', function() {
         deck: sinon.match.any,
         state: 'waiting',
         dealer: 0,
+        sb: 50,
         lineup: [{
           address: P1_ADDR
         },{
@@ -570,16 +574,18 @@ describe('Stream worker other events', function() {
     const lineup = [new BigNumber(0), [EMPTY_ADDR, EMPTY_ADDR], [new BigNumber(0), new BigNumber(0)], [new BigNumber(0), new BigNumber(0)]];
     sinon.stub(dynamo, 'query').yields(null, { Items: []});
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'putItem').yields(null, {});
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
     Promise.all(worker.process(event)).then(function(rsp) {
-     expect(dynamo.putItem).calledWith({Item: {
+      expect(dynamo.putItem).calledWith({Item: {
         tableAddr: '0xa2de',
         handId: 1,
         deck: sinon.match.any,
         state: 'waiting',
         dealer: 0,
+        sb: 50,
         lineup: [{address: EMPTY_ADDR},{address: EMPTY_ADDR}],
         changed: sinon.match.any,
       }, TableName: 'poker'});
