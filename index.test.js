@@ -1209,7 +1209,8 @@ describe('Oracle get Hand', function() {
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
       state: 'river',
       lineup: [],
-      distribution: 'dist'
+      distribution: 'dist',
+      deck: deck
     }});
 
     var oracle = new Oracle(new Db(dynamo), null, rc);
