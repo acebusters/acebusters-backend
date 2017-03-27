@@ -5,10 +5,10 @@ const EWT = require('ethereum-web-token');
 const BigNumber = require('bignumber.js');
 const Receipt = require('poker-helper').Receipt;
 
-const EventWorker = require('./lib/index');
-const Table = require('./lib/tableContract');
-const Factory = require('./lib/factoryContract');
-const Db = require('./lib/db');
+const EventWorker = require('./src/index');
+const Table = require('./src/tableContract');
+const Factory = require('./src/factoryContract');
+const Db = require('./src/db');
 
 const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 const ABI_FOLD = [{name: 'fold', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
@@ -136,28 +136,29 @@ describe('Stream worker HandComplete event', function() {
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7'
     };
-    const lineup = [new BigNumber(1), [EMPTY_ADDR, P1_ADDR, P2_ADDR, P3_ADDR, EMPTY_ADDR], [new BigNumber(0), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(0)], [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)]];
+    const lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR, EMPTY_ADDR], [new BigNumber(3000), new BigNumber(3000), new BigNumber(3000), new BigNumber(3000), new BigNumber(0)], [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)]];
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
-    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(500));
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 2,
-      dealer: 2,
-      state: 'preflop',
+      dealer: 3,
+      state: 'showdown',
       lineup: [{
-        address: EMPTY_ADDR
-      }, {
         address: P1_ADDR,
-        last: 'eyJ0eXBlIjoiRVdUIiwiYWxnIjoiRVMyNTZrIn0.eyJmb2xkIjpbeyJ1aW50IjoyfSx7InVpbnQiOjEwMDB9XSwidiI6MX0.-fvwojvYXTskrQpfQMPib9qQqXsAMZ27apanwmOBtv0J5RJ-bHUUdmKIZIdouXYfQIwFUy2Gra9RmtdvOcdN0g'
+        last: new EWT(ABI_FOLD).fold(2, 350).sign(P1_PRIV)
       }, {
         address: P2_ADDR,
-        last: 'eyJ0eXBlIjoiRVdUIiwiYWxnIjoiRVMyNTZrIn0.eyJiZXQiOlt7InVpbnQiOjJ9LHsidWludCI6MTAwMDB9XSwidiI6MX0.8cJiJN6zJvu4yq3RbdETIo6Iz3LAJsfU2glwCR96xAdFbLwSc4-lLE5Va9SXiffjJQiyYlyXPiCAZnQyJbbeOA'
+        last: new EWT(ABI_BET).bet(2, 850).sign(P2_PRIV)
       }, {
         address: P3_ADDR,
-        last: 'eyJ0eXBlIjoiRVdUIiwiYWxnIjoiRVMyNTZrIn0.eyJmb2xkIjpbeyJ1aW50IjoyfSx7InVpbnQiOjUwMH1dLCJ2IjoxfQ.9pp-TgK9HJsK18M6L54wZ-eiwJO6GwpsFHc-jQ5hTT4pSuXIUn9a4L0Pmy9__sQh3SI8bMCxuRbS4Tb-hJBFtQ'
+        last: new EWT(ABI_SHOW).show(2, 850).sign(P3_PRIV)
+      }, {
+        address: P4_ADDR,
+        last: new EWT(ABI_FOLD).fold(2, 350).sign(P4_PRIV)
       }, {
         address: EMPTY_ADDR
       }],
-      deck: [26,47,39,33,20,50,28,6,32,10,7,42,46,0,24,9,4,37,51,14,22,30,48,43,3,41,25,5,2,15,45,13,40,17,29,38,18,11,21,12,49,36,16,34,1,19,44,27,8,23,31,35]
+      deck: [35,21,13,1,9,23,25,15,44,43,39,22,34,24,10,4,38,18,11,2,31,51,49,50,41,28]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'putItem').yields(null, {});
@@ -169,13 +170,13 @@ describe('Stream worker HandComplete event', function() {
         handId: 3,
         deck: sinon.match.any,
         state: 'waiting',
-        dealer: 3,
-        lineup: [ { address: EMPTY_ADDR }, { address: P1_ADDR }, { address: P2_ADDR }, { address: P3_ADDR }, { address: EMPTY_ADDR } ],
+        dealer: 0,
+        lineup: [ { address: P1_ADDR }, { address: P2_ADDR }, { address: P3_ADDR }, { address: P4_ADDR }, { address: EMPTY_ADDR } ],
         changed: sinon.match.any
       }, TableName: 'poker'});
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
-        EWT.concat(P2_ADDR, 11385).toString('hex'),
-        EWT.concat(ORACLE_ADDR, 115).toString('hex'),
+        EWT.concat(P3_ADDR, 2376).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 24).toString('hex'),
       ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
       done();
@@ -755,12 +756,12 @@ describe('Stream worker other events', function() {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    let trueIsh = sinon.match(function (value) {
+      const hasSeat = value.ExpressionAttributeValues[':s'].address === P2_ADDR;
+      const hasDealer = value.ExpressionAttributeValues[':d'] === 1;
+      return hasSeat && hasDealer;
+    }, "trueIsh");
     Promise.all(worker.process(event)).then(function(rsp) {
-      const trueIsh = sinon.match(function (value) {
-        const hasSeat = value.ExpressionAttributeValues[':s'].address === P2_ADDR;
-        const hasDealer = value.ExpressionAttributeValues[':d'] === 1;
-        return hasSeat && hasDealer;
-      }, "trueIsh");
       expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
       //expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
       done();
