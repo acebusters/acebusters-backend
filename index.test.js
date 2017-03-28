@@ -428,6 +428,8 @@ describe('Oracle pay', function() {
     var pfCheck = new EWT(ABI_CHECK_PRE).checkPre(1, 100).sign(P2_KEY);
     oracle.pay(tableAddr, pfCheck).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':m', 100)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('UpdateExpression', 'set lineup[1] = :l, #hand_state = :s, changed = :c, preMaxBet = :m'));
       done();
     }).catch(done);
   });
