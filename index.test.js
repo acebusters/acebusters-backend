@@ -8,6 +8,11 @@ const Sdb = require('./lib/sdb.js');
 const Dynamo = require('./lib/dynamo.js');
 const Contract = require('./lib/tableContract.js');
 
+const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
+const P2_ADDR = '0xe10f3d125e5f4c753a6456fc37123cf17c6900f2';
+const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
+
+
 var sdb = {
   getAttributes: function(){},
 };
@@ -144,8 +149,38 @@ describe('Interval Scanner', function() {
     var manager = new ScanManager(new Sdb(sdb), new Dynamo(dynamo), new Contract(web3), sns);
 
     manager.scan(set.id).then(function(rsp) {
-      expect(rsp.length).to.eql(1);
-      expect(rsp[0]).to.contain('ProgressNettingRequest');
+      expect(rsp[0].length).to.eql(1);
+      expect(rsp[0][0]).to.contain('ProgressNettingRequest');
+      done();
+    }).catch(done);
+  });
+
+  it('should kick a player', function(done) {
+    const now = Date.now() - (1000 * 60 * 10) // 10 minutes ago
+    sinon.stub(sdb, 'getAttributes').yields(null, {Attributes: [
+      { Name: 'addresses', Value: set.addresses[0]},
+      { Name: 'topicArn', Value: set.topicArn}
+    ]});
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 8,
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR,
+        sitout: now
+      }],
+    }]});
+    sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
+    sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(5));
+    sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(0));
+
+    var manager = new ScanManager(new Sdb(sdb), new Dynamo(dynamo), new Contract(web3), sns);
+
+    manager.scan(set.id).then(function(rsp) {
+      expect(rsp[0].length).to.eql(2);
+      expect(rsp[0][1]).to.contain('ProgressNettingRequest');
+      expect(rsp[0][0]).to.contain('Kick');
       done();
     }).catch(done);
   });
