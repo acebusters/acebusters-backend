@@ -32,6 +32,10 @@ const pusher = {
   trigger: function(){}
 };
 
+const sentry = {
+  captureMessage: function(){}
+}
+
 var rc = new ReceiptCache();
 
 describe('Stream worker', function() {
@@ -184,10 +188,10 @@ describe('Stream worker', function() {
         }
       }
     };
-
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc, sentry);
 
     worker.process(event).then(function(rsp) {
       expect(sns.publish).callCount(1);
@@ -321,10 +325,10 @@ describe('Stream worker', function() {
         }
       }
     };
-
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc, sentry);
 
     worker.process(event).then(function(rsp) {
       expect(sns.publish).callCount(2);
@@ -509,6 +513,7 @@ describe('Stream worker', function() {
 
 
   afterEach(function () {
+    if (sentry.captureMessage.restore) sentry.captureMessage.restore();
     if (sns.publish.restore) sns.publish.restore();
     if (pusher.trigger.restore) pusher.trigger.restore();
   });
