@@ -214,6 +214,7 @@ TableManager.prototype.updateState = function(tableAddr, hand, pos) {
     const bb = (max.amount <= hand.sb*2 ) ? hand.sb*2 : null;
     const bettingComplete = this.helper.allDone(hand.lineup, hand.dealer, hand.state, max.amount, bb);
     const handComplete = this.helper.checkForNextHand(hand);
+    let streetMaxBet;
     if (bettingComplete && !handComplete) {
       if (hand.state == 'river')
         hand.state = 'showdown';
@@ -225,6 +226,7 @@ TableManager.prototype.updateState = function(tableAddr, hand, pos) {
         hand.state = 'flop';
       if (hand.state == 'dealing')
         hand.state = 'preflop';
+      streetMaxBet = max.amount;
     }
     if (hand.state == 'waiting')
       hand.state = 'dealing';
@@ -236,7 +238,7 @@ TableManager.prototype.updateState = function(tableAddr, hand, pos) {
       hand.state = 'showdown';
     }
     // update db
-    return this.db.updateSeat(tableAddr, hand.handId, hand.lineup[pos], pos, hand.state, changed);
+    return this.db.updateSeat(tableAddr, hand.handId, hand.lineup[pos], pos, hand.state, changed, streetMaxBet);
 }
 
 TableManager.prototype.calcBalance = function(tableAddr, pos, receipt) {
@@ -308,7 +310,7 @@ TableManager.prototype.show = function(tableAddr, ewt, cards) {
     if (hand.lineup[pos].last == ewt)
       return Promise.reject('Unauthorized: you can not reuse receipts.');
 
-    prevReceipt = self.rc.get(hand.lineup[pos].last);
+    const prevReceipt = self.rc.get(hand.lineup[pos].last);
     if (receipt.values[1] < prevReceipt.values[1]) {
       return Promise.reject('Unauthorized: you have to submit show with same or highter amount as last receipt.');
     }
@@ -334,7 +336,7 @@ TableManager.prototype.show = function(tableAddr, ewt, cards) {
 }
 
 TableManager.prototype.leave = function(tableAddr, ewt) {
-  var self = this, hand, pos = -1, leaveReceipt
+  var self = this, hand, pos = -1, leaveReceipt,
     receipt = this.rc.get(ewt);
   var handId = receipt.values[0];
   // check if this hand exists

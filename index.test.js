@@ -5,9 +5,9 @@ const EWT = require('ethereum-web-token');
 var BigNumber = require('bignumber.js');
 var ReceiptCache = require('poker-helper').ReceiptCache;
 
-const Oracle = require('./lib/index');
-const Db = require('./lib/db');
-const TableContract = require('./lib/tableContract');
+const Oracle = require('./src/index');
+const Db = require('./src/db');
+const TableContract = require('./src/tableContract');
 
 // BET can replace lower bet
 // BET can replace SIT_OUT during dealing state
@@ -428,6 +428,8 @@ describe('Oracle pay', function() {
     var pfCheck = new EWT(ABI_CHECK_PRE).checkPre(1, 100).sign(P2_KEY);
     oracle.pay(tableAddr, pfCheck).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':m', 100)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('UpdateExpression', 'set lineup[1] = :l, #hand_state = :s, changed = :c, preMaxBet = :m'));
       done();
     }).catch(done);
   });

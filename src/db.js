@@ -78,7 +78,7 @@ Db.prototype.updateLeave = function(tableAddr, handId, seat, pos) {
   });
 }
 
-Db.prototype.updateSeat = function(tableAddr, handId, seat, pos, state, changed) {
+Db.prototype.updateSeat = function(tableAddr, handId, seat, pos, state, changed, streetMaxBet) {
   var self = this;
   return new Promise(function (fulfill, reject) {
     var params = {
@@ -97,6 +97,17 @@ Db.prototype.updateSeat = function(tableAddr, handId, seat, pos, state, changed)
         "#hand_state": "state"
       }
     };
+    if (streetMaxBet && streetMaxBet > 0) {
+      let attribute = 'preMaxBet';
+      if (state == 'showdown')
+        attribute = 'riverMaxBet';
+      if (state == 'river')
+        attribute = 'turnMaxBet';
+      if (state == 'turn')
+        attribute = 'flopMaxBet';
+      params.UpdateExpression += ', ' + attribute + ' = :m';
+      params.ExpressionAttributeValues[':m'] = streetMaxBet;
+    }
     self.dynamo.updateItem(params, function(err, rsp) {
       if (err) {
         reject(err);
