@@ -5,9 +5,9 @@ const EWT = require('ethereum-web-token');
 var BigNumber = require('bignumber.js');
 var ReceiptCache = require('poker-helper').ReceiptCache;
 
-const Oracle = require('./lib/index');
-const Db = require('./lib/db');
-const TableContract = require('./lib/tableContract');
+const Oracle = require('./src/index');
+const Db = require('./src/db');
+const TableContract = require('./src/tableContract');
 
 // BET can replace lower bet
 // BET can replace SIT_OUT during dealing state

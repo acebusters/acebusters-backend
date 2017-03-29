@@ -310,7 +310,7 @@ TableManager.prototype.show = function(tableAddr, ewt, cards) {
     if (hand.lineup[pos].last == ewt)
       return Promise.reject('Unauthorized: you can not reuse receipts.');
 
-    prevReceipt = self.rc.get(hand.lineup[pos].last);
+    const prevReceipt = self.rc.get(hand.lineup[pos].last);
     if (receipt.values[1] < prevReceipt.values[1]) {
       return Promise.reject('Unauthorized: you have to submit show with same or highter amount as last receipt.');
     }
@@ -336,7 +336,7 @@ TableManager.prototype.show = function(tableAddr, ewt, cards) {
 }
 
 TableManager.prototype.leave = function(tableAddr, ewt) {
-  var self = this, hand, pos = -1, leaveReceipt
+  var self = this, hand, pos = -1, leaveReceipt,
     receipt = this.rc.get(ewt);
   var handId = receipt.values[0];
   // check if this hand exists

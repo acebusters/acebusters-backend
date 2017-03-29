@@ -3,9 +3,9 @@ const Web3 = require('web3');
 const doc = require('dynamodb-doc');
 AWS.config.update({region: 'eu-west-1'});
 
-const Db = require('./lib/db');
-const TableContract = require('./lib/tableContract');
-const TableManager = require('./lib/index');
+const Db = require('./src/db');
+const TableContract = require('./src/tableContract');
+const TableManager = require('./src/index');
 var ReceiptCache = require('poker-helper').ReceiptCache;
 
 var web3, dynamo = new doc.DynamoDB();
