@@ -788,7 +788,6 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-
   it('should allow to come back from sitout in waiting with 3 players.', function(done) {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
@@ -823,6 +822,43 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should allow to come back from sitout by paying BB fold receipt.', function(done) {
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(0),
+      [P1_ADDR, P2_ADDR, , P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
+      [0, 0]
+    ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 1,
+      sb: 50,
+      state: 'flop',
+      dealer: 1,
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(1, 150).sign(P1_KEY)
+      }, {
+        address: P2_ADDR,
+        sitout: 1
+      }, {
+        address: P3_ADDR,
+        last: new EWT(ABI_BET).bet(1, 250).sign(P1_KEY)
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const fold = new EWT(ABI_FOLD).fold(1, 100).sign(P2_KEY);
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    oracle.pay(tableAddr, fold).then(function(rsp) {
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
+      const seat = {
+        address: P2_ADDR,
+        last: fold
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      done();
+    }).catch(done);
+  });
 
   it('should prevent check during wrong state.', function(done) {
     var check = new EWT(ABI_CHECK_PRE).checkPre(1, 100).sign(P2_KEY);
