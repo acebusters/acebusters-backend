@@ -133,6 +133,11 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
       // player coming back from sitout.
       delete hand.lineup[pos].sitout;
     }
+    // allow people to come back from sitout by paying BB
+    if (hand.state !== 'waiting' && hand.lineup[pos].sitout 
+      && receipt.abi[0].name === 'fold' && receipt.values[1] >= hand.sb * 2) {
+      delete hand.lineup[pos].sitout;
+    }
 
     //check bet not too small
     var max = self.helper.findMaxBet(hand.lineup);
