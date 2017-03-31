@@ -34,7 +34,7 @@ exports.handler = function (event, context, callback) {
     }
 
     let requests = [];
-    const worker = new EventWorker(table, factory, new Db(dynamo), process.env.ORACLE_PRIV);
+    const worker = new EventWorker(table, factory, new Db(dynamo), process.env.ORACLE_PRIV, Raven);
     for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }
