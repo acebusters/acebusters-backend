@@ -93,37 +93,37 @@ EventWorker.prototype.process = function (msg) {
   // handle TableLeave event:
   // fordward receipt signed by oracle to table.
   if (msgType === 'TableLeave') {
-    tasks.push(this.submitLeave(msgBody.tableAddr, msgBody.leaveReceipt).catch(this.err));
+    tasks.push(this.submitLeave(msgBody.tableAddr, msgBody.leaveReceipt));
   }
 
   // have the table propress in netting request, for that
   // we send a leave receipt from the oracle
   if (msgType === 'ProgressNettingRequest') {
-    tasks.push(this.progressNettingRequest(msg.Subject.split('::')[1], msgBody.handId).catch(this.err));
+    tasks.push(this.progressNettingRequest(msg.Subject.split('::')[1], msgBody.handId));
   }
 
   // have the table propress in netting
   // call the net function for that
   if (msgType === 'ProgressNetting') {
-    tasks.push(this.progressNetting(msg.Subject.split('::')[1]).catch(this.err));
+    tasks.push(this.progressNetting(msg.Subject.split('::')[1]));
   }
 
   // this is where we take all receipt and distributions
   // and send them to the contract to net
   if (msgType === 'HandleDispute') {
-    tasks.push(this.handleDispute(msgBody.tableAddr, msgBody.lastHandNetted, msgBody.lastNettingRequest).catch(this.err));
+    tasks.push(this.handleDispute(msgBody.tableAddr, msgBody.lastHandNetted, msgBody.lastNettingRequest));
   }
 
   // handle HandComplete event:
   if (msgType === 'HandComplete') {
-    tasks.push(this.putNextHand(msg.Subject.split('::')[1]).catch(this.err));
+    tasks.push(this.putNextHand(msg.Subject.split('::')[1]));
   }
 
   // handle TableNettingRequest:
   // we start preparing the netting in db.
   // create netting, sign by oracle, wait for others
   if (msgType === 'TableNettingRequest') {
-    tasks.push(this.createNetting(msgBody.tableAddr, msgBody.handId).catch(this.err));
+    tasks.push(this.createNetting(msgBody.tableAddr, msgBody.handId));
   }
 
   // handle TableNettingComplete, when everyone has signed
@@ -136,13 +136,13 @@ EventWorker.prototype.process = function (msg) {
         sigs += msgBody.netting[addr].replace('0x', '');
       }
     }
-    tasks.push(this.table.settle(msgBody.tableAddr, msgBody.netting.newBalances, sigs).catch(this.err));
+    tasks.push(this.table.settle(msgBody.tableAddr, msgBody.netting.newBalances, sigs));
   }
 
   // react to email confirmed. deploy proxy and controller
   // on the chain.
   if (msgType === 'EmailConfirmed') {
-    tasks.push(this.factory.createAccount(msgBody.signerAddr).catch(this.err));
+    tasks.push(this.factory.createAccount(msgBody.signerAddr));
     tasks.push(this.log(`EmailConfirmed: ${msgBody.signerAddr}`, {
       user: {
         id: msgBody.signerAddr,
@@ -156,19 +156,19 @@ EventWorker.prototype.process = function (msg) {
   // find all players that have lastHand == lastHandNetted
   // pay out those players
   if (msgType === 'ContractEvent' && msgBody.event === 'Netted') {
-    tasks.push(this.payoutPlayers(msgBody.address).catch(this.err));
+    tasks.push(this.payoutPlayers(msgBody.address));
   }
 
   // react to Join event in table contract:
   // find new player and add to lineup in dynamo
   if (msgType === 'ContractEvent' && msgBody.event === 'Join') {
-    tasks.push(this.addPlayer(msgBody.address).catch(this.err));
+    tasks.push(this.addPlayer(msgBody.address));
   }
 
   // react to Leave event in table contract:
   // find player and from lineup in dynamo
   if (msgType === 'ContractEvent' && msgBody.event === 'Leave') {
-    tasks.push(this.removePlayer(msgBody.address).catch(this.err));
+    tasks.push(this.removePlayer(msgBody.address));
   }
 
   // nothing to do
