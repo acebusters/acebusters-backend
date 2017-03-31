@@ -1,5 +1,6 @@
 import doc from 'dynamodb-doc';
 import Web3 from 'web3';
+import Raven from 'raven';
 
 import Db from './src/db';
 import EventWorker from './src/index';
@@ -9,8 +10,15 @@ import Factory from './src/factoryContract';
 let web3Provider;
 let dynamo;
 
-exports.handler = function(event, context, callback) {
+exports.handler = function (event, context, callback) {
   console.log('Request received:\n', JSON.stringify(event));
+
+  Raven.config(process.env.SENTRY_URL, {
+    captureUnhandledRejections: true,
+  }).install(() => {
+    callback(null, 'This is thy sheath; there rust, and let me die.');
+  });
+
   if (event.Records && event.Records instanceof Array) {
     let web3;
     if (!web3Provider) {
@@ -27,19 +35,25 @@ exports.handler = function(event, context, callback) {
 
     let requests = [];
     const worker = new EventWorker(table, factory, new Db(dynamo), process.env.ORACLE_PRIV);
-    for (let i = 0; i < event.Records.length; i+=1) {
+    for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }
     Promise.all(requests).then((data) => {
       console.log(JSON.stringify(data));
       callback(null, data);
     }).catch((err) => {
-      console.log(JSON.stringify(err));
-      console.log(err.stack);
-      callback(err);
+      Raven.captureException(err, (sendErr) => {
+        if (sendErr) {
+          console.log('Failed to send captured exception to Sentry');
+          console.log(JSON.stringify(sendErr));
+          callback(sendErr);
+          return;
+        }
+        callback(null, err);
+      });
     });
   } else {
     console.log('Context received:\n', JSON.stringify(context));
-    console.log('taking no action.');
+    callback(null, 'no action taken.');
   }
 };
