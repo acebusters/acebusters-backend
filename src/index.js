@@ -49,18 +49,6 @@ const contains = function (needle) {
   return indexOf.call(this, needle) > -1;
 };
 
-const err = function (sentry) {
-  const errFunc = function (e) {
-    sentry.captureException(e, (sendErr) => {
-      if (sendErr) {
-        console.error(`Failed to send captured exception to Sentry: ${sendErr}`);
-      }
-    });
-    return e;
-  };
-  return errFunc;
-};
-
 const shuffle = function () {
   const array = [];
   for (let i = 0; i < 52; i += 1) {
@@ -105,37 +93,37 @@ EventWorker.prototype.process = function (msg) {
   // handle TableLeave event:
   // fordward receipt signed by oracle to table.
   if (msgType === 'TableLeave') {
-    tasks.push(this.submitLeave(msgBody.tableAddr, msgBody.leaveReceipt).catch(err(this.sentry)));
+    tasks.push(this.submitLeave(msgBody.tableAddr, msgBody.leaveReceipt).catch(this.err));
   }
 
   // have the table propress in netting request, for that
   // we send a leave receipt from the oracle
   if (msgType === 'ProgressNettingRequest') {
-    tasks.push(this.progressNettingRequest(msg.Subject.split('::')[1], msgBody.handId).catch(err(this.sentry)));
+    tasks.push(this.progressNettingRequest(msg.Subject.split('::')[1], msgBody.handId).catch(this.err));
   }
 
   // have the table propress in netting
   // call the net function for that
   if (msgType === 'ProgressNetting') {
-    tasks.push(this.progressNetting(msg.Subject.split('::')[1]).catch(err(this.sentry)));
+    tasks.push(this.progressNetting(msg.Subject.split('::')[1]).catch(this.err));
   }
 
   // this is where we take all receipt and distributions
   // and send them to the contract to net
   if (msgType === 'HandleDispute') {
-    tasks.push(this.handleDispute(msgBody.tableAddr, msgBody.lastHandNetted, msgBody.lastNettingRequest).catch(err(this.sentry)));
+    tasks.push(this.handleDispute(msgBody.tableAddr, msgBody.lastHandNetted, msgBody.lastNettingRequest).catch(this.err));
   }
 
   // handle HandComplete event:
   if (msgType === 'HandComplete') {
-    tasks.push(this.putNextHand(msg.Subject.split('::')[1]).catch(err(this.sentry)));
+    tasks.push(this.putNextHand(msg.Subject.split('::')[1]).catch(this.err));
   }
 
   // handle TableNettingRequest:
   // we start preparing the netting in db.
   // create netting, sign by oracle, wait for others
   if (msgType === 'TableNettingRequest') {
-    tasks.push(this.createNetting(msgBody.tableAddr, msgBody.handId).catch(err(this.sentry)));
+    tasks.push(this.createNetting(msgBody.tableAddr, msgBody.handId).catch(this.err));
   }
 
   // handle TableNettingComplete, when everyone has signed
@@ -148,13 +136,13 @@ EventWorker.prototype.process = function (msg) {
         sigs += msgBody.netting[addr].replace('0x', '');
       }
     }
-    tasks.push(this.table.settle(msgBody.tableAddr, msgBody.netting.newBalances, sigs).catch(err(this.sentry)));
+    tasks.push(this.table.settle(msgBody.tableAddr, msgBody.netting.newBalances, sigs).catch(this.err));
   }
 
   // react to email confirmed. deploy proxy and controller
   // on the chain.
   if (msgType === 'EmailConfirmed') {
-    tasks.push(this.factory.createAccount(msgBody.signerAddr).catch(err(this.sentry)));
+    tasks.push(this.factory.createAccount(msgBody.signerAddr).catch(this.err));
     tasks.push(this.log(`EmailConfirmed: ${msgBody.signerAddr}`, {
       user: {
         id: msgBody.signerAddr,
@@ -168,23 +156,32 @@ EventWorker.prototype.process = function (msg) {
   // find all players that have lastHand == lastHandNetted
   // pay out those players
   if (msgType === 'ContractEvent' && msgBody.event === 'Netted') {
-    tasks.push(this.payoutPlayers(msgBody.address).catch(err(this.sentry)));
+    tasks.push(this.payoutPlayers(msgBody.address).catch(this.err));
   }
 
   // react to Join event in table contract:
   // find new player and add to lineup in dynamo
   if (msgType === 'ContractEvent' && msgBody.event === 'Join') {
-    tasks.push(this.addPlayer(msgBody.address).catch(err(this.sentry)));
+    tasks.push(this.addPlayer(msgBody.address).catch(this.err));
   }
 
   // react to Leave event in table contract:
   // find player and from lineup in dynamo
   if (msgType === 'ContractEvent' && msgBody.event === 'Leave') {
-    tasks.push(this.removePlayer(msgBody.address).catch(err(this.sentry)));
+    tasks.push(this.removePlayer(msgBody.address).catch(this.err));
   }
 
   // nothing to do
   return tasks;
+};
+
+EventWorker.prototype.err = function (e) {
+  this.sentry.captureException(e, (sendErr) => {
+    if (sendErr) {
+      console.error(`Failed to send captured exception to Sentry: ${sendErr}`);
+    }
+  });
+  return e;
 };
 
 EventWorker.prototype.log = function (message, context) {
