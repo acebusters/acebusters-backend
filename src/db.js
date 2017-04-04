@@ -4,7 +4,7 @@ function Db(dynamo) {
   this.tableName = 'poker';
 }
 
-Db.prototype.getHand = function (tableAddr, handId) {
+Db.prototype.getHand = function getHand(tableAddr, handId) {
   return new Promise((fulfill, reject) => {
     if (handId < 1) {
       fulfill({ distribution: {} }); // return the genensis hand
@@ -27,7 +27,7 @@ Db.prototype.getHand = function (tableAddr, handId) {
   });
 };
 
-Db.prototype.getLastHand = function (tableAddr) {
+Db.prototype.getLastHand = function getLastHand(tableAddr) {
   return new Promise((fulfill, reject) => {
     this.dynamo.query({
       TableName: this.tableName,
@@ -49,7 +49,7 @@ Db.prototype.getLastHand = function (tableAddr) {
   });
 };
 
-Db.prototype.updateSeat = function (tableAddr, handId, seat, pos, time, dealer) {
+Db.prototype.updateSeat = function updateSeat(tableAddr, handId, seat, pos, time, dealer) {
   return new Promise((fulfill, reject) => {
     const params = {
       TableName: this.tableName,
@@ -71,7 +71,7 @@ Db.prototype.updateSeat = function (tableAddr, handId, seat, pos, time, dealer) 
   });
 };
 
-Db.prototype.updateNetting = function (tableAddr, handId, netting) {
+Db.prototype.updateNetting = function updateNetting(tableAddr, handId, netting) {
   return new Promise((fulfill, reject) => {
     const params = {
       TableName: this.tableName,
@@ -90,7 +90,7 @@ Db.prototype.updateNetting = function (tableAddr, handId, netting) {
   });
 };
 
-Db.prototype.putHand = function (tableAddr, handId, lineup, dealer, deck, sb, changed) {
+Db.prototype.putHand = function putHand(tableAddr, handId, lineup, dealer, deck, sb, changed) {
   return new Promise((fulfill, reject) => {
     this.dynamo.putItem({
       TableName: this.tableName,
@@ -114,7 +114,7 @@ Db.prototype.putHand = function (tableAddr, handId, lineup, dealer, deck, sb, ch
   });
 };
 
-Db.prototype.updateDistribution = function (tableAddr, handId, distribution) {
+Db.prototype.updateDistribution = function updateDistribution(tableAddr, handId, distribution) {
   return new Promise((fulfill, reject) => {
     const params = {
       TableName: this.tableName,

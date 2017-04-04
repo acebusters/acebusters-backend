@@ -154,8 +154,11 @@ describe('Stream worker HandComplete event', () => {
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
     };
-    const lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR, EMPTY_ADDR], [new BigNumber(3000), new BigNumber(3000), new BigNumber(3000), new BigNumber(3000), new BigNumber(0)], [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
+      [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR, EMPTY_ADDR],
+      [new BigNumber(3000), new BigNumber(3000), new BigNumber(3000), new BigNumber(3000), new BigNumber(0)],
+      [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 2,
@@ -215,8 +218,11 @@ describe('Stream worker HandComplete event', () => {
         handId: 2,
       }),
     };
-    const lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 2,
@@ -249,8 +255,11 @@ describe('Stream worker HandComplete event', () => {
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
     };
-    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(1000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(1000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
@@ -296,25 +305,81 @@ describe('Stream worker HandComplete event', () => {
     }).catch(done);
   });
 
-  it('should calc dist for showdown with 2 winners.', (done) => {
-    const bet41 = new EWT(ABI_SHOW).show(4, 1000).sign(P1_PRIV);
-    const bet42 = new EWT(ABI_SHOW).show(4, 1000).sign(P2_PRIV);
-
+  it('should put leaving player into sitout.', (done) => {
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
     };
-    const lineup = [new BigNumber(3), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(1000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      // P1 has exit hand at 3
+      [new BigNumber(3), new BigNumber(0)],
+    ]);
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'showdown',
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV),
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV),
+      }],
+      changed: 234,
+      deck: [24, 25, 0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 2, 3],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    Promise.all(worker.process(event)).then((rsp) => {
+      const distHand3 = new EWT(ABI_DIST).distribution(3, 0, [
+        EWT.concat(P1_ADDR, 1980).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 20).toString('hex'),
+      ]).sign(ORACLE_PRIV, sentry);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
+      expect(dynamo.putItem).calledWith({ Item: {
+        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
+        handId: 4,
+        deck: sinon.match.any,
+        state: 'waiting',
+        dealer: 1,
+        sb: 50,
+        lineup: [{
+          address: P1_ADDR,
+          sitout: 1,
+          exitHand: 3,
+        }, {
+          address: P2_ADDR,
+        }],
+        changed: sinon.match.any,
+      },
+        TableName: 'poker' });
+      done();
+    }).catch(done);
+  });
+
+  it('should calc dist for showdown with 2 winners.', (done) => {
+    const event = {
+      Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
+    };
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(3),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(1000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 4,
       state: 'showdown',
       lineup: [{
         address: P1_ADDR,
-        last: bet41,
+        last: new EWT(ABI_SHOW).show(4, 1000).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: bet42,
+        last: new EWT(ABI_SHOW).show(4, 1000).sign(P2_PRIV),
       }],
       deck,
     }] });
@@ -336,33 +401,31 @@ describe('Stream worker HandComplete event', () => {
   });
 
   it('should calc dist for sidepot.', (done) => {
-    const bet41 = new EWT(ABI_SHOW).show(4, 400).sign(P1_PRIV);
-    const bet42 = new EWT(ABI_SHOW).show(4, 1100).sign(P2_PRIV);
-    const bet43 = new EWT(ABI_SHOW).show(4, 1100).sign(P3_PRIV);
-    const bet44 = new EWT(ABI_FOLD).fold(4, 50).sign(P4_PRIV);
-
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
     };
-    const lineup = [new BigNumber(3), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(400), new BigNumber(2000), new BigNumber(2000), new BigNumber(2000)], [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(3),
+      [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR],
+      [new BigNumber(400), new BigNumber(2000), new BigNumber(2000), new BigNumber(2000)],
+      [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 4,
       state: 'showdown',
       lineup: [{
         address: P1_ADDR,
-        last: bet41,
+        last: new EWT(ABI_SHOW).show(4, 400).sign(P1_PRIV),
         sitout: 'allin',
       }, {
         address: P2_ADDR,
-        last: bet42,
+        last: new EWT(ABI_SHOW).show(4, 1100).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
-        last: bet43,
+        last: new EWT(ABI_SHOW).show(4, 1100).sign(P3_PRIV),
       }, {
         address: P4_ADDR,
-        last: bet44,
+        last: new EWT(ABI_FOLD).fold(4, 50).sign(P4_PRIV),
       }],
       deck: [24, 25, 0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 22, 23, 14, 15, 16, 17, 18, 19, 20, 21, 12, 13, 2, 3],
     }] });
@@ -384,13 +447,6 @@ describe('Stream worker HandComplete event', () => {
   });
 
   it('should put broke players into sitout tracking back multiple hands.', (done) => {
-    const bet31 = new EWT(ABI_BET).bet(3, 500).sign(P1_PRIV);
-    const bet32 = new EWT(ABI_BET).bet(3, 1000).sign(P2_PRIV);
-    const distHand3 = new EWT(ABI_DIST).distribution(3, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV, sentry);
-    const bet41 = new EWT(ABI_BET).bet(4, 500).sign(P1_PRIV);
-    const bet42 = new EWT(ABI_BET).bet(4, 1000).sign(P2_PRIV);
-    const distHand4 = new EWT(ABI_DIST).distribution(4, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV, sentry);
-
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
       Message: JSON.stringify({
@@ -398,31 +454,34 @@ describe('Stream worker HandComplete event', () => {
         handId: 3,
       }),
     };
-    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(2075)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(2075)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       handId: 3,
       lineup: [{
         address: P1_ADDR,
-        last: bet31,
+        last: new EWT(ABI_BET).bet(3, 500).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: bet32,
+        last: new EWT(ABI_BET).bet(3, 1000).sign(P2_PRIV),
       }],
-      distribution: distHand3,
+      distribution: new EWT(ABI_DIST).distribution(3, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV, sentry),
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 4,
       lineup: [{
         address: P1_ADDR,
-        last: bet41,
+        last: new EWT(ABI_BET).bet(4, 500).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: bet42,
+        last: new EWT(ABI_BET).bet(4, 1000).sign(P2_PRIV),
       }],
       changed: 123,
-      distribution: distHand4,
+      distribution: new EWT(ABI_DIST).distribution(4, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV, sentry),
     }] });
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
@@ -482,8 +541,11 @@ describe('Stream worker other events', () => {
         leaveReceipt,
       }),
     };
-    const lineup = [new BigNumber(handId - 1), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(handId - 1),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
@@ -583,8 +645,11 @@ describe('Stream worker other events', () => {
         leaveReceipt,
       }),
     };
-    const lineup = [new BigNumber(handId), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(handId),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
     sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
@@ -601,9 +666,12 @@ describe('Stream worker other events', () => {
 
   it('should handle new Table.', (done) => {
     const event = { Subject: 'HandComplete::0xa2de', Message: '' };
-    const lineup = [new BigNumber(0), [EMPTY_ADDR, EMPTY_ADDR], [new BigNumber(0), new BigNumber(0)], [new BigNumber(0), new BigNumber(0)]];
     sinon.stub(dynamo, 'query').yields(null, { Items: [] });
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0),
+      [EMPTY_ADDR, EMPTY_ADDR],
+      [new BigNumber(0), new BigNumber(0)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
@@ -640,9 +708,12 @@ describe('Stream worker other events', () => {
         handId: 2,
       }),
     };
-    const lineup = [new BigNumber(0), [P1_ADDR, P2_ADDR, EMPTY_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(0)], [new BigNumber(0), new BigNumber(2), new BigNumber(0)]];
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0),
+      [P1_ADDR, P2_ADDR, EMPTY_ADDR],
+      [new BigNumber(50000), new BigNumber(50000), new BigNumber(0)],
+      [new BigNumber(0), new BigNumber(2), new BigNumber(0)],
+    ]);
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
@@ -765,8 +836,11 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(1), new BigNumber(2)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(1), new BigNumber(2)],
+    ]);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(contract.payoutFrom, 'sendTransaction')
       .yields(null, '0x123456')
@@ -791,8 +865,11 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    const lineup = [new BigNumber(2), [EMPTY_ADDR, P2_ADDR], [new BigNumber(0), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [EMPTY_ADDR, P2_ADDR],
+      [new BigNumber(0), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'waiting',
@@ -826,8 +903,11 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
@@ -857,8 +937,11 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR, P3_ADDR],
+      [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'flop',
@@ -889,8 +972,11 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    const lineup = [new BigNumber(2), [P1_ADDR, EMPTY_ADDR], [new BigNumber(50000), new BigNumber(0)], [new BigNumber(0), new BigNumber(0)]];
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, EMPTY_ADDR],
+      [new BigNumber(50000), new BigNumber(0)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       lineup: [{
