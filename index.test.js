@@ -1166,6 +1166,7 @@ describe('Oracle info', function() {
         deck: deck,
         lineup: [],
         changed: 123,
+        preMaxBet: 200,
         state: 'flop'
     }]});
 
@@ -1176,6 +1177,7 @@ describe('Oracle info', function() {
         dealer: 0,
         lineup: [],
         changed: 123,
+        preMaxBet: 200,
         state: 'flop'
       });
       done();
@@ -1189,6 +1191,8 @@ describe('Oracle info', function() {
         deck: deck,
         lineup: [],
         changed: 123,
+        preMaxBet: 200,
+        flopMaxBet: 300,
         state: 'turn'
     }]});
 
@@ -1199,6 +1203,8 @@ describe('Oracle info', function() {
         dealer: 0,
         lineup: [],
         changed: 123,
+        preMaxBet: 200,
+        flopMaxBet: 300,
         state: 'turn'
       });
       done();
@@ -1212,6 +1218,9 @@ describe('Oracle info', function() {
         deck: deck,
         lineup: [],
         changed: 123,
+        preMaxBet: 200,
+        flopMaxBet: 300,
+        turnMaxBet: 400,
         state: 'river'
     }]});
 
@@ -1222,6 +1231,9 @@ describe('Oracle info', function() {
         dealer: 0,
         lineup: [],
         changed: 123,
+        preMaxBet: 200,
+        flopMaxBet: 300,
+        turnMaxBet: 400,
         state: 'river'
       });
       done();
@@ -1242,6 +1254,10 @@ describe('Oracle info', function() {
         deck: deck,
         lineup: lineup,
         changed: 123,
+        preMaxBet: 200,
+        flopMaxBet: 300,
+        turnMaxBet: 400,
+        riverMaxBet: 500,
         distribution: 'dist',
         state: 'showdown'
     }]});
@@ -1260,6 +1276,10 @@ describe('Oracle info', function() {
           last: muck2
         }],
         changed: 123,
+        preMaxBet: 200,
+        flopMaxBet: 300,
+        turnMaxBet: 400,
+        riverMaxBet: 500,
         distribution: 'dist',
         state: 'showdown'
       });
