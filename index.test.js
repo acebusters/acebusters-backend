@@ -547,13 +547,16 @@ describe('Stream worker other events', () => {
       [new BigNumber(0), new BigNumber(0)],
     ]);
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(sentry, 'captureMessage').yields(null, 'sentry');
 
-    const worker = new EventWorker(new Table(web3, '0x1255'));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
 
     Promise.all(worker.process(event)).then((tx) => {
-      expect(tx[0]).to.eql(['0x112233', '']);
       expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith('tx: table.leave()', {
+        tags: { tableAddr, handId },
+        extra: { leaveHex, txHash: '0x112233' }
+      });
       done();
     }).catch(done);
   });
@@ -573,8 +576,11 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then((tx) => {
-      expect(tx[0]).to.eql('0x112233');
       expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith('tx: table.leave()', {
+        tags: { tableAddr, handId },
+        extra: { leaveHex, txHash: '0x112233' }
+      });
       done();
     }).catch(done);
   });
@@ -584,12 +590,16 @@ describe('Stream worker other events', () => {
 
     const event = { Subject: `ProgressNetting::${tableAddr}` };
     sinon.stub(contract.net, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
 
     Promise.all(worker.process(event)).then((tx) => {
-      expect(tx[0]).to.eql('0x112233');
       expect(contract.net.sendTransaction).calledWith({ from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith('tx: table.net()', {
+        tags: { tableAddr },
+        extra: { txHash: '0x112233' }
+      });
       done();
     }).catch(done);
   });
@@ -618,7 +628,7 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.submitBets, 'sendTransaction').yields(null, '0x445566');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
 
     Promise.all(worker.process(event)).then((tx) => {
       expect(tx[0]).to.eql(['0x112233', '0x445566']);
@@ -654,12 +664,19 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
 
     Promise.all(worker.process(event)).then((tx) => {
-      expect(tx[0]).to.eql(['0x112233', '0x445566']);
       expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(contract.payoutFrom.sendTransaction).calledWith(P1_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith('tx: table.leave()', {
+        tags: { tableAddr, handId },
+        extra: { txHash: '0x112233', leaveHex }
+      });
+      expect(sentry.captureMessage).calledWith('tx: table.payout()', {
+        tags: { tableAddr },
+        extra: { txHash: '0x445566', signerAddr: P1_ADDR }
+      });
       done();
     }).catch(done);
   });
@@ -771,10 +788,13 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
-      expect(rsp[0]).to.eql('0x123456');
       expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith('tx: table.settle()', {
+        tags: { tableAddr: '0x77aabb11ee00' },
+        extra: { txHash: '0x123456', bals: '0x112233', sigs: '0x223344334455445566' }
+      });
       done();
     }).catch(done);
   });
@@ -818,7 +838,7 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       expect(rsp[0]).to.eql(['0x123456']);
       expect(contract.payoutFrom.sendTransaction).calledWith(P2_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
@@ -846,7 +866,7 @@ describe('Stream worker other events', () => {
       .yields(null, '0x123456')
       .onFirstCall().yields(null, '0x789abc');
 
-    const worker = new EventWorker(new Table(web3, '0x1255'));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       expect(rsp[0]).to.eql(['0x789abc', '0x123456']);
       expect(contract.payoutFrom.sendTransaction).callCount(2);
@@ -881,7 +901,7 @@ describe('Stream worker other events', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     const trueIsh = sinon.match((value) => {
       const hasSeat = value.ExpressionAttributeValues[':s'].address === P2_ADDR;
       const hasDealer = value.ExpressionAttributeValues[':d'] === 1;
@@ -920,7 +940,7 @@ describe('Stream worker other events', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       const seat = { address: P2_ADDR };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
@@ -955,7 +975,7 @@ describe('Stream worker other events', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       const seat = { address: P3_ADDR, sitout: sinon.match.number };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
@@ -988,7 +1008,7 @@ describe('Stream worker other events', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo));
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       const seat = { address: EMPTY_ADDR };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));

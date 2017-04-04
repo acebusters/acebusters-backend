@@ -137,7 +137,12 @@ EventWorker.prototype.process = function process(msg) {
         sigs += msgBody.netting[addr].replace('0x', '');
       }
     }
-    tasks.push(this.table.settle(msgBody.tableAddr, msgBody.netting.newBalances, sigs));
+    tasks.push(this.table.settle(msgBody.tableAddr, msgBody.netting.newBalances, sigs).then((txHash) => {
+      return this.log('tx: table.settle()', {
+        tags: { tableAddr: msgBody.tableAddr },
+        extra: { bals: msgBody.netting.newBalances, sigs, txHash },
+      });
+    }));
   }
 
   // react to email confirmed. deploy proxy and controller
@@ -209,13 +214,26 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaveReceipt
   }
   return this.table.leave(tableAddr, leaveHex).then((_txHash) => {
     txHash = _txHash;
-    return this.table.getLineup(tableAddr);
+    const logProm = this.log('tx: table.leave()', {
+      tags: { tableAddr, handId: leave.handId },
+      extra: { txHash, leaveHex },
+    });
+    const lineupProm = this.table.getLineup(tableAddr);
+    return Promise.all([lineupProm, logProm]);
   }).then((rsp) => {
-    if (rsp.lastHandNetted >= leave.handId) {
-      return this.table.payout(tableAddr, leave.signerAddr);
+    if (rsp[0].lastHandNetted >= leave.handId) {
+      return this.table.payout(tableAddr, leave.signerAddr).then((_txHash) => {
+        return this.log('tx: table.payout()', {
+          tags: { tableAddr },
+          extra: {
+            txHash: _txHash,
+            signerAddr: leave.signerAddr,
+          },
+        });
+      });
     }
     return Promise.resolve('');
-  }).then(payoutHash => Promise.resolve([txHash, payoutHash]));
+  }).then((payoutHash) => Promise.resolve([txHash, payoutHash]));
 };
 
 EventWorker.prototype.progressNettingRequest = function progressNettingRequest(tableAddr, handId) {
@@ -235,11 +253,21 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
 
 EventWorker.prototype.progressNettingRequest = function progressNettingRequest(tableAddr, handId) {
   const leaveHex = Receipt.leave(tableAddr, handId, this.oracleAddr).signToHex(this.oraclePriv);
-  return this.table.leave(tableAddr, leaveHex);
+  return this.table.leave(tableAddr, leaveHex).then((txHash) => {
+    return this.log('tx: table.leave()', {
+      tags: { tableAddr, handId },
+      extra: { leaveHex, txHash },
+    });
+  });
 };
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
-  return this.table.net(tableAddr);
+  return this.table.net(tableAddr).then((txHash) => {
+    return this.log('tx: table.net()', {
+      tags: { tableAddr },
+      extra: { txHash }
+    });
+  });
 };
 
 EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
@@ -247,17 +275,18 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
   const receipts = [];
   const dists = [];
   const handProms = [];
+  let txHash;
   let txHash1;
   let betsHex = '0x';
   let betSigs = '0x';
+  let distsHex = '0x';
+  let distSigs = '0x';
   for (let i = lastHandNetted + 1; i <= lastNettingRequest; i += 1) {
     handProms.push(this.db.getHand(tableAddr, i));
   }
   return Promise.all(handProms).then((hands) => {
     let i;
     let pos;
-    let distsHex = '0x';
-    let distSigs = '0x';
     // sum up previous hands
     for (i = 0; i < hands.length; i += 1) {
       for (pos = 0; pos < hands[i].lineup.length; pos += 1) {
@@ -286,8 +315,21 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
     return this.table.submitDists(tableAddr, distsHex, distSigs);
   }).then((_txHash) => {
     txHash1 = _txHash;
-    return this.table.submitBets(tableAddr, betsHex, betSigs);
-  }).then(txHash => [txHash1, txHash]);
+    const logProm = this.log('tx: table.submitDists()', {
+      tags: { tableAddr },
+      extra: { txHash: txHash1, distsHex, distSigs }
+    });
+    const betsProm = this.table.submitBets(tableAddr, betsHex, betSigs);
+    return Promise.all([betsProm, logProm]);
+  }).then((rsp) => {
+    txHash = rsp[0];
+    return this.log('tx: table.submitBets()', {
+      tags: { tableAddr },
+      extra: { txHash: txHash, betsHex, betSigs }
+    });
+  }).then(() => {
+    return Promise.resolve([txHash1, txHash]);
+  });
 };
 
 EventWorker.prototype.payoutPlayers = function payoutPlayers(tableAddr) {
