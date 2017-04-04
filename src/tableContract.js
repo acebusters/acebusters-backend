@@ -5,7 +5,7 @@ function TableContract(web3, senderAddr) {
   this.senderAddr = senderAddr;
 }
 
-TableContract.prototype.leave = function (tableAddr, leaveReceipt) {
+TableContract.prototype.leave = function leave(tableAddr, leaveReceipt) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.leave.sendTransaction(leaveReceipt,
@@ -20,7 +20,7 @@ TableContract.prototype.leave = function (tableAddr, leaveReceipt) {
   });
 };
 
-TableContract.prototype.settle = function (tableAddr, newBalances, sigs) {
+TableContract.prototype.settle = function settle(tableAddr, newBalances, sigs) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.settle.sendTransaction(newBalances, sigs,
@@ -35,7 +35,7 @@ TableContract.prototype.settle = function (tableAddr, newBalances, sigs) {
   });
 };
 
-TableContract.prototype.net = function (tableAddr) {
+TableContract.prototype.net = function net(tableAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.net.sendTransaction({ from: this.senderAddr, gas: 2600000 },
@@ -49,7 +49,7 @@ TableContract.prototype.net = function (tableAddr) {
   });
 };
 
-TableContract.prototype.submitDists = function (tableAddr, distsHex, sigsHex) {
+TableContract.prototype.submitDists = function submitDists(tableAddr, distsHex, sigsHex) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.submitDists.sendTransaction(distsHex, sigsHex,
@@ -64,7 +64,7 @@ TableContract.prototype.submitDists = function (tableAddr, distsHex, sigsHex) {
   });
 };
 
-TableContract.prototype.submitBets = function (tableAddr, betsHex, sigsHex) {
+TableContract.prototype.submitBets = function submitBets(tableAddr, betsHex, sigsHex) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.submitBets.sendTransaction(betsHex, sigsHex,
@@ -79,7 +79,7 @@ TableContract.prototype.submitBets = function (tableAddr, betsHex, sigsHex) {
   });
 };
 
-TableContract.prototype.payout = function (tableAddr, signerAddr) {
+TableContract.prototype.payout = function payout(tableAddr, signerAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.payoutFrom.sendTransaction(signerAddr,
@@ -94,7 +94,7 @@ TableContract.prototype.payout = function (tableAddr, signerAddr) {
   });
 };
 
-TableContract.prototype.getSmallBlind = function (tableAddr) {
+TableContract.prototype.getSmallBlind = function getSmallBlind(tableAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.smallBlind.call((err, val) => {
@@ -107,7 +107,7 @@ TableContract.prototype.getSmallBlind = function (tableAddr) {
   });
 };
 
-TableContract.prototype.getLineup = function (tableAddr) {
+TableContract.prototype.getLineup = function getLineup(tableAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.getLineup.call((err, data) => {

@@ -10,7 +10,7 @@ import Factory from './src/factoryContract';
 let web3Provider;
 let dynamo;
 
-exports.handler = function (event, context, callback) {
+exports.handler = function handler(event, context, callback) {
   console.log('Request received:\n', JSON.stringify(event));
 
   Raven.config(process.env.SENTRY_URL, {

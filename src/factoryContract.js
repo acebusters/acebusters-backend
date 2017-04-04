@@ -6,7 +6,7 @@ function FactoryContract(web3, senderAddr, factoryAddr) {
   this.factoryAddr = factoryAddr;
 }
 
-FactoryContract.prototype.createAccount = function (signerAddr) {
+FactoryContract.prototype.createAccount = function createAccount(signerAddr) {
   const contract = this.web3.eth.contract(FACTORY_ABI).at(this.factoryAddr);
   return new Promise((fulfill, reject) => {
     contract.create.sendTransaction(signerAddr, this.senderAddr, 259200,
