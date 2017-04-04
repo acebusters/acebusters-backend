@@ -395,8 +395,8 @@ describe('Oracle pay', function() {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-    const pfCheck = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    oracle.pay(tableAddr, pfCheck).then(function(rsp) {
+    const bet = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    oracle.pay(tableAddr, bet).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
       done();
     }).catch(done);
@@ -1557,7 +1557,7 @@ describe('Oracle leave', function() {
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
       const seat = {
         address: P1_ADDR,
-        lastHand: 2,
+        exitHand: 2,
         leaveReceipt: leaveReceipt
       }
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
@@ -1584,7 +1584,7 @@ describe('Oracle leave', function() {
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
       const seat = {
         address: P1_ADDR,
-        lastHand: 2,
+        exitHand: 2,
         sitout: 1,
         leaveReceipt: leaveReceipt
       }
