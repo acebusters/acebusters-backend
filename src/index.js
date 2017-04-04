@@ -118,8 +118,8 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     if (pos < 0)
       return Promise.reject('Forbidden: address ' + receipt.signer + ' not in lineup.');
     //check signer not leaving
-    if (hand.lineup[pos].lastHand && hand.lineup[pos].lastHand < hand.handId)
-      return Promise.reject('Forbidden: lastHand ' + hand.lineup[pos].lastHand + ' exceeded.');
+    if (hand.lineup[pos].exitHand && hand.lineup[pos].exitHand < hand.handId)
+      return Promise.reject('Forbidden: exitHand ' + hand.lineup[pos].exitHand + ' exceeded.');
     //check ewt not reused
     if (hand.lineup[pos].last == ewt)
       return Promise.reject('Unauthorized: you can not reuse receipts.');
@@ -366,15 +366,15 @@ TableManager.prototype.leave = function(tableAddr, ewt) {
     if (pos < 0)
       return Promise.reject('Forbidden: address ' + receipt.signer + ' not in lineup.');
     // check signer not submitting another leave receipt
-    if (hand.lineup[pos] && hand.lineup[pos].lastHand)
-      return Promise.reject('Forbidden: lastHand ' + hand.lineup[pos].lastHand + ' already set.');
+    if (hand.lineup[pos] && hand.lineup[pos].exitHand)
+      return Promise.reject('Forbidden: exitHand ' + hand.lineup[pos].exitHand + ' already set.');
     leaveReceipt = Receipt.leave(tableAddr, handId, receipt.signer).sign(self.oraclePriv);
-    // put leave receipt into lineup and set lastHand
+    // put leave receipt into lineup and set exitHand
     if (!hand.lineup[pos]) {
       hand.lineup[pos] = {};
     }
     hand.lineup[pos].leaveReceipt = leaveReceipt;
-    hand.lineup[pos].lastHand = receipt.values[0];
+    hand.lineup[pos].exitHand = receipt.values[0];
     if (receipt.values[0] < hand.handId) {
       hand.lineup[pos].sitout = 1;
     }
