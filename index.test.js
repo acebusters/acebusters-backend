@@ -3,10 +3,10 @@ const sinon = require('sinon');
 require('chai').use(require('sinon-chai'));
 const BigNumber = require('bignumber.js');
 
-const ScanManager = require('./lib/scanner');
-const Sdb = require('./lib/sdb.js');
-const Dynamo = require('./lib/dynamo.js');
-const Contract = require('./lib/tableContract.js');
+const ScanManager = require('./src/scanner');
+const Sdb = require('./src/sdb.js');
+const Dynamo = require('./src/dynamo.js');
+const Contract = require('./src/tableContract.js');
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P2_ADDR = '0xe10f3d125e5f4c753a6456fc37123cf17c6900f2';
@@ -150,7 +150,7 @@ describe('Interval Scanner', function() {
 
     manager.scan(set.id).then(function(rsp) {
       expect(rsp[0].length).to.eql(1);
-      expect(rsp[0][0]).to.contain('ProgressNettingRequest');
+      expect(rsp[0][0]).to.contain('TableNettingRequest');
       done();
     }).catch(done);
   });
@@ -179,7 +179,7 @@ describe('Interval Scanner', function() {
 
     manager.scan(set.id).then(function(rsp) {
       expect(rsp[0].length).to.eql(2);
-      expect(rsp[0][1]).to.contain('ProgressNettingRequest');
+      expect(rsp[0][1]).to.contain('TableNettingRequest');
       expect(rsp[0][0]).to.contain('Kick');
       done();
     }).catch(done);

@@ -1,23 +1,48 @@
 
-function ScanManager(sdb, dynamo, contract, sns) {
+function ScanManager(sdb, dynamo, contract, sns, sentry) {
   this.sdb = sdb;
   this.dynamo = dynamo;
   this.contract = contract;
   this.sns = sns;
+  this.sentry = sentry;
 }
 
 ScanManager.prototype.scan = function(setId) {
   const self = this;
   const actions = [];
-  return this.sdb.getContractSet(setId).then(function(set) {
-    if (!set.addresses || set.addresses.length == 0)
-      return Promise.reject('no contracts to scan');
+  return this.sdb.getContractSet(setId).then((set) => {
+    if (!set.addresses || set.addresses.length == 0) {
+      this.log('no contracts to scan');
+    }
     set.addresses.forEach(function(tableAddr) {
       actions.push(self.handleTable(tableAddr, set.topicArn));
     });
     return Promise.all(actions);
   })
 }
+
+ScanManager.prototype.err = function err(e) {
+  this.sentry.captureException(e, (sendErr) => {
+    if (sendErr) {
+      console.error(`Failed to send captured exception to Sentry: ${sendErr}`);
+    }
+  });
+  return e;
+};
+
+ScanManager.prototype.log = function log(message, context) {
+  const cntxt = (context) ? context : {};
+  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
+  return new Promise((fulfill, reject) => {
+    this.sentry.captureMessage(message, cntxt, (error, eventId) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      fulfill(eventId);
+    });
+  });
+};
 
 ScanManager.prototype.handleTable = function(tableAddr, topicArn) {
   const self = this;
@@ -31,10 +56,15 @@ ScanManager.prototype.handleTable = function(tableAddr, topicArn) {
     lnt = rsp[2];
     if (lnr > lhn) {
       const now = Math.floor(Date.now() / 1000);
-      if (lnt + 60 * 10 < now) {
-        // if the dispute period is over
-        // send transaction to net up in contract
-        return self.notify({}, 'ProgressNetting::' + tableAddr, topicArn);
+      if (lnt + (60 * 10) < now) {
+        if (lnt + (60 * 60) > now) {
+          // if the dispute period is over
+          // send transaction to net up in contract
+          return self.notify({}, 'ProgressNetting::' + tableAddr, topicArn);
+        } else {
+          // if dispute period is over since more than 1 hour,
+          // do nothing
+        }
       } else {
         // don't react to netting requests younger than 3 minutes,
         // if it is older, and there is still time to sibmit receipt,
@@ -62,17 +92,22 @@ ScanManager.prototype.handleTable = function(tableAddr, topicArn) {
     }
     // check if any of the sitout flags are older than 5 min
     if (rsp.lineup) {
-      const old = Date.now() - (1000 * 5 * 60); // 5 minutes
+      // 5 minutes
+      const old = Date.now() - (1000 * 5 * 60);
+      // if the receipt is older than 1 hour, ignore it
+      const tooOld = Date.now() - (1000 * 60 * 60);
       for (var i = 0; i < rsp.lineup.length; i++) {
         if (rsp.lineup[i].sitout && typeof rsp.lineup[i].sitout === 'number') {
-          if (rsp.lineup[i].sitout < old) {
+          if (rsp.lineup[i].sitout < old && rsp.lineup[i].sitout > tooOld) {
             results.push(self.notify({ pos: i, tableAddr: tableAddr }, 'Kick::' + tableAddr, topicArn));
           }
         }
       }
     }
-    if (rsp.handId > lhn + 1) {
-      results.push(self.notify({handId: rsp.handId}, 'ProgressNettingRequest::' + tableAddr, topicArn));
+    if (rsp.handId >= lhn + 2) {
+      // if there are more than 2 hands not netted
+      // prepare netting in db
+      results.push(self.notify({ handId: rsp.handId-1, tableAddr: tableAddr }, 'TableNettingRequest::' + tableAddr, topicArn));
     }
     return Promise.all(results);
   });
@@ -80,12 +115,12 @@ ScanManager.prototype.handleTable = function(tableAddr, topicArn) {
 
 ScanManager.prototype.notify = function(event, subject, topicArn) {
   const self = this;
-  return new Promise(function (fulfill, reject) {
+  return new Promise((fulfill, reject) => {
     self.sns.publish({
       Message: JSON.stringify(event),
       Subject: subject,
       TopicArn: topicArn
-    }, function(err, rsp){
+    }, (err, rsp) => {
       if (err) {
         reject(err);
         return;
