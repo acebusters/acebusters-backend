@@ -96,12 +96,6 @@ EventWorker.prototype.process = function process(msg) {
     tasks.push(this.submitLeave(msgBody.tableAddr, msgBody.leaveReceipt));
   }
 
-  // have the table propress in netting request, for that
-  // we send a leave receipt from the oracle
-  if (msgType === 'ProgressNettingRequest') {
-    tasks.push(this.progressNettingRequest(msg.Subject.split('::')[1], msgBody.handId));
-  }
-
   // have the table propress in netting
   // call the net function for that
   if (msgType === 'ProgressNetting') {
@@ -191,8 +185,10 @@ EventWorker.prototype.err = function err(e) {
 };
 
 EventWorker.prototype.log = function log(message, context) {
+  const cntxt = (context) ? context : {};
+  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
   return new Promise((fulfill, reject) => {
-    this.sentry.captureMessage(message, context, (error, eventId) => {
+    this.sentry.captureMessage(message, cntxt, (error, eventId) => {
       if (error) {
         reject(error);
         return;
@@ -236,11 +232,6 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaveReceipt
   }).then((payoutHash) => Promise.resolve([txHash, payoutHash]));
 };
 
-EventWorker.prototype.progressNettingRequest = function progressNettingRequest(tableAddr, handId) {
-  const leaveHex = Receipt.leave(tableAddr, handId, this.oracleAddr).signToHex(this.oraclePriv);
-  return this.table.leave(tableAddr, leaveHex);
-};
-
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
   // 1. get last hand
   // 2. check player really overstayed sitout
@@ -249,16 +240,6 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
   // 5. make receipt
   // 6. store in lineup
   // 7. send to contract
-};
-
-EventWorker.prototype.progressNettingRequest = function progressNettingRequest(tableAddr, handId) {
-  const leaveHex = Receipt.leave(tableAddr, handId, this.oracleAddr).signToHex(this.oraclePriv);
-  return this.table.leave(tableAddr, leaveHex).then((txHash) => {
-    return this.log('tx: table.leave()', {
-      tags: { tableAddr, handId },
-      extra: { leaveHex, txHash },
-    });
-  });
 };
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {

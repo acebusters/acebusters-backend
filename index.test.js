@@ -554,30 +554,7 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then((tx) => {
       expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.leave()', {
-        tags: { tableAddr, handId },
-        extra: { leaveHex, txHash: '0x112233' }
-      });
-      done();
-    }).catch(done);
-  });
-
-  it('should handle ProgressNettingRequest event.', (done) => {
-    const handId = 5;
-    const tableAddr = EMPTY_ADDR;
-    const leaveHex = Receipt.leave(tableAddr, handId, ORACLE_ADDR).signToHex(ORACLE_PRIV, sentry);
-
-    const event = {
-      Subject: `ProgressNettingRequest::${tableAddr}`,
-      Message: JSON.stringify({ handId }),
-    };
-    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
-
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV, sentry);
-
-    Promise.all(worker.process(event)).then((tx) => {
-      expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
-      expect(sentry.captureMessage).calledWith('tx: table.leave()', {
+        level: sinon.match.any,
         tags: { tableAddr, handId },
         extra: { leaveHex, txHash: '0x112233' }
       });
@@ -597,6 +574,7 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then((tx) => {
       expect(contract.net.sendTransaction).calledWith({ from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.net()', {
+        level: sinon.match.any,
         tags: { tableAddr },
         extra: { txHash: '0x112233' }
       });
@@ -670,10 +648,12 @@ describe('Stream worker other events', () => {
       expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(contract.payoutFrom.sendTransaction).calledWith(P1_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.leave()', {
+        level: sinon.match.any,
         tags: { tableAddr, handId },
         extra: { txHash: '0x112233', leaveHex }
       });
       expect(sentry.captureMessage).calledWith('tx: table.payout()', {
+        level: sinon.match.any,
         tags: { tableAddr },
         extra: { txHash: '0x445566', signerAddr: P1_ADDR }
       });
@@ -792,6 +772,7 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then((rsp) => {
       expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.settle()', {
+        level: sinon.match.any,
         tags: { tableAddr: '0x77aabb11ee00' },
         extra: { txHash: '0x123456', bals: '0x112233', sigs: '0x223344334455445566' }
       });
