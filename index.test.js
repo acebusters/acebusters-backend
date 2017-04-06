@@ -361,7 +361,7 @@ describe('Stream worker HandComplete event', () => {
     }).catch(done);
   });
 
-  it('should calc dist for showdown with 2 winners.', (done) => {
+  it('should calc dist for showdown with 2 winners and odd amounts.', (done) => {
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
     };
@@ -376,10 +376,10 @@ describe('Stream worker HandComplete event', () => {
       state: 'showdown',
       lineup: [{
         address: P1_ADDR,
-        last: new EWT(ABI_SHOW).show(4, 1000).sign(P1_PRIV),
+        last: new EWT(ABI_SHOW).show(4, 1050).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new EWT(ABI_SHOW).show(4, 1000).sign(P2_PRIV),
+        last: new EWT(ABI_SHOW).show(4, 1050).sign(P2_PRIV),
       }],
       deck,
     }] });
@@ -390,9 +390,9 @@ describe('Stream worker HandComplete event', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       const distHand4 = new EWT(ABI_DIST).distribution(4, 0, [
-        EWT.concat(P1_ADDR, 990).toString('hex'),
-        EWT.concat(P2_ADDR, 990).toString('hex'),
-        EWT.concat(ORACLE_ADDR, 20).toString('hex'),
+        EWT.concat(P1_ADDR, 1039).toString('hex'),
+        EWT.concat(P2_ADDR, 1039).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 22).toString('hex'),
       ]).sign(ORACLE_PRIV, sentry);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand4)));
       expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 5)));
