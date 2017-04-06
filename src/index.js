@@ -595,7 +595,7 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
       if (!winners[addr]) {
         winners[addr] = 0;
       }
-      const share = (evals[i].size - Math.round(evals[i].size * RAKE)) / evals[i].winners.length;
+      const share = Math.floor((evals[i].size - (evals[i].size * RAKE)) / evals[i].winners.length);
       total -= share;
       winners[addr] += share;
     }
