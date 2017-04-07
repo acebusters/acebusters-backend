@@ -120,6 +120,7 @@ TableManager.prototype.hand = function(tableAddr, handId) {
 TableManager.prototype.pay = function(tableAddr, ewt) {
   const self = this;
   const receipt = this.rc.get(ewt);
+  const now = Math.floor(Date.now() / 1000);
   const handId = receipt.values[0];
   var hand, turn, dist, deck, params, prevReceipt, pos = -1;
   return this.db.getLastHand(tableAddr).then(function(_hand) {
@@ -148,11 +149,6 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
         return Promise.reject('Bad Request: not enough players to start game.');
       }
       // player coming back from sitout.
-      delete hand.lineup[pos].sitout;
-    }
-    // allow people to come back from sitout by paying BB
-    if (hand.state !== 'waiting' && hand.lineup[pos].sitout 
-      && receipt.abi[0].name === 'fold' && receipt.values[1] >= hand.sb * 2) {
       delete hand.lineup[pos].sitout;
     }
 
@@ -190,12 +186,33 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     max.amount = (receipt.values[1] > max.amount) ? receipt.values[1] : max.amount;
     turn = self.helper.isMyTurn(hand, pos);
     if (hand.state === 'waiting') {
-      if (!turn && activeCount > 1) {
-        return Promise.reject('Bad Request: not your turn to pay small blind.');
+      if (receipt.values[1] === 0 && receipt.abi[0].name == 'sitOut') {
+        hand.lineup[pos].sitout = now;
+      } else {
+        if (!turn && activeCount > 1) {
+          return Promise.reject('Bad Request: not your turn to pay small blind.');
+        }
+        //check if receipt is small blind?
+        if (receipt.values[1] !== hand.sb) {
+          return Promise.reject('Bad Request: small blind not valid.');
+        }
       }
-      //check if receipt is small blind?
-      if (receipt.values[1] !== hand.sb) {
-        return Promise.reject('Bad Request: small blind not valid.');
+    } else {
+      if (receipt.abi[0].name == 'sitOut') {
+        if (receipt.values[1] <= 0) {
+          return Promise.reject('Unauthorized: need to pay for after state waiting.');
+        } else {
+          if (hand.lineup[pos].sitout) {
+            // allow people to come back from sitout by paying BB
+            if (receipt.values[1] >= hand.sb * 2) {
+              delete hand.lineup[pos].sitout;
+            } else {
+              return Promise.reject('Unauthorized: need to pay BB to return.');
+            }
+          } else {
+            hand.lineup[pos].sitout = now;
+          }
+        } 
       }
     }
     if (hand.state === 'dealing') {
