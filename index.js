@@ -1,7 +1,8 @@
-const AWS = require('aws-sdk');
-const StreamWorker = require('./lib/index');
-var Pusher = require('pusher');
-var ReceiptCache = require('poker-helper').ReceiptCache;
+import AWS from 'aws-sdk';
+import Pusher from 'pusher';
+import { ReceiptCache } from 'poker-helper';
+
+import StreamWorker from './src/index';
 
 var pusher = new Pusher({
   appId: '314687',
