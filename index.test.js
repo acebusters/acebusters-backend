@@ -76,8 +76,29 @@ describe('Interval Scanner', () => {
     }).catch(done);
   });
 
-  it('should handle multiple contracts', (done) => {
+  it('should do nothing with netting request older than 1 hour', (done) => {
     const now = Math.floor(Date.now() / 1000);
+    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
+      { Name: 'addresses', Value: set.addresses[0] },
+      { Name: 'topicArn', Value: set.topicArn },
+    ] });
+    sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
+    sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
+    sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+
+    const manager = new ScanManager(new Sdb(sdb), null, new Contract(web3), sns, sentry);
+
+    manager.scan(set.id).then(() => {
+      expect(sentry.captureMessage).callCount(0);
+      expect(sns.publish).callCount(0);
+      done();
+    }).catch(done);
+  });
+
+  it('should handle multiple contracts', (done) => {
+    const now = Math.floor(Date.now() / 1000) - 3601;
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
       { Name: 'addresses', Value: set.addresses[0] },
       { Name: 'addresses', Value: set.addresses[1] },

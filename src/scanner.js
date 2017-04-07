@@ -63,6 +63,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
           const subject = `ProgressNetting::${tableAddr}`;
           return this.notify({}, subject, topicArn).then(() => this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
         }
+        return Promise.resolve(null);
         // if dispute period is over since more than 1 hour,
         // do nothing
       }
@@ -82,7 +83,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
       // check if more netting can be done from oracle
       return this.dynamo.getLastHand(tableAddr);
     }
-    return Promise.resolve('nothing to be done.');
+    return Promise.resolve(null);
   }).then((rsp) => {
     const results = [];
     if (!rsp || !rsp.handId) {
