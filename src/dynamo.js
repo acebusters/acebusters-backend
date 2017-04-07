@@ -1,30 +1,29 @@
-function Dynamo (dynamo) {
+function Dynamo(dynamo) {
   this.dynamo = dynamo;
   this.tableName = 'poker';
 }
 
 
-Dynamo.prototype.getLastHand = function(tableAddr) {
-  var self = this;
-  return new Promise(function (fulfill, reject) {
-    self.dynamo.query({
-      TableName: self.tableName,
+Dynamo.prototype.getLastHand = function getLastHand(tableAddr) {
+  return new Promise((fulfill, reject) => {
+    this.dynamo.query({
+      TableName: this.tableName,
       KeyConditionExpression: 'tableAddr = :a',
-      ExpressionAttributeValues: {':a': tableAddr},
+      ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
-      ScanIndexForward: false
-    }, function(err, rsp) {
+      ScanIndexForward: false,
+    }, (err, rsp) => {
       if (err) {
         reject(err);
         return;
       }
       if (!rsp.Items || rsp.Items.length < 1) {
-        reject('Not Found: table with address ' + tableAddr + ' unknown.');
+        reject(`Not Found: table with address ${tableAddr} unknown.`);
         return;
       }
       fulfill(rsp.Items[0]);
     });
   });
-}
+};
 
 module.exports = Dynamo;
