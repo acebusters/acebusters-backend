@@ -1,12 +1,12 @@
-const attr = require('dynamodb-data-types').AttributeValue;
-const PokerHelper = require('poker-helper').PokerHelper;
+import { AttributeValue } from 'dynamodb-data-types';
+import { PokerHelper } from 'poker-helper';
 
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
-const leaveReceived = function(oldHand, newHand) {
-  for (var i = 0; i < newHand.lineup.length; i++) {
-    if (newHand.lineup[i].lastHand !== undefined && 
-      oldHand.lineup[i].lastHand === undefined) {
+const leaveReceived = function leaveReceived(oldHand, newHand) {
+  for (let i = 0; i < newHand.lineup.length; i++) {
+    if (newHand.lineup[i].exitHand !== undefined && 
+      oldHand.lineup[i].exitHand === undefined) {
       // return after first leave detected
       // we don't expect more than one per db change
       return i;
@@ -15,9 +15,9 @@ const leaveReceived = function(oldHand, newHand) {
   return -1;
 }
 
-const findActingPlayer = function(oldHand, newHand) {
+const findActingPlayer = function findActingPlayer(oldHand, newHand) {
   if (newHand.lineup && oldHand.lineup) {
-    for (var i = 0; i < newHand.lineup.length; i++) {
+    for (let i = 0; i < newHand.lineup.length; i++) {
       if (oldHand.lineup[i] && newHand.lineup[i] && 
         newHand.lineup[i].last && 
         oldHand.lineup[i].last !== newHand.lineup[i].last) {
@@ -28,9 +28,9 @@ const findActingPlayer = function(oldHand, newHand) {
   return null;
 }
 
-const countTakenSeats = function(lineup) {
+const countTakenSeats = function countTakenSeats(lineup) {
   var taken = 0;
-  for (var i = 0; i < lineup.length; i++) {
+  for (let i = 0; i < lineup.length; i++) {
     if (lineup[i].address && lineup[i].address !== EMPTY_ADDR) {
       taken += 1;
     }
@@ -38,20 +38,20 @@ const countTakenSeats = function(lineup) {
   return taken;
 }
 
-const lineupHasLeave = function(newHand) {
-  for (var i = 0; i < newHand.lineup.length; i++) {
-    if (newHand.lineup[i].lastHand === newHand.handId) {
+const lineupHasLeave = function lineupHasLeave(newHand) {
+  for (let i = 0; i < newHand.lineup.length; i++) {
+    if (newHand.lineup[i].exitHand === newHand.handId) {
       return i;
     }
   }
   return -1;
 }
 
-const renderPublicState = function(hand, rc) {
+const renderPublicState = function renderPublicState(hand, rc) {
   if (hand.state == 'showdown') {
-    for (var i = 0; i < hand.lineup.length; i++) {
+    for (let i = 0; i < hand.lineup.length; i++) {
       if (hand.lineup[i].last) {
-        var last = rc.get(hand.lineup[i].last);
+        const last = rc.get(hand.lineup[i].last);
         if (last.abi[0].name == 'show') {
           hand.lineup[i].cards = [];
           hand.lineup[i].cards.push(hand.deck[i * 2]);
@@ -60,7 +60,7 @@ const renderPublicState = function(hand, rc) {
       }
     }
   }
-  var rv = {
+  const rv = {
     handId: hand.handId,
     lineup: hand.lineup,
     dealer: hand.dealer,
@@ -120,14 +120,14 @@ var StreamScanner = function(sns, topicArn, pusher, rc, sentry) {
   this.sentry = sentry;
 }
 
-StreamScanner.prototype.process = function(record) {
+StreamScanner.prototype.process = function process(record) {
   if (!record || !record.dynamodb ||
     (record.eventName !== 'MODIFY' && record.eventName !== 'INSERT')) {
     return Promise.reject('unknown record type: ' + JSON.stringify(record));
   }
   const tasks = [];
-  const newHand = attr.unwrap(record.dynamodb.NewImage);
-  const keys = attr.unwrap(record.dynamodb.Keys);
+  const newHand = AttributeValue.unwrap(record.dynamodb.NewImage);
+  const keys = AttributeValue.unwrap(record.dynamodb.Keys);
 
   // check update
   const msg = renderPublicState(newHand, this.rc);
@@ -138,7 +138,7 @@ StreamScanner.prototype.process = function(record) {
     return Promise.all(tasks);
   }
 
-  const oldHand = attr.unwrap(record.dynamodb.OldImage);
+  const oldHand = AttributeValue.unwrap(record.dynamodb.OldImage);
 
   // check leave
   var pos = leaveReceived(oldHand, newHand);
@@ -150,10 +150,10 @@ StreamScanner.prototype.process = function(record) {
       tableAddr: keys.tableAddr
     }, this.topicArn));
     // also, if the leave is for last hand, we can create a distribution already
-    if (newHand.lineup[pos].lastHand < newHand.handId) {
+    if (newHand.lineup[pos].exitHand < newHand.handId) {
       tasks.push(this.notify('TableNettingRequest::'+keys.tableAddr, {
         tableAddr: keys.tableAddr,
-        handId: newHand.lineup[pos].lastHand
+        handId: newHand.lineup[pos].exitHand
       }, this.topicArn));
     }
   }
@@ -210,11 +210,10 @@ StreamScanner.prototype.process = function(record) {
   return Promise.all(tasks);
 }
 
-StreamScanner.prototype.publishUpdate = function(topic, msg) {
-  const self = this;
-  return new Promise(function (fulfill, reject) {
+StreamScanner.prototype.publishUpdate = function publishUpdate(topic, msg) {
+  return new Promise((fulfill, reject) => {
     try {
-      const rsp = self.pusher.trigger(topic, 'update', msg);
+      const rsp = this.pusher.trigger(topic, 'update', msg);
       fulfill(rsp);
     } catch (err) {
       reject(err);
@@ -222,23 +221,23 @@ StreamScanner.prototype.publishUpdate = function(topic, msg) {
   });
 }
 
-StreamScanner.prototype.log = function(message, context) {
-  const self = this;
-  return new Promise(function (fulfill, reject) {
-    self.sentry.captureMessage(message, context, function (err, eventId) {
-      if (err) {
-        reject(err);
+StreamScanner.prototype.log = function log(message, context) {
+  const cntxt = (context) || {};
+  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
+  return new Promise((fulfill, reject) => {
+    this.sentry.captureMessage(message, cntxt, (error, eventId) => {
+      if (error) {
+        reject(error);
         return;
       }
       fulfill(eventId);
     });
   });
-}
+};
 
-StreamScanner.prototype.notify = function(subject, event, topicArn) {
-  const self = this;
-  return new Promise(function (fulfill, reject) {
-    self.sns.publish({
+StreamScanner.prototype.notify = function notify(subject, event, topicArn) {
+  return new Promise((fulfill, reject) => {
+    this.sns.publish({
       Message: JSON.stringify(event),
       Subject: subject,
       TopicArn: topicArn

@@ -3,7 +3,7 @@ const sinon = require('sinon');
 require('chai').use(require('sinon-chai'));
 const EWT = require('ethereum-web-token');
 var ReceiptCache = require('poker-helper').ReceiptCache;
-const StreamWorker = require('./lib/index');
+const StreamWorker = require('./src/index');
 
 const ABI_BET = [{name: 'bet', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 const ABI_FOLD = [{name: 'fold', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
@@ -38,7 +38,7 @@ const sentry = {
 
 var rc = new ReceiptCache();
 
-describe('Stream worker', function() {
+describe('Stream scanner', function() {
 
   it('should send tx on new leave receipt for prev hand.', (done) => {
 
@@ -56,7 +56,7 @@ describe('Stream worker', function() {
               address: {
                 S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2'
               },
-              lastHand: {
+              exitHand: {
                 N: '2'
               },
               leaveReceipt: {
@@ -118,7 +118,7 @@ describe('Stream worker', function() {
               address: {
                 S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2'
               },
-              lastHand: {
+              exitHand: {
                 N: '3'
               },
               leaveReceipt: {
@@ -312,7 +312,7 @@ describe('Stream worker', function() {
           handId: { N: '2' },
           lineup: { L: [
             { M: { address: { S: P1_ADDR }, last: { S: bet1 } } },
-            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, lastHand: { N: '2' }, leaveReceipt: { S: '0x99' } } }
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, exitHand: { N: '2' }, leaveReceipt: { S: '0x99' } } }
           ]}
         },
         NewImage: {
@@ -320,7 +320,7 @@ describe('Stream worker', function() {
           handId: { N: '2' },
           lineup: { L: [
             { M: { address: { S: P1_ADDR }, last: { S: fold } } },
-            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, lastHand: { N: '2' }, leaveReceipt: { S: '0x99' } } }
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, exitHand: { N: '2' }, leaveReceipt: { S: '0x99' } } }
           ]},
         }
       }
