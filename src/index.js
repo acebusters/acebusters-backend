@@ -695,12 +695,6 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
         if (prevHand.lineup[i].sitout) {
           lineup[i].sitout = prevHand.lineup[i].sitout;
         }
-        if (prevHand.lineup[i].last) {
-          const receipt = EWT.parse(prevHand.lineup[i].last);
-          if (receipt.abi[0].name === 'sitOut') {
-            lineup[i].sitout = prevHand.changed;
-          }
-        }
         // if player leaving, put into sitout
         if (prevHand.handId >= lineup[i].exitHand) {
           lineup[i].sitout = 1;
