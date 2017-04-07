@@ -750,6 +750,34 @@ describe('Stream worker other events', () => {
     }).catch(done);
   });
 
+  it('should prevent TableNettingRequest event from overwriting netting.', (done) => {
+
+    const event = {
+      Subject: 'TableNettingRequest::0xa2decf075b96c8e5858279b31f644501a140e8a7',
+      Message: JSON.stringify({
+        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
+        handId: 2,
+      }),
+    };
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0),
+      [P1_ADDR, P2_ADDR, EMPTY_ADDR],
+      [new BigNumber(50000), new BigNumber(50000), new BigNumber(0)],
+      [new BigNumber(0), new BigNumber(2), new BigNumber(0)],
+    ]);
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
+      netting: {},
+    } }).onFirstCall().yields(null, { Item: {} });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    Promise.all(worker.process(event)).then((rsp) => {
+      expect(dynamo.updateItem).callCount(0);
+      done();
+    }).catch(done);
+  });
+
   // submit netting when netting complete.
   it('should handle TableNettingComplete event.', (done) => {
     const event = {
@@ -757,18 +785,20 @@ describe('Stream worker other events', () => {
       Message: JSON.stringify({
         tableAddr: '0x77aabb11ee00',
         handId: 2,
-        netting: {
-          newBalances: '0x112233',
-          [ORACLE_ADDR]: '0x223344',
-          [P1_ADDR]: '0x334455',
-          [P2_ADDR]: '0x445566',
-        },
       }),
     };
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
+      netting: {
+        newBalances: '0x112233',
+        [ORACLE_ADDR]: '0x223344',
+        [P1_ADDR]: '0x334455',
+        [P2_ADDR]: '0x445566',
+      },
+    } })
     sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.settle()', {

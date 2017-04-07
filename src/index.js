@@ -124,19 +124,7 @@ EventWorker.prototype.process = function process(msg) {
   // handle TableNettingComplete, when everyone has signed
   // in db, forward netting to settle() function in table.
   if (msgType === 'TableNettingComplete') {
-    let sigs = '0x';
-    for (const addr in msgBody.netting) {
-      if (msgBody.netting.hasOwnProperty(addr) &&
-        addr !== 'newBalances') {
-        sigs += msgBody.netting[addr].replace('0x', '');
-      }
-    }
-    tasks.push(this.table.settle(msgBody.tableAddr, msgBody.netting.newBalances, sigs).then((txHash) => {
-      return this.log('tx: table.settle()', {
-        tags: { tableAddr: msgBody.tableAddr },
-        extra: { bals: msgBody.netting.newBalances, sigs, txHash },
-      });
-    }));
+    tasks.push(this.submitNetting(msgBody.tableAddr, msgBody.handId));
   }
 
   // react to email confirmed. deploy proxy and controller
@@ -328,6 +316,26 @@ EventWorker.prototype.payoutPlayers = function payoutPlayers(tableAddr) {
      Promise.resolve(txns));
 };
 
+EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) {
+  let hand;
+  let sigs = '0x';
+  return this.db.getHand(tableAddr, handId).then((_hand) => {
+    hand = _hand;
+    for (const addr in hand.netting) {
+      if (hand.netting.hasOwnProperty(addr) &&
+        addr !== 'newBalances') {
+        sigs += hand.netting[addr].replace('0x', '');
+      }
+    }
+    return this.table.settle(tableAddr, hand.netting.newBalances, sigs);
+  }).then((txHash) => {
+    return this.log('tx: table.settle()', {
+      tags: { tableAddr: tableAddr },
+      extra: { bals: hand.netting.newBalances, sigs, txHash },
+    });
+  });
+}
+
 EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) {
   const balances = { [this.oracleAddr]: 0 };
   return this.table.getLineup(tableAddr).then((rsp) => {
@@ -343,6 +351,10 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     }
     return Promise.all(hands);
   }).then((hands) => {
+    // prevent overwriting netting
+    if (hands[hands.length-1].netting) {
+      return Promise.resolve('netting already found');
+    }
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
