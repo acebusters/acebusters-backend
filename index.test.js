@@ -656,6 +656,58 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should allow to sitout in state waiting.', function(done) {
+    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
+      handId: 1,
+      dealer: 0,
+      state: 'waiting',
+      lineup: [{ address: P1_ADDR}, {address: P2_ADDR},{address: P3_ADDR}]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
+
+    oracle.pay(tableAddr, sitout).then(function(rsp) {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P3_ADDR,
+        sitout: sinon.match.any,
+        last: sitout };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent 0 sitout after state waiting.', function(done) {
+    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
+      handId: 1,
+      dealer: 0,
+      state: 'dealing',
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(1, 50).sign(P2_KEY)
+      },{
+        address: P3_ADDR
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
+
+    oracle.pay(tableAddr, sitout).catch(function(err) {
+      expect(err).to.contain('Unauthorized');
+      done();
+    }).catch(done);
+  });
+
   it('should allow to sitout if BB.', function(done) {
     const sb = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
     var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: sb},{address: P3_ADDR}];
@@ -671,11 +723,14 @@ describe('Oracle pay', function() {
 
     var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
+    const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 1).sign(P3_KEY);
 
     oracle.pay(tableAddr, sitout).then(function(rsp) {
       expect(rsp).to.eql({});
-      const seat = { address: P3_ADDR, last: sitout };
+      const seat = {
+        address: P3_ADDR,
+        sitout: sinon.match.any,
+        last: sitout };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
       done();
     }).catch(done);
@@ -822,7 +877,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to come back from sitout by paying BB fold receipt.', function(done) {
+  it('should allow to come back from sitout by paying BB sitout receipt.', function(done) {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
       [P1_ADDR, P2_ADDR, , P2_ADDR],
@@ -847,13 +902,13 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const fold = new EWT(ABI_FOLD).fold(1, 100).sign(P2_KEY);
+    const action = new EWT(ABI_SIT_OUT).sitOut(1, 100).sign(P2_KEY);
     var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-    oracle.pay(tableAddr, fold).then(function(rsp) {
+    oracle.pay(tableAddr, action).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       const seat = {
         address: P2_ADDR,
-        last: fold
+        last: action
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
       done();
