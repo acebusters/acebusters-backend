@@ -14,6 +14,7 @@ const ABI_BET = [{ name: 'bet', type: 'function', inputs: [{ type: 'uint' }, { t
 const ABI_FOLD = [{ name: 'fold', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }] }];
 const ABI_SHOW = [{ name: 'show', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }] }];
 const ABI_DIST = [{ name: 'distribution', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }, { type: 'bytes32[]' }] }];
+const ABI_SIT_OUT = [{name: 'sitOut', type: 'function', inputs: [{type: 'uint'}, {type: 'uint'}]}];
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P1_PRIV = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
@@ -251,14 +252,14 @@ describe('Stream worker HandComplete event', () => {
     }).catch(done);
   });
 
-  it('should put broke players into sitout.', (done) => {
+  it('should put broke players into sitout and active players back from sitout.', (done) => {
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
     };
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
-      [P1_ADDR, P2_ADDR],
-      [new BigNumber(50000), new BigNumber(1000)],
-      [new BigNumber(0), new BigNumber(0)],
+      [P1_ADDR, P3_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(10000), new BigNumber(1000)],
+      [new BigNumber(0), new BigNumber(0), new BigNumber(0)],
     ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
@@ -267,6 +268,9 @@ describe('Stream worker HandComplete event', () => {
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV),
+      }, {
+        address: P3_ADDR,
+        last: new EWT(ABI_SIT_OUT).sitOut(3, 100).sign(P3_PRIV),
       }, {
         address: P2_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV),
@@ -281,8 +285,8 @@ describe('Stream worker HandComplete event', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       const distHand3 = new EWT(ABI_DIST).distribution(3, 0, [
-        EWT.concat(P1_ADDR, 1980).toString('hex'),
-        EWT.concat(ORACLE_ADDR, 20).toString('hex'),
+        EWT.concat(P1_ADDR, 2079).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 21).toString('hex'),
       ]).sign(ORACLE_PRIV, sentry);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
       expect(dynamo.putItem).calledWith({ Item: {
@@ -294,6 +298,8 @@ describe('Stream worker HandComplete event', () => {
         sb: 50,
         lineup: [{
           address: P1_ADDR,
+        }, {
+          address: P3_ADDR,
         }, {
           address: P2_ADDR,
           sitout: 234,
