@@ -183,12 +183,14 @@ describe('Interval Scanner', () => {
   });
 
   it('should initiate new netting requests', (done) => {
+    const now = Math.floor(Date.now() / 1000);
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
       { Name: 'addresses', Value: set.addresses[0] },
       { Name: 'topicArn', Value: set.topicArn },
     ] });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 8,
+      changed: now
     }] });
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
@@ -216,13 +218,14 @@ describe('Interval Scanner', () => {
   });
 
   it('should kick a player', (done) => {
-    const now = Date.now() - (1000 * 60 * 10); // 10 minutes ago
+    const now = Math.floor((Date.now() / 1000) - (60 * 10)); // 10 minutes ago
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
       { Name: 'addresses', Value: set.addresses[0] },
       { Name: 'topicArn', Value: set.topicArn },
     ] });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 8,
+      changed: now,
       lineup: [{
         address: P1_ADDR,
       }, {

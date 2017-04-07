@@ -89,12 +89,12 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
     if (!rsp || !rsp.handId) {
       return Promise.resolve(rsp);
     }
+    const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
     // check if any of the sitout flags are older than 5 min
     if (rsp.lineup) {
       // 5 minutes
-      const old = Date.now() - (1000 * 5 * 60);
+      const old = Math.floor(Date.now() / 1000) - (5 * 60);
       // if the receipt is older than 1 hour, ignore it
-      const tooOld = Date.now() - (1000 * 60 * 60);
       const subject = `Kick::${tableAddr}`;
       for (let i = 0; i < rsp.lineup.length; i += 1) {
         if (rsp.lineup[i].sitout && typeof rsp.lineup[i].sitout === 'number') {
@@ -108,7 +108,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
         }
       }
     }
-    if (rsp.handId >= lhn + 2) {
+    if (rsp.handId >= lhn + 2 && rsp.changed > (tooOld)) {
       // if there are more than 2 hands not netted
       // prepare netting in db
       const subject = `TableNettingRequest::${tableAddr}`;
