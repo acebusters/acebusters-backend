@@ -20,9 +20,10 @@
   "dependencies": {
     "aws-sdk": "^2.22.0",
     "babel-runtime": "^6.11.6",
-    "web3": "^0.18.2",
+    "bignumber.js": "^4.0.1",
+    "dynamodb-doc": "^1.0.0",
     "raven": "^1.2.0",
-    "dynamodb-doc": "^1.0.0"
+    "web3": "^0.18.2"
   },
   "devDependencies": {
     "babel-cli": "^6.16.0",
