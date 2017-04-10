@@ -160,11 +160,14 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     //make sure to replace receipts in right order
     if (hand.lineup[pos].last) {
       prevReceipt = self.rc.get(hand.lineup[pos].last);
-      if (prevReceipt.abi[0].name == 'fold')
+      if (prevReceipt.abi[0].name === 'fold')
         return Promise.reject('Bad Request: no bet after fold.');
 
-      if (prevReceipt.abi[0].name == 'sitOut' && hand.state != 'dealing')
-        return Promise.reject('Bad Request: leave sitout only during dealing.');
+      if (prevReceipt.abi[0].name === 'sitOut') {
+        if (receipt.abi[0].name === 'bet' || receipt.abi[0].name === 'sitOut') {
+          return Promise.reject('Bad Request: can not toggle sitout in same hand.');
+        }
+      }
 
       if (receipt.abi[0].name.indexOf('check') > -1 && receipt.values[1] != prevReceipt.values[1]) {
         return Promise.reject('Bad Request: check should not raise.');
@@ -186,8 +189,20 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     max.amount = (receipt.values[1] > max.amount) ? receipt.values[1] : max.amount;
     turn = self.helper.isMyTurn(hand, pos);
     if (hand.state === 'waiting') {
-      if (receipt.values[1] === 0 && receipt.abi[0].name == 'sitOut') {
-        hand.lineup[pos].sitout = now;
+      if (receipt.abi[0].name == 'sitOut') {
+        if (receipt.values[1] === 0) {
+          if (hand.lineup[pos].sitout) {
+            return Promise.reject('Bad Request: pay BB when passed dealer in sitout.');
+          } else {
+            hand.lineup[pos].sitout = now;
+          }
+        } else {
+          if (receipt.values[1] === hand.sb * 2) {
+            delete hand.lineup[pos].sitout;
+          } else {
+            return Promise.reject('Bad Request: pay BB when passed dealer in sitout.');
+          }
+        }
       } else {
         if (!turn && activeCount > 1) {
           return Promise.reject('Bad Request: not your turn to pay small blind.');
