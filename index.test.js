@@ -709,14 +709,18 @@ describe('Oracle pay', function() {
   });
 
   it('should allow to sitout if BB.', function(done) {
-    const sb = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
-    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: sb},{address: P3_ADDR}];
-
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       dealer: 0,
       state: 'dealing',
-      lineup: lineup
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(1, 50).sign(P2_KEY)
+      },{
+        address: P3_ADDR
+      }]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
@@ -731,6 +735,70 @@ describe('Oracle pay', function() {
         address: P3_ADDR,
         sitout: sinon.match.any,
         last: sitout };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent sitout toggle in same hand.', function(done) {
+    sinon.stub(dynamo, 'query').yields(null, {Items:[{
+      handId: 13,
+      dealer: 0,
+      sb: 50,
+      state: 'dealing',
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_SIT_OUT).sitOut(13, 0).sign(P1_KEY),
+        sitout: 1
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(13, 50).sign(P2_KEY)
+      },{
+        address: P3_ADDR,
+        last: new EWT(ABI_BET).bet(13, 100).sign(P2_KEY)
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const sitout = new EWT(ABI_SIT_OUT).sitOut(13, 100).sign(P1_KEY);
+
+    oracle.pay(tableAddr, sitout).catch(function(err) {
+      expect(err).to.contain('can not toggle sitout');
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to come back from sitout in waiting.', function(done) {
+    sinon.stub(dynamo, 'query').yields(null, {Items:[{
+      handId: 13,
+      dealer: 0,
+      sb: 50,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR,
+        sitout: 1
+      },{
+        address: P3_ADDR
+      }]
+    }]});
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+
+    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const sitout = new EWT(ABI_SIT_OUT).sitOut(13, 100).sign(P2_KEY);
+
+    oracle.pay(tableAddr, sitout).then(function(rsp) {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P2_ADDR,
+        last: sitout
+      };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
       done();
     }).catch(done);
@@ -792,7 +860,7 @@ describe('Oracle pay', function() {
     }]});
 
     new Oracle(new Db(dynamo), null, rc).pay(tableAddr, bet).catch(function(err) {
-      expect(err).to.contain('leave sitout only during dealing.');
+      expect(err).to.contain('can not toggle sitout');
       done();
     }).catch(done);
   });
