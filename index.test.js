@@ -140,7 +140,7 @@ describe('Stream worker HandComplete event', () => {
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
         EWT.concat(P2_ADDR, 1485).toString('hex'),
         EWT.concat(ORACLE_ADDR, 15).toString('hex'),
-      ]).sign(ORACLE_PRIV, sentry);
+      ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
       expect(sentry.captureMessage).calledWith(`HandComplete: ${tableAddr}`, sinon.match.any);
       expect(sentry.captureMessage).calledWith(`NewHand: ${tableAddr}`, {
@@ -203,7 +203,7 @@ describe('Stream worker HandComplete event', () => {
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
         EWT.concat(P3_ADDR, 2376).toString('hex'),
         EWT.concat(ORACLE_ADDR, 24).toString('hex'),
-      ]).sign(ORACLE_PRIV, sentry);
+      ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
       done();
     }).catch(done);
@@ -245,7 +245,7 @@ describe('Stream worker HandComplete event', () => {
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
         EWT.concat(P2_ADDR, 148).toString('hex'),
         EWT.concat(ORACLE_ADDR, 2).toString('hex'),
-      ]).sign(ORACLE_PRIV, sentry);
+      ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
       expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 3)));
       expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('dealer', 1)));
@@ -288,7 +288,7 @@ describe('Stream worker HandComplete event', () => {
       const distHand3 = new EWT(ABI_DIST).distribution(3, 0, [
         EWT.concat(P1_ADDR, 2079).toString('hex'),
         EWT.concat(ORACLE_ADDR, 21).toString('hex'),
-      ]).sign(ORACLE_PRIV, sentry);
+      ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
       expect(dynamo.putItem).calledWith({ Item: {
         tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
@@ -345,7 +345,7 @@ describe('Stream worker HandComplete event', () => {
       const distHand3 = new EWT(ABI_DIST).distribution(3, 0, [
         EWT.concat(P1_ADDR, 1980).toString('hex'),
         EWT.concat(ORACLE_ADDR, 20).toString('hex'),
-      ]).sign(ORACLE_PRIV, sentry);
+      ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
       expect(dynamo.putItem).calledWith({ Item: {
         tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
@@ -400,7 +400,7 @@ describe('Stream worker HandComplete event', () => {
         EWT.concat(P1_ADDR, 1039).toString('hex'),
         EWT.concat(P2_ADDR, 1039).toString('hex'),
         EWT.concat(ORACLE_ADDR, 22).toString('hex'),
-      ]).sign(ORACLE_PRIV, sentry);
+      ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand4)));
       expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 5)));
       done();
@@ -446,7 +446,7 @@ describe('Stream worker HandComplete event', () => {
         EWT.concat(P1_ADDR, 1237).toString('hex'),
         EWT.concat(ORACLE_ADDR, 27).toString('hex'),
         EWT.concat(P2_ADDR, 1386).toString('hex'),
-      ]).sign(ORACLE_PRIV, sentry);
+      ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand4)));
       expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 5)));
       done();
@@ -476,7 +476,7 @@ describe('Stream worker HandComplete event', () => {
         address: P2_ADDR,
         last: new EWT(ABI_BET).bet(3, 1000).sign(P2_PRIV),
       }],
-      distribution: new EWT(ABI_DIST).distribution(3, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV, sentry),
+      distribution: new EWT(ABI_DIST).distribution(3, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV),
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 4,
@@ -488,7 +488,7 @@ describe('Stream worker HandComplete event', () => {
         last: new EWT(ABI_BET).bet(4, 1000).sign(P2_PRIV),
       }],
       changed: 123,
-      distribution: new EWT(ABI_DIST).distribution(4, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV, sentry),
+      distribution: new EWT(ABI_DIST).distribution(4, 0, [EWT.concat(P1_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV),
     }] });
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
@@ -538,8 +538,8 @@ describe('Stream worker other events', () => {
   it('should handle TableLeave event.', (done) => {
     const handId = 2;
     const tableAddr = EMPTY_ADDR;
-    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV, sentry);
-    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV, sentry);
+    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV);
+    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -630,8 +630,8 @@ describe('Stream worker other events', () => {
   it('should handle TableLeave and Payout if netting not needed.', (done) => {
     const handId = 2;
     const tableAddr = EMPTY_ADDR;
-    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV, sentry);
-    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV, sentry);
+    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV);
+    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -663,6 +663,47 @@ describe('Stream worker other events', () => {
         level: sinon.match.any,
         tags: { tableAddr },
         extra: { txHash: '0x445566', signerAddr: P1_ADDR }
+      });
+      done();
+    }).catch(done);
+  });
+
+  it('should handle Kick.', (done) => {
+    const tableAddr = EMPTY_ADDR;
+    const event = {
+      Subject: `Kick::${tableAddr}`,
+      Message: JSON.stringify({
+        tableAddr,
+        pos: 0,
+      }),
+    };
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR,
+        sitout: 1,
+      }, {
+        address: P2_ADDR,
+      }],
+    }] });
+    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+
+    Promise.all(worker.process(event)).then((tx) => {
+      const leaveHex = Receipt.leave(tableAddr, 3, P1_ADDR).signToHex(ORACLE_PRIV);
+      expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith('tx: table.leave()', {
+        level: sinon.match.any,
+        tags: { tableAddr, handId: 3 },
+        extra: { txHash: '0x112233', leaveHex }
       });
       done();
     }).catch(done);
@@ -703,7 +744,7 @@ describe('Stream worker other events', () => {
     const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
     const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
     const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
-    const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV, sentry);
+    const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 1500).toString('hex')]).sign(ORACLE_PRIV);
 
     const event = {
       Subject: 'TableNettingRequest::0xa2decf075b96c8e5858279b31f644501a140e8a7',

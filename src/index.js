@@ -140,6 +140,10 @@ EventWorker.prototype.process = function process(msg) {
     }));
   }
 
+  if (msgType == 'Kick') {
+    tasks.push(this.kickPlayer(msgBody.tableAddr, msgBody.pos));
+  }
+
   // react to Netting event in table contract:
   // find all players that have lastHand == lastHandNetted
   // pay out those players
@@ -226,23 +230,32 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
   const lineupProm = this.table.getLineup(tableAddr);
   const lastHandProm = this.db.getLastHand(tableAddr);
   return Promise.all([lineupProm, lastHandProm]).then((rsps) => {
-    const lineup = rsps[0][1];
+    const lineup = rsps[0].lineup;
     hand = rsps[1];
-    if (!pos || pos > hand.lineup.length) {
+    if (typeof pos === 'undefined' || pos > hand.lineup.length) {
       return Promise.reject(`pos ${pos} could not be found to kick.`);
     }
-    const addr = hand.lineup[pos];
-    if(lineup.indexOf(addr) < 0) {
+    const addr = hand.lineup[pos].address;
+    let found = false;
+    for (let i = 0; i < lineup.length; i += 1) {
+      if (lineup[i].address === addr) {
+        found = true;
+        break;
+      }
+    }
+    if(!found) {
       return Promise.reject(`player ${addr} not in lineup.`);
     }
+    // check if on sitout for more than 5 minutes
+    const old = Math.floor(Date.now() / 1000) - (5 * 60);
+    if (!hand.lineup[pos].sitout || typeof hand.lineup[pos].sitout !== 'number' ||
+      hand.lineup[pos].sitout > old) {
+      return Promise.reject(`player ${addr} not timed out ${hand.lineup[pos].sitout}.`);
+    }
+    const leaveReceipt = Receipt.leave(tableAddr, hand.handId, addr).sign(this.oraclePriv);
+    return this.submitLeave(tableAddr, leaveReceipt);
+    // TODO: set exitHand flag in db?
   });
-  // 1. get last hand
-  // 2. check player really overstayed sitout
-  // 3. get lineup
-  // 4. check player still in lineup
-  // 5. make receipt
-  // 6. store in lineup
-  // 7. send to contract
 };
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
