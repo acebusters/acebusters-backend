@@ -124,6 +124,67 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
+  it('should prevent SB from leaving player.', function(done) {
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
+      [P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      state: 'waiting',
+      handId: 3,
+      dealer: 1,
+      sb: 50,
+      lineup: [{
+        address: EMPTY_ADDR
+      }, {
+        address: P2_ADDR,
+        exitHand: 2,
+      }, {
+        address: P3_ADDR
+      }]
+    }]});
+
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const blind = new EWT(ABI_BET).bet(3, 50).sign(P2_KEY);
+    oracle.pay(tableAddr, blind).catch(function(err) {
+      expect(err).to.contain('Forbidden: exitHand 2 exceeded.');
+      done();
+    }).catch(done);
+  });
+
+  it('should prevent BB from leaving player.', function(done) {
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
+      [P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      state: 'dealing',
+      handId: 3,
+      dealer: 2,
+      sb: 50,
+      lineup: [{
+        address: EMPTY_ADDR
+      }, {
+        address: P2_ADDR,
+        exitHand: 2,
+      }, {
+        address: P3_ADDR,
+        last: new EWT(ABI_BET).bet(3, 50).sign(P3_KEY)
+      }]
+    }]});
+
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const blind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
+    oracle.pay(tableAddr, blind).catch(function(err) {
+      expect(err).to.contain('Forbidden: exitHand 2 exceeded.');
+      done();
+    }).catch(done);
+  });
+
   it('should prevent game with less than 2 players.', function(done) {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
