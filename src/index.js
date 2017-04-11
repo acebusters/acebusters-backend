@@ -222,6 +222,20 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaveReceipt
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
+  let hand;
+  const lineupProm = this.table.getLineup(tableAddr);
+  const lastHandProm = this.db.getLastHand(tableAddr);
+  return Promise.all([lineupProm, lastHandProm]).then((rsps) => {
+    const lineup = rsps[0][1];
+    hand = rsps[1];
+    if (!pos || pos > hand.lineup.length) {
+      return Promise.reject(`pos ${pos} could not be found to kick.`);
+    }
+    const addr = hand.lineup[pos];
+    if(lineup.indexOf(addr) < 0) {
+      return Promise.reject(`player ${addr} not in lineup.`);
+    }
+  });
   // 1. get last hand
   // 2. check player really overstayed sitout
   // 3. get lineup
