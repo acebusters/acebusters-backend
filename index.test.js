@@ -87,6 +87,7 @@ const dynamo = {
   putItem() {},
   query() {},
   updateItem() {},
+  deleteItem() {},
 };
 
 sinon.stub(web3.eth, 'contract').returns(web3.eth);
@@ -850,15 +851,26 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    const lineup = [new BigNumber(2), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(2)]];
+    const lineup = [new BigNumber(3), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(2)]];
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{ handId: 2 }] });
+    sinon.stub(dynamo, 'deleteItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
     sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       expect(rsp[0]).to.eql(['0x123456']);
       expect(contract.payoutFrom.sendTransaction).calledWith(P2_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(dynamo.deleteItem).callCount(2);
+      expect(dynamo.deleteItem).calledWith({ Key: {
+        handId: 2,
+        tableAddr: '0x77aabb11ee00'
+      }, TableName: 'poker' });
+      expect(dynamo.deleteItem).calledWith({ Key: {
+        handId: 3,
+        tableAddr: '0x77aabb11ee00'
+      }, TableName: 'poker' });
       done();
     }).catch(done);
   });
@@ -878,17 +890,24 @@ describe('Stream worker other events', () => {
       [new BigNumber(50000), new BigNumber(50000)],
       [new BigNumber(1), new BigNumber(2)],
     ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{ handId: 2 }] });
+    sinon.stub(dynamo, 'deleteItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(contract.payoutFrom, 'sendTransaction')
       .yields(null, '0x123456')
       .onFirstCall().yields(null, '0x789abc');
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then((rsp) => {
       expect(rsp[0]).to.eql(['0x789abc', '0x123456']);
       expect(contract.payoutFrom.sendTransaction).callCount(2);
       expect(contract.payoutFrom.sendTransaction).calledWith(P1_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(contract.payoutFrom.sendTransaction).calledWith(P2_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(dynamo.deleteItem).callCount(1);
+      expect(dynamo.deleteItem).calledWith({ Key: {
+        handId: 2,
+        tableAddr: '0x77aabb11ee00'
+      }, TableName: 'poker' });
       done();
     }).catch(done);
   });
@@ -1045,6 +1064,7 @@ describe('Stream worker other events', () => {
     if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+    if (dynamo.deleteItem.restore) dynamo.deleteItem.restore();
     if (sentry.captureMessage.restore) sentry.captureMessage.restore();
     if (sentry.captureException.restore) sentry.captureException.restore();
   });

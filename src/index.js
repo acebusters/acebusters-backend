@@ -145,6 +145,7 @@ EventWorker.prototype.process = function process(msg) {
   // pay out those players
   if (msgType === 'ContractEvent' && msgBody.event === 'Netted') {
     tasks.push(this.payoutPlayers(msgBody.address));
+    tasks.push(this.deleteHands(msgBody.address));
   }
 
   // react to Join event in table contract:
@@ -300,6 +301,23 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
     return Promise.resolve([txHash1, txHash]);
   });
 };
+
+EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
+  let lhn;
+  return this.table.getLineup(tableAddr).then((rsp) => {
+    lhn = rsp.lastHandNetted;
+    return this.db.getFirstHand(tableAddr);
+  }).then((hand) => {
+    if (lhn < 2 || hand.handId > lhn) {
+      return Promise.resolve(`no work on range lhn: ${lhn} , handId: ${hand.handId}`);
+    }
+    const deletes = [];
+    for (let i = hand.handId; i <= lhn; i += 1) {
+      deletes.push(this.db.deleteHand(tableAddr, i));
+    }
+    return Promise.all(deletes);
+  });
+}
 
 EventWorker.prototype.payoutPlayers = function payoutPlayers(tableAddr) {
   return this.table.getLineup(tableAddr).then((rsp) => {

@@ -49,6 +49,28 @@ Db.prototype.getLastHand = function getLastHand(tableAddr) {
   });
 };
 
+Db.prototype.getFirstHand = function getFirstHand(tableAddr) {
+  return new Promise((fulfill, reject) => {
+    this.dynamo.query({
+      TableName: this.tableName,
+      KeyConditionExpression: 'tableAddr = :a',
+      ExpressionAttributeValues: { ':a': tableAddr },
+      Limit: 1,
+      ScanIndexForward: true,
+    }, (err, rsp) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      if (!rsp.Items || rsp.Items.length < 1) {
+        reject(`Not Found: table with address ${tableAddr} unknown.`);
+        return;
+      }
+      fulfill(rsp.Items[0]);
+    });
+  });
+};
+
 Db.prototype.updateSeat = function updateSeat(tableAddr, handId, seat, pos, time, dealer) {
   return new Promise((fulfill, reject) => {
     const params = {
@@ -130,6 +152,25 @@ Db.prototype.updateDistribution = function updateDistribution(tableAddr, handId,
         return;
       }
       fulfill(rsp.Item);
+    });
+  });
+};
+
+Db.prototype.deleteHand = function deleteHand(tableAddr, handId) {
+  return new Promise((fulfill, reject) => {
+    // avoid deleting unwanted entries
+    if (!handId || !tableAddr) {
+      reject('null key value detected on delete.');
+    }
+    this.dynamo.deleteItem({
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+    }, (err, rsp) => {
+      if (err) {
+        reject(`Error: Dynamo failed: ${err}`);
+        return;
+      }
+      fulfill(rsp);
     });
   });
 };
