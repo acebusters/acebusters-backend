@@ -368,6 +368,63 @@ describe('Stream worker HandComplete event', () => {
     }).catch(done);
   });
 
+  it('should handle exitHand flag.', (done) => {
+    const event = {
+      Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
+    };
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      // P1 will exit at hand 3, but the tx is not mined yet
+      [new BigNumber(0), new BigNumber(0)],
+    ]);
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'showdown',
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV),
+        exitHand: 3,
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV),
+      }],
+      changed: 234,
+      deck: [24, 25, 0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 2, 3],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    Promise.all(worker.process(event)).then((rsp) => {
+      const distHand3 = new EWT(ABI_DIST).distribution(3, 0, [
+        EWT.concat(P1_ADDR, 1980).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 20).toString('hex'),
+      ]).sign(ORACLE_PRIV);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
+      expect(dynamo.putItem).calledWith({ Item: {
+        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
+        handId: 4,
+        deck: sinon.match.any,
+        state: 'waiting',
+        dealer: 1,
+        sb: 50,
+        lineup: [{
+          address: P1_ADDR,
+          sitout: 1,
+          exitHand: 3,
+        }, {
+          address: P2_ADDR,
+        }],
+        changed: sinon.match.any,
+      },
+        TableName: 'poker' });
+      done();
+    }).catch(done);
+  });
+
   it('should calc dist for showdown with 2 winners and odd amounts.', (done) => {
     const event = {
       Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
