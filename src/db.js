@@ -27,36 +27,14 @@ Db.prototype.getHand = function getHand(tableAddr, handId) {
   });
 };
 
-Db.prototype.getLastHand = function getLastHand(tableAddr) {
+Db.prototype.getLastHand = function getLastHand(tableAddr, scanForward = false) {
   return new Promise((fulfill, reject) => {
     this.dynamo.query({
       TableName: this.tableName,
       KeyConditionExpression: 'tableAddr = :a',
       ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
-      ScanIndexForward: false,
-    }, (err, rsp) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      if (!rsp.Items || rsp.Items.length < 1) {
-        reject(`Not Found: table with address ${tableAddr} unknown.`);
-        return;
-      }
-      fulfill(rsp.Items[0]);
-    });
-  });
-};
-
-Db.prototype.getFirstHand = function getFirstHand(tableAddr) {
-  return new Promise((fulfill, reject) => {
-    this.dynamo.query({
-      TableName: this.tableName,
-      KeyConditionExpression: 'tableAddr = :a',
-      ExpressionAttributeValues: { ':a': tableAddr },
-      Limit: 1,
-      ScanIndexForward: true,
+      ScanIndexForward: scanForward,
     }, (err, rsp) => {
       if (err) {
         reject(err);

@@ -306,7 +306,7 @@ EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
   let lhn;
   return this.table.getLineup(tableAddr).then((rsp) => {
     lhn = rsp.lastHandNetted;
-    return this.db.getFirstHand(tableAddr);
+    return this.db.getLastHand(tableAddr, true);
   }).then((hand) => {
     if (lhn < 2 || hand.handId > lhn) {
       return Promise.resolve(`no work on range lhn: ${lhn} , handId: ${hand.handId}`);
