@@ -27,14 +27,14 @@ Db.prototype.getHand = function getHand(tableAddr, handId) {
   });
 };
 
-Db.prototype.getLastHand = function getLastHand(tableAddr) {
+Db.prototype.getLastHand = function getLastHand(tableAddr, scanForward = false) {
   return new Promise((fulfill, reject) => {
     this.dynamo.query({
       TableName: this.tableName,
       KeyConditionExpression: 'tableAddr = :a',
       ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
-      ScanIndexForward: false,
+      ScanIndexForward: scanForward,
     }, (err, rsp) => {
       if (err) {
         reject(err);
@@ -130,6 +130,25 @@ Db.prototype.updateDistribution = function updateDistribution(tableAddr, handId,
         return;
       }
       fulfill(rsp.Item);
+    });
+  });
+};
+
+Db.prototype.deleteHand = function deleteHand(tableAddr, handId) {
+  return new Promise((fulfill, reject) => {
+    // avoid deleting unwanted entries
+    if (!handId || !tableAddr) {
+      reject('null key value detected on delete.');
+    }
+    this.dynamo.deleteItem({
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+    }, (err, rsp) => {
+      if (err) {
+        reject(`Error: Dynamo failed: ${err}`);
+        return;
+      }
+      fulfill(rsp);
     });
   });
 };
