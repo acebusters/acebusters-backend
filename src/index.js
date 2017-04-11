@@ -250,7 +250,7 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
     const old = Math.floor(Date.now() / 1000) - (5 * 60);
     if (!hand.lineup[pos].sitout || typeof hand.lineup[pos].sitout !== 'number' ||
       hand.lineup[pos].sitout > old) {
-      return Promise.reject(`player ${addr} not timed out ${hand.lineup[pos].sitout}.`);
+      return Promise.reject(`player ${addr} still got ${hand.lineup[pos].sitout - old} seconds to sit out, not yet to be kicked.`);
     }
     const leaveReceipt = Receipt.leave(tableAddr, hand.handId, addr).sign(this.oraclePriv);
     return this.submitLeave(tableAddr, leaveReceipt);
