@@ -740,6 +740,10 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
         if (prevHand.lineup[i].sitout) {
           lineup[i].sitout = prevHand.lineup[i].sitout;
         }
+        // copy over all exitHands
+        if (prevHand.lineup[i].exitHand) {
+          lineup[i].exitHand = prevHand.lineup[i].exitHand;
+        }
         // if player leaving, put into sitout
         if (prevHand.handId >= lineup[i].exitHand) {
           lineup[i].sitout = 1;
