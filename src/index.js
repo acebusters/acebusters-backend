@@ -123,7 +123,7 @@ var StreamScanner = function(sns, topicArn, pusher, rc, sentry) {
 StreamScanner.prototype.process = function process(record) {
   if (!record || !record.dynamodb ||
     (record.eventName !== 'MODIFY' && record.eventName !== 'INSERT')) {
-    return Promise.reject('unknown record type: ' + JSON.stringify(record));
+    return Promise.resolve('unknown record type: ' + JSON.stringify(record));
   }
   const tasks = [];
   const newHand = AttributeValue.unwrap(record.dynamodb.NewImage);
@@ -246,7 +246,6 @@ StreamScanner.prototype.notify = function notify(subject, event, topicArn) {
         reject(err);
         return;
       }
-      console.log('published event: ' + subject);
       fulfill({});
     });
   });

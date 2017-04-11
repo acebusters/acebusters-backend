@@ -102,6 +102,25 @@ describe('Stream scanner', function() {
 
   });
 
+ it('should silently ignore deletes.', (done) => {
+
+    const event = {
+      eventName: "REMOVE",
+      dynamodb: {}
+    };
+
+    sinon.stub(sns, 'publish').yields(null, {});
+
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+
+    worker.process(event).then(function(rsp) {
+      expect(rsp).to.contain('unknown record');
+      expect(sns.publish).callCount(0);
+      done();
+    }).catch(done);
+
+  });
+
   it('should send tx on new leave receipt for this hand.', (done) => {
 
     const event = {
