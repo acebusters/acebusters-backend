@@ -143,7 +143,7 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
       return Promise.reject('Unauthorized: you can not reuse receipts.');
 
     // are we ready to start dealing?
-    const activeCount = self.helper.activePlayersLeft(hand);
+    const activeCount = self.helper.getActiveLineup(hand.lineup, hand.dealer, hand.state).length;
     if (hand.state === 'waiting' && activeCount < 2) {
       if (activeCount == 0 || !hand.lineup[pos].sitout) {
         return Promise.reject('Bad Request: not enough players to start game.');
@@ -477,10 +477,12 @@ TableManager.prototype.timeout = function(tableAddr) {
   // get the latest hand to check on
   return this.db.getLastHand(tableAddr).then(function(_hand) {
     hand = _hand;
-    pos = self.helper.whosTurn(hand);
-    if (pos == -1) {
+    try {
+      pos = self.helper.whosTurn(hand);
+    } catch (e) {
       return Promise.reject('Bad Request: could not find next player to act in hand ' + hand.handId);
     }
+
     const now = Math.floor(Date.now() / 1000)
     const leftTime = (hand.changed + 180) - now;
     if (leftTime > 0) {

@@ -473,6 +473,7 @@ describe('Oracle pay', function() {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, {Items:[{
       handId: 1,
+      sb: 50,
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY)
@@ -1863,17 +1864,18 @@ describe('Oracle timing', function() {
   });
 
   it('should allow to put player into sitout.', function(done) {
-    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
+    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 1,
       dealer: 0,
+      state: 'flop',
       lineup: [{
         address: P1_ADDR,
-        last: bet1
+        last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY)
       }, {
         address: P2_ADDR,
-        last: new EWT(ABI_BET).bet(1, 100).sign(P2_KEY)
+        last: bet1
       }]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
@@ -1881,7 +1883,7 @@ describe('Oracle timing', function() {
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
-        address: P1_ADDR,
+        address: P2_ADDR,
         last: bet1,
         sitout: sinon.match.number
       } )));
