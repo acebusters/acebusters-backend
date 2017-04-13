@@ -143,7 +143,7 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
       return Promise.reject('Unauthorized: you can not reuse receipts.');
 
     // are we ready to start dealing?
-    const activeCount = self.helper.getActiveLineup(hand.lineup, hand.dealer, hand.state).length;
+    const activeCount = self.helper.countActivePlayers(hand.lineup, hand.state);
     if (hand.state === 'waiting' && activeCount < 2) {
       if (activeCount == 0 || !hand.lineup[pos].sitout) {
         return Promise.reject('Bad Request: not enough players to start game.');
@@ -233,9 +233,7 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     if (hand.state === 'dealing') {
       //check if receipt is big blind?
       if (turn && receipt.abi[0].name === 'bet') {
-        var smallBlindPos = self.helper.nextActivePlayer(hand.lineup, (hand.lineup.length > 2) ? hand.dealer + 1 : hand.dealer);
-
-        var bigBlindPos = self.helper.nextActivePlayer(hand.lineup, smallBlindPos + 1);
+        var bigBlindPos = self.helper.getBbPos(hand.lineup, hand.dealer, hand.state);
         if (self.helper.whosTurn(hand) === bigBlindPos) {
           if (receipt.values[1] !== hand.sb * 2)
             return Promise.reject('Bad Request: big blind not valid.');
@@ -265,7 +263,7 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
 TableManager.prototype.updateState = function(tableAddr, hand, pos) {
     const changed = Math.floor(Date.now() / 1000);
     const max = this.helper.findMaxBet(hand.lineup);
-    const bb = (max.amount <= hand.sb*2 ) ? hand.sb*2 : null;
+    const bb = hand.sb * 2;
     const bettingComplete = this.helper.allDone(hand.lineup, hand.dealer, hand.state, max.amount, bb);
     const handComplete = this.helper.checkForNextHand(hand);
     let streetMaxBet;
