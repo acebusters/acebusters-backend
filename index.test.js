@@ -1922,7 +1922,7 @@ describe('Oracle timing', function() {
       state: 'flop',
       lineup: [{
         address: P1_ADDR,
-        last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY)
+        last: new EWT(ABI_BET).bet(1, 150).sign(P1_KEY)
       }, {
         address: P2_ADDR,
         last: bet1
@@ -1942,18 +1942,15 @@ describe('Oracle timing', function() {
   });
 
   it('should handle sitout on hand state complete.', function(done) {
-    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
-    var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P2_KEY);
-
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 1,
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: bet1
+        last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY)
       }, {
         address: P2_ADDR,
-        last: fold
+        last: new EWT(ABI_FOLD).fold(1, 50).sign(P2_KEY)
       }]
     }]});
 
