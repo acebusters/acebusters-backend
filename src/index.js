@@ -153,7 +153,7 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     }
 
     //check bet not too small
-    var max = self.helper.findMaxBet(hand.lineup);
+    var max = self.helper.getMaxBet(hand.lineup, hand.state);
     if (hand.state != 'dealing' && receipt.abi[0].name == 'bet' && receipt.values[1] < max.amount)
       return Promise.reject('Unauthorized: you have to match or raise ' + max.amount);
 
@@ -187,7 +187,7 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
       return Promise.reject('Bad Request: checkRiver only during river.');
 
     max.amount = (receipt.values[1] > max.amount) ? receipt.values[1] : max.amount;
-    turn = self.helper.isMyTurn(hand, pos);
+    turn = self.helper.isTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2, receipt.signer);
     if (hand.state === 'waiting') {
       if (receipt.abi[0].name == 'sitOut') {
         if (receipt.values[1] === 0) {
@@ -233,8 +233,9 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     if (hand.state === 'dealing') {
       //check if receipt is big blind?
       if (turn && receipt.abi[0].name === 'bet') {
-        var bigBlindPos = self.helper.getBbPos(hand.lineup, hand.dealer, hand.state);
-        if (self.helper.whosTurn(hand) === bigBlindPos) {
+        const bigBlindPos = self.helper.getBbPos(hand.lineup, hand.dealer, hand.state);
+        const nextToAct = self.helper.getWhosTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
+        if (nextToAct === bigBlindPos) {
           if (receipt.values[1] !== hand.sb * 2)
             return Promise.reject('Bad Request: big blind not valid.');
         }
@@ -262,10 +263,9 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
 
 TableManager.prototype.updateState = function(tableAddr, hand, pos) {
     const changed = Math.floor(Date.now() / 1000);
-    const max = this.helper.findMaxBet(hand.lineup);
-    const bb = hand.sb * 2;
-    const bettingComplete = this.helper.allDone(hand.lineup, hand.dealer, hand.state, max.amount, bb);
-    const handComplete = this.helper.checkForNextHand(hand);
+    const max = this.helper.getMaxBet(hand.lineup, hand.state);
+    const bettingComplete = this.helper.isBettingDone(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
+    const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
     let streetMaxBet;
     if (bettingComplete && !handComplete) {
       if (hand.state == 'river')
@@ -284,8 +284,8 @@ TableManager.prototype.updateState = function(tableAddr, hand, pos) {
       hand.state = 'dealing';
 
     // take care of all-in
-    const activePlayerCount = this.helper.activePlayersLeft(hand);
-    const allInPlayerCount = this.helper.countAllIns(hand);
+    const activePlayerCount = this.helper.countActivePlayers(hand.lineup, hand.state);
+    const allInPlayerCount = this.helper.countAllIn(hand.lineup);
     if (bettingComplete && activePlayerCount === 1 && allInPlayerCount > 0) {
       hand.state = 'showdown';
     }
@@ -355,7 +355,7 @@ TableManager.prototype.show = function(tableAddr, ewt, cards) {
     if (hand.lineup[pos].sitout && hand.lineup[pos].sitout.indexOf('allin') < 0) {
       return Promise.reject('Forbidden: seat ' + pos + ' in sitout, not allowed in showdown.');
     }
-    if (!self.helper.isActivePlayer(hand.lineup, pos) && hand.lineup[pos].sitout !== 'allin') {
+    if (!self.helper.isActivePlayer(hand.lineup, pos, hand.state) && hand.lineup[pos].sitout !== 'allin') {
       return Promise.reject('Forbidden: seat ' + pos + ' is not an active player.');
     }
     // check ewt not reused
@@ -476,7 +476,7 @@ TableManager.prototype.timeout = function(tableAddr) {
   return this.db.getLastHand(tableAddr).then(function(_hand) {
     hand = _hand;
     try {
-      pos = self.helper.whosTurn(hand);
+      pos = self.helper.getWhosTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
     } catch (e) {
       return Promise.reject('Bad Request: could not find next player to act in hand ' + hand.handId);
     }
