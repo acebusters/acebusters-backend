@@ -3,71 +3,6 @@ const ethUtil = require('ethereumjs-util');
 const PokerHelper = require('poker-helper').PokerHelper;
 const Receipt = require('poker-helper').Receipt;
 
-const renderPublicState = function(hand, rc) {
-  if (hand.state == 'showdown') {
-    for (var i = 0; i < hand.lineup.length; i++) {
-      if (hand.lineup[i].last) {
-        var last = rc.get(hand.lineup[i].last);
-        if (last.abi[0].name == 'show') {
-          hand.lineup[i].cards = [];
-          hand.lineup[i].cards.push(hand.deck[i * 2]);
-          hand.lineup[i].cards.push(hand.deck[i * 2 + 1]);
-        }
-      }
-    }
-  }
-  var rv = {
-    handId: hand.handId,
-    lineup: hand.lineup,
-    dealer: hand.dealer,
-    state: hand.state,
-    changed: hand.changed,
-    cards: []
-  }
-  if (hand.state == 'flop') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-  }
-  if (hand.state == 'turn') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.flopMaxBet = hand.flopMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-    rv.cards.push(hand.deck[23]);
-  }
-  if (hand.state == 'river') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.flopMaxBet = hand.flopMaxBet;
-    rv.turnMaxBet = hand.turnMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-    rv.cards.push(hand.deck[23]);
-    rv.cards.push(hand.deck[24]);
-  }
-  if (hand.state == 'showdown') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.flopMaxBet = hand.flopMaxBet;
-    rv.turnMaxBet = hand.turnMaxBet;
-    rv.riverMaxBet = hand.riverMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-    rv.cards.push(hand.deck[23]);
-    rv.cards.push(hand.deck[24]);
-  }
-  if (hand.distribution) {
-    rv.distribution = hand.distribution;
-  }
-  if (hand.netting) {
-    rv.netting = hand.netting;
-  }
-  return rv;
-}
-
 var TableManager = function(db, contract, receiptCache, oraclePriv) {
   this.db = db;
   this.rc = receiptCache;
@@ -88,10 +23,12 @@ TableManager.prototype.getConfig = function(stageVars) {
 }
 
 TableManager.prototype.info = function(tableAddr, tableContracts) {
-  var self = this;
-  return this.db.getLastHand(tableAddr).then(function(hand) {
-    return Promise.resolve(renderPublicState(hand, self.rc));
-  }, function(err) {
+  return this.db.getLastHand(tableAddr).then((hand) => {
+    return Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
+      hand.dealer, hand.sb, hand.state, hand.changed, hand.deck, hand.preMaxBet,
+      hand.flopMaxBet, hand.turnMaxBet, hand.riverMaxBet, hand.distribution,
+      hand.netting));
+  }, (err) => {
     var tables = [];
     if (tableContracts) {
       tables = tableContracts.split(',');
@@ -111,9 +48,11 @@ TableManager.prototype.info = function(tableAddr, tableContracts) {
 }
 
 TableManager.prototype.hand = function(tableAddr, handId) {
-  var self = this;
-  return this.db.getHand(tableAddr, parseInt(handId)).then(function(hand) {
-    return Promise.resolve(renderPublicState(hand, self.rc));
+  return this.db.getHand(tableAddr, parseInt(handId)).then((hand) => {
+    return Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
+      hand.dealer, hand.sb, hand.state, hand.changed, hand.deck, hand.preMaxBet,
+      hand.flopMaxBet, hand.turnMaxBet, hand.riverMaxBet, hand.distribution,
+      hand.netting));
   });
 }
 
@@ -153,9 +92,13 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     }
 
     //check bet not too small
-    var max = self.helper.getMaxBet(hand.lineup, hand.state);
-    if (hand.state != 'dealing' && receipt.abi[0].name == 'bet' && receipt.values[1] < max.amount)
-      return Promise.reject('Unauthorized: you have to match or raise ' + max.amount);
+    if (hand.state != 'waiting' && hand.state != 'dealing' &&
+      receipt.abi[0].name == 'bet') {
+      const max = self.helper.getMaxBet(hand.lineup, hand.state);
+      if(receipt.values[1] < max.amount) {
+        return Promise.reject('Unauthorized: you have to match or raise ' + max.amount);
+      }
+    }
 
     //make sure to replace receipts in right order
     if (hand.lineup[pos].last) {
@@ -186,7 +129,6 @@ TableManager.prototype.pay = function(tableAddr, ewt) {
     if (receipt.abi[0].name == 'checkRiver' && hand.state != 'river')
       return Promise.reject('Bad Request: checkRiver only during river.');
 
-    max.amount = (receipt.values[1] > max.amount) ? receipt.values[1] : max.amount;
     turn = self.helper.isTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2, receipt.signer);
     if (hand.state === 'waiting') {
       if (receipt.abi[0].name == 'sitOut') {

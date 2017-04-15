@@ -1376,6 +1376,7 @@ describe('Oracle info', function() {
       handId: 0,
       deck: deck,
       dealer: 0,
+      sb: 50,
       lineup: [],
       changed: 123,
       state: 'preflop'
@@ -1386,6 +1387,7 @@ describe('Oracle info', function() {
         handId: 0,
         cards: [],
         dealer: 0,
+        sb: 50,
         lineup: [],
         changed: 123,
         state: 'preflop'
@@ -1398,6 +1400,7 @@ describe('Oracle info', function() {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
         dealer: 0,
+        sb: 50,
         deck: deck,
         lineup: [],
         changed: 123,
@@ -1410,6 +1413,7 @@ describe('Oracle info', function() {
         handId: 0,
         cards: [20, 21, 22],
         dealer: 0,
+        sb: 50,
         lineup: [],
         changed: 123,
         preMaxBet: 200,
@@ -1423,6 +1427,7 @@ describe('Oracle info', function() {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
         dealer: 0,
+        sb: 50,
         deck: deck,
         lineup: [],
         changed: 123,
@@ -1436,6 +1441,7 @@ describe('Oracle info', function() {
         handId: 0,
         cards: [20, 21, 22, 23],
         dealer: 0,
+        sb: 50,
         lineup: [],
         changed: 123,
         preMaxBet: 200,
@@ -1450,6 +1456,7 @@ describe('Oracle info', function() {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
         dealer: 0,
+        sb: 50,
         deck: deck,
         lineup: [],
         changed: 123,
@@ -1464,6 +1471,7 @@ describe('Oracle info', function() {
         handId: 0,
         cards: [20, 21, 22, 23, 24],
         dealer: 0,
+        sb: 50,
         lineup: [],
         changed: 123,
         preMaxBet: 200,
@@ -1486,6 +1494,7 @@ describe('Oracle info', function() {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
         dealer: 0,
+        sb: 50,
         deck: deck,
         lineup: lineup,
         changed: 123,
@@ -1502,6 +1511,7 @@ describe('Oracle info', function() {
         handId: 0,
         cards: [20, 21, 22, 23, 24],
         dealer: 0,
+        sb: 50,
         lineup: [{
           address: P1_ADDR,
           cards: [0, 1],
