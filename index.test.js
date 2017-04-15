@@ -383,9 +383,10 @@ describe('Stream scanner', function() {
         OldImage: {
           dealer: { N: '0' },
           handId: { N: '2' },
+          state: { S: 'waiting' },
           lineup: { L: [
             { M: { address: { S: EMPTY_ADDR } } },
-            { M: { address: { S: P1_ADDR } } },
+            { M: { address: { S: P1_ADDR }, sitout: { N: 1 } } },
             { M: { address: { S: P2_ADDR } } },
             { M: { address: { S: EMPTY_ADDR } } }
           ]},
@@ -398,10 +399,11 @@ describe('Stream scanner', function() {
         NewImage: {
           dealer: { N: '0' },
           handId: { N: '2' },
+          state: { S: 'waiting' },
           lineup: { L: [
             { M: { address: { S: EMPTY_ADDR } } },
-            { M: { address: { S: P1_ADDR } } },
-            { M: { address: { S: P2_ADDR } } },
+            { M: { address: { S: P1_ADDR }, sitout: { N: 1 } } },
+            { M: { address: { S: P2_ADDR }} },
             { M: { address: { S: EMPTY_ADDR } } }
           ]},
           netting: { M: {
@@ -449,9 +451,10 @@ describe('Stream scanner', function() {
         NewImage: {
           state: { S: "waiting" },
           handId: { N: 3},
-          dealer: { N: 0},
-          changed: { N: 123},
-          deck: { L: [{ N: 0},{ N: 1},{ N: 2},{ N: 3}]},
+          sb: { N: 50 },
+          dealer: { N: 0 },
+          changed: { N: 123 },
+          deck: { L: [{ N: 0 },{ N: 1 },{ N: 2 },{ N: 3 }]},
           lineup: { L: [
             { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
             { M: {
@@ -476,6 +479,7 @@ describe('Stream scanner', function() {
         changed: 123,
         dealer: 0,
         handId: 3,
+        sb: 50,
         lineup: [{ address: "0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f" }, { address: "0xc3ccb3902a164b83663947aff0284c6624f3fbf2" }],
         state: "waiting"
       });
@@ -496,6 +500,7 @@ describe('Stream scanner', function() {
         NewImage: {
           state: { S: "waiting" },
           handId: { N: 3},
+          sb: { N: 50 },
           dealer: { N: 0},
           changed: { N: 123},
           deck: { L: [{ N: 0},{ N: 1},{ N: 2},{ N: 3}]},
@@ -521,6 +526,7 @@ describe('Stream scanner', function() {
         cards: [],
         changed: 123,
         dealer: 0,
+        sb: 50,
         handId: 3,
         lineup: [{ address: "0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f" }, { address: "0xc3ccb3902a164b83663947aff0284c6624f3fbf2" }],
         state: "waiting"

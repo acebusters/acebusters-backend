@@ -47,71 +47,6 @@ const lineupHasLeave = function lineupHasLeave(newHand) {
   return -1;
 }
 
-const renderPublicState = function renderPublicState(hand, rc) {
-  if (hand.state == 'showdown') {
-    for (let i = 0; i < hand.lineup.length; i++) {
-      if (hand.lineup[i].last) {
-        const last = rc.get(hand.lineup[i].last);
-        if (last.abi[0].name == 'show') {
-          hand.lineup[i].cards = [];
-          hand.lineup[i].cards.push(hand.deck[i * 2]);
-          hand.lineup[i].cards.push(hand.deck[i * 2 + 1]);
-        }
-      }
-    }
-  }
-  const rv = {
-    handId: hand.handId,
-    lineup: hand.lineup,
-    dealer: hand.dealer,
-    state: hand.state,
-    changed: hand.changed,
-    cards: []
-  }
-  if (hand.state == 'flop') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-  }
-  if (hand.state == 'turn') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.flopMaxBet = hand.flopMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-    rv.cards.push(hand.deck[23]);
-  }
-  if (hand.state == 'river') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.flopMaxBet = hand.flopMaxBet;
-    rv.turnMaxBet = hand.turnMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-    rv.cards.push(hand.deck[23]);
-    rv.cards.push(hand.deck[24]);
-  }
-  if (hand.state == 'showdown') {
-    rv.preMaxBet = hand.preMaxBet;
-    rv.flopMaxBet = hand.flopMaxBet;
-    rv.turnMaxBet = hand.turnMaxBet;
-    rv.riverMaxBet = hand.riverMaxBet;
-    rv.cards.push(hand.deck[20]);
-    rv.cards.push(hand.deck[21]);
-    rv.cards.push(hand.deck[22]);
-    rv.cards.push(hand.deck[23]);
-    rv.cards.push(hand.deck[24]);
-  }
-  if (hand.distribution) {
-    rv.distribution = hand.distribution;
-  }
-  if (hand.netting) {
-    rv.netting = hand.netting;
-  }
-  return rv;
-}
-
 var StreamScanner = function(sns, topicArn, pusher, rc, sentry) {
   this.sns = sns;
   this.topicArn = topicArn;
@@ -130,7 +65,12 @@ StreamScanner.prototype.process = function process(record) {
   const keys = AttributeValue.unwrap(record.dynamodb.Keys);
 
   // check update
-  const msg = renderPublicState(newHand, this.rc);
+  const ph = new PokerHelper(this.rc);
+  //.renderHand(
+  const msg = ph.renderHand(newHand.handId, newHand.lineup, newHand.dealer,
+    newHand.sb, newHand.state, newHand.changed, newHand.deck,newHand.preMaxBet,
+    newHand.flopMaxBet, newHand.turnMaxBet, newHand.riverMaxBet,
+    newHand.distribution, newHand.netting);
   tasks.push(this.publishUpdate(keys.tableAddr, msg));
 
 
@@ -159,9 +99,8 @@ StreamScanner.prototype.process = function process(record) {
   }
 
   // check hand complete
-  const ph = new PokerHelper(this.rc);
-  if (ph.checkForNextHand(newHand) === true &&
-    ( !oldHand.lineup || ph.checkForNextHand(oldHand) === false )) {
+  if (ph.isHandComplete(newHand.lineup, newHand.dealer, newHand.state) === true &&
+    ( !oldHand.lineup || ph.isHandComplete(oldHand.lineup, oldHand.dealer, oldHand.state) === false )) {
     tasks.push(this.notify('HandComplete::'+keys.tableAddr, {
       tableAddr: keys.tableAddr,
       handId: newHand.handId
@@ -174,7 +113,6 @@ StreamScanner.prototype.process = function process(record) {
       }, this.topicArn));
     }
   }
-
   // send event to sentry
   const actingPlayer = findActingPlayer(oldHand, newHand);
   if (actingPlayer) {
@@ -206,7 +144,6 @@ StreamScanner.prototype.process = function process(record) {
       }, this.topicArn));
     }
   }
-
   return Promise.all(tasks);
 }
 
