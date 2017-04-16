@@ -252,7 +252,8 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
       hand.lineup[pos].sitout > old) {
       return Promise.reject(`player ${addr} still got ${hand.lineup[pos].sitout - old} seconds to sit out, not yet to be kicked.`);
     }
-    const leaveReceipt = Receipt.leave(tableAddr, hand.handId, addr).sign(this.oraclePriv);
+    const handId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
+    const leaveReceipt = Receipt.leave(tableAddr, handId, addr).sign(this.oraclePriv);
     return this.submitLeave(tableAddr, leaveReceipt);
     // TODO: set exitHand flag in db?
   });
@@ -757,7 +758,7 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
       }
     }
     const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
-    const newDealer = this.helper.nextActivePlayer(lineup, prevDealer);
+    const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
     const deck = shuffle();
     const changed = Math.floor(Date.now() / 1000);
     return this.db.putHand(tableAddr, prevHand.handId + 1,

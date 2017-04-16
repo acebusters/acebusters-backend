@@ -751,17 +751,19 @@ describe('Stream worker other events', () => {
     }] });
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then((tx) => {
-      const leaveHex = Receipt.leave(tableAddr, 3, P1_ADDR).signToHex(ORACLE_PRIV);
+      const leaveHex = Receipt.leave(tableAddr, 2, P1_ADDR).signToHex(ORACLE_PRIV);
       expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.leave()', {
         level: sinon.match.any,
-        tags: { tableAddr, handId: 3 },
+        tags: { tableAddr, handId: 2 },
         extra: { txHash: '0x112233', leaveHex }
       });
+      expect(contract.payoutFrom.sendTransaction).callCount(1);
       done();
     }).catch(done);
   });
