@@ -1,9 +1,9 @@
 import EWT from 'ethereum-web-token';
 import ethUtil from 'ethereumjs-util';
 import { PokerHelper, Receipt } from 'poker-helper';
-import { Unauthorized, BadRequest, Forbidden } from './errors';
+import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
-var TableManager = function TableManager(db, contract, receiptCache, oraclePriv) {
+const TableManager = function TableManager(db, contract, receiptCache, oraclePriv) {
   this.db = db;
   this.rc = receiptCache;
   this.helper = new PokerHelper(this.rc);
@@ -11,56 +11,56 @@ var TableManager = function TableManager(db, contract, receiptCache, oraclePriv)
   if (oraclePriv) {
     this.oraclePriv = oraclePriv;
     const priv = new Buffer(oraclePriv.replace('0x', ''), 'hex');
-    this.oracleAddr = '0x' + ethUtil.privateToAddress(priv).toString('hex');
+    this.oracleAddr = `0x${ethUtil.privateToAddress(priv).toString('hex')}`;
   }
-}
+};
 
 TableManager.prototype.getConfig = function getConfig(stageVars) {
   return Promise.resolve({
     tableContracts: stageVars.tableContracts.split(','),
-    providerUrl: stageVars.providerUrl
+    providerUrl: stageVars.providerUrl,
   });
-}
+};
 
 TableManager.prototype.info = function info(tableAddr, tableContracts) {
-  return this.db.getLastHand(tableAddr).then((hand) => {
-    return Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
-      hand.dealer, hand.sb, hand.state, hand.changed, hand.deck, hand.preMaxBet,
-      hand.flopMaxBet, hand.turnMaxBet, hand.riverMaxBet, hand.distribution,
-      hand.netting));
-  }, (err) => {
-    var tables = [];
+  return this.db.getLastHand(tableAddr).then(hand => Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
+      hand.state, hand.changed, hand.deck, hand.preMaxBet, hand.flopMaxBet,
+      hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting)), (err) => {
+    let tables = [];
     if (tableContracts) {
       tables = tableContracts.split(',');
     }
-    if (err.name && err.name === 'NotFound' && 
+    if (err.name && err.name === 'NotFound' &&
       tables.indexOf(tableAddr) > -1) {
       return Promise.resolve({
         handId: 0,
         dealer: 0,
         state: 'showdown',
-        distribution: '0x1234'
+        distribution: '0x1234',
       });
-    } else {
-      throw err;
     }
+    throw err;
   });
-}
+};
 
-TableManager.prototype.hand = function hand(tableAddr, handId) {
-  return this.db.getHand(tableAddr, parseInt(handId)).then((hand) => {
-    return Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
+TableManager.prototype.getHand = function getHand(tableAddr, handIdStr) {
+  const handId = parseInt(handIdStr, 10);
+  return this.db.getHand(tableAddr, handId).then(hand => Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
       hand.dealer, hand.sb, hand.state, hand.changed, hand.deck, hand.preMaxBet,
       hand.flopMaxBet, hand.turnMaxBet, hand.riverMaxBet, hand.distribution,
-      hand.netting));
-  });
-}
+      hand.netting)));
+};
 
 TableManager.prototype.pay = function pay(tableAddr, ewt) {
   const receipt = this.rc.get(ewt);
   const now = Math.floor(Date.now() / 1000);
   const handId = receipt.values[0];
-  var hand, turn, dist, deck, params, prevReceipt, pos = -1;
+  let hand;
+  let turn;
+  let dist;
+  let deck;
+  let prevReceipt;
+  let pos;
   return this.db.getLastHand(tableAddr).then((_hand) => {
     hand = _hand;
     deck = _hand.deck;
@@ -76,35 +76,35 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
     if (pos < 0) {
       throw new Forbidden(`address ${receipt.signer} not in lineup.`);
     }
-    //check signer not leaving
+    // check signer not leaving
     if (hand.lineup[pos].exitHand && hand.lineup[pos].exitHand < hand.handId) {
       throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} exceeded.`);
     }
-    //check ewt not reused
-    if (hand.lineup[pos].last == ewt) {
+    // check ewt not reused
+    if (hand.lineup[pos].last === ewt) {
       throw new Unauthorized('you can not reuse receipts.');
     }
 
     // are we ready to start dealing?
     const activeCount = this.helper.countActivePlayers(hand.lineup, hand.state);
     if (hand.state === 'waiting' && activeCount < 2) {
-      if (activeCount == 0 || !hand.lineup[pos].sitout) {
+      if (activeCount === 0 || !hand.lineup[pos].sitout) {
         throw new BadRequest('not enough players to start game.');
       }
       // player coming back from sitout.
       delete hand.lineup[pos].sitout;
     }
 
-    //check bet not too small
-    if (hand.state != 'waiting' && hand.state != 'dealing' &&
-      receipt.abi[0].name == 'bet') {
+    // check bet not too small
+    if (hand.state !== 'waiting' && hand.state !== 'dealing' &&
+      receipt.abi[0].name === 'bet') {
       const max = this.helper.getMaxBet(hand.lineup, hand.state);
-      if(receipt.values[1] < max.amount) {
+      if (receipt.values[1] < max.amount) {
         throw new Unauthorized(`you have to match or raise ${max.amount}`);
       }
     }
 
-    //make sure to replace receipts in right order
+    // make sure to replace receipts in right order
     if (hand.lineup[pos].last) {
       prevReceipt = this.rc.get(hand.lineup[pos].last);
       if (prevReceipt.abi[0].name === 'fold') {
@@ -117,72 +117,66 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         }
       }
 
-      if (receipt.abi[0].name.indexOf('check') > -1 && receipt.values[1] != prevReceipt.values[1]) {
+      if (receipt.abi[0].name.indexOf('check') > -1 && receipt.values[1] !== prevReceipt.values[1]) {
         throw new BadRequest('check should not raise.');
       }
     }
 
-    if (receipt.abi[0].name == 'checkPre' && hand.state != 'preflop') {
+    if (receipt.abi[0].name === 'checkPre' && hand.state !== 'preflop') {
       throw new BadRequest('check only during preflop.');
     }
 
-    if (receipt.abi[0].name == 'checkFlop' && hand.state != 'flop') {
+    if (receipt.abi[0].name === 'checkFlop' && hand.state !== 'flop') {
       throw new BadRequest('checkFlop only during flop.');
     }
 
-    if (receipt.abi[0].name == 'checkTurn' && hand.state != 'turn') {
+    if (receipt.abi[0].name === 'checkTurn' && hand.state !== 'turn') {
       throw new BadRequest('checkTurn only during turn.');
     }
 
-    if (receipt.abi[0].name == 'checkRiver' && hand.state != 'river') {
+    if (receipt.abi[0].name === 'checkRiver' && hand.state !== 'river') {
       throw new BadRequest('checkRiver only during river.');
     }
 
     turn = this.helper.isTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2, receipt.signer);
     if (hand.state === 'waiting') {
-      if (receipt.abi[0].name == 'sitOut') {
+      if (receipt.abi[0].name === 'sitOut') {
         if (receipt.values[1] === 0) {
           if (hand.lineup[pos].sitout) {
             throw new BadRequest('pay BB when passed dealer in sitout.');
           } else {
             hand.lineup[pos].sitout = now;
           }
+        } else if (receipt.values[1] === hand.sb * 2) {
+          delete hand.lineup[pos].sitout;
         } else {
-          if (receipt.values[1] === hand.sb * 2) {
-            delete hand.lineup[pos].sitout;
-          } else {
-            throw new BadRequest('pay BB when passed dealer in sitout.');
-          }
+          throw new BadRequest('pay BB when passed dealer in sitout.');
         }
       } else {
         if (!turn && activeCount > 1) {
           throw new BadRequest('not your turn to pay small blind.');
         }
-        //check if receipt is small blind?
+        // check if receipt is small blind?
         if (receipt.values[1] !== hand.sb) {
           throw new BadRequest('small blind not valid.');
         }
       }
-    } else {
-      if (receipt.abi[0].name == 'sitOut') {
-        if (receipt.values[1] <= 0) {
-          throw new Unauthorized('need to pay for after state waiting.');
-        } else {
-          if (hand.lineup[pos].sitout) {
+    } else if (receipt.abi[0].name === 'sitOut') {
+      if (receipt.values[1] <= 0) {
+        throw new Unauthorized('need to pay for after state waiting.');
+      } else if (hand.lineup[pos].sitout) {
             // allow people to come back from sitout by paying BB
-            if (receipt.values[1] >= hand.sb * 2) {
-              delete hand.lineup[pos].sitout;
-            } else {
-              throw Unauthorized('need to pay BB to return.');
-            }
-          } else {
-            hand.lineup[pos].sitout = now;
-          }
-        } 
+        if (receipt.values[1] >= hand.sb * 2) {
+          delete hand.lineup[pos].sitout;
+        } else {
+          throw Unauthorized('need to pay BB to return.');
+        }
+      } else {
+        hand.lineup[pos].sitout = now;
       }
     }
     if (hand.state === 'dealing') {
-      //check if receipt is big blind?
+      // check if receipt is big blind?
       if (turn && receipt.abi[0].name === 'bet') {
         const bigBlindPos = this.helper.getBbPos(hand.lineup, hand.dealer, hand.state);
         const nextToAct = this.helper.getWhosTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
@@ -193,8 +187,8 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         }
       }
     }
-    if ( (prevReceipt && prevReceipt.values[1] < receipt.values[1]) || !prevReceipt && receipt.values[1] > 0) {
-      //calc bal
+    if ((prevReceipt && prevReceipt.values[1] < receipt.values[1]) || (!prevReceipt && receipt.values[1] > 0)) {
+      // calc bal
       return this.calcBalance(tableAddr, pos, receipt).then((balLeft) => {
         hand.lineup[pos].last = ewt;
         if (balLeft === 0) {
@@ -202,38 +196,44 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         }
         return this.updateState(tableAddr, hand, pos);
       });
-    } else {
-      hand.lineup[pos].last = ewt;
-      return this.updateState(tableAddr, hand, pos);
     }
+    hand.lineup[pos].last = ewt;
+    return this.updateState(tableAddr, hand, pos);
   }).then(() => {
-    var rsp = (deck) ? { cards: [deck[pos * 2], deck[pos * 2 + 1]] } : {};
-    rsp = (dist) ? {distribution: dist} : rsp;
+    let rsp = (deck) ? { cards: [deck[pos * 2], deck[(pos * 2) + 1]] } : {};
+    rsp = (dist) ? { distribution: dist } : rsp;
     return Promise.resolve(rsp);
   });
-}
+};
 
-TableManager.prototype.updateState = function updateState(tableAddr, hand, pos) {
+TableManager.prototype.updateState = function updateState(tableAddr, handParam, pos) {
+  const hand = handParam;
   const changed = Math.floor(Date.now() / 1000);
   const max = this.helper.getMaxBet(hand.lineup, hand.state);
   const bettingComplete = this.helper.isBettingDone(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
   const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
   let streetMaxBet;
   if (bettingComplete && !handComplete) {
-    if (hand.state == 'river')
+    if (hand.state === 'river') {
       hand.state = 'showdown';
-    if (hand.state == 'turn')
+    }
+    if (hand.state === 'turn') {
       hand.state = 'river';
-    if (hand.state == 'flop')
+    }
+    if (hand.state === 'flop') {
       hand.state = 'turn';
-    if (hand.state == 'preflop')
+    }
+    if (hand.state === 'preflop') {
       hand.state = 'flop';
-    if (hand.state == 'dealing')
+    }
+    if (hand.state === 'dealing') {
       hand.state = 'preflop';
+    }
     streetMaxBet = max.amount;
   }
-  if (hand.state == 'waiting')
+  if (hand.state === 'waiting') {
     hand.state = 'dealing';
+  }
 
   // take care of all-in
   const activePlayerCount = this.helper.countActivePlayers(hand.lineup, hand.state);
@@ -243,48 +243,47 @@ TableManager.prototype.updateState = function updateState(tableAddr, hand, pos) 
   }
   // update db
   return this.db.updateSeat(tableAddr, hand.handId, hand.lineup[pos], pos, hand.state, changed, streetMaxBet);
-}
+};
 
 TableManager.prototype.calcBalance = function calcBalance(tableAddr, pos, receipt) {
   let amount;
   if (receipt.values[1] > 0) {
-    //check if balance sufficient
-    //1. get balance at last netted
-    //2. go hand by hand till current hand - 1
+    // check if balance sufficient
+    // 1. get balance at last netted
+    // 2. go hand by hand till current hand - 1
       // substract all bets
       // add all winnings
-    //3. check if amount - bet > 0
+    // 3. check if amount - bet > 0
     return this.contract.getLineup(tableAddr).then((rsp) => {
       amount = rsp.lineup[pos].amount.toNumber();
-      //return get all old hands
-      var hands = [];
-      for (var i = rsp.lastHandNetted.toNumber() + 1; i < receipt.values[0]; i ++ )
+      // return get all old hands
+      const hands = [];
+      for (let i = rsp.lastHandNetted.toNumber() + 1; i < receipt.values[0]; i += 1) {
         hands.push(this.db.getHand(tableAddr, i));
+      }
       return Promise.all(hands);
     }).then((hands) => {
-      for (var i = 0; i < hands.length; i ++) {
-        if (hands[i].lineup[pos].last)
+      for (let i = 0; i < hands.length; i += 1) {
+        if (hands[i].lineup[pos].last) {
           amount -= this.rc.get(hands[i].lineup[pos].last).values[1];
-        var dists = this.rc.get(hands[i].distribution).values[2];
-        for (var j = 0; j < dists.length; j ++) {
-          var dist = EWT.separate(dists[j]);
-          if (dist.address == receipt.signer)
+        }
+        const dists = this.rc.get(hands[i].distribution).values[2];
+        for (let j = 0; j < dists.length; j += 1) {
+          const dist = EWT.separate(dists[j]);
+          if (dist.address === receipt.signer) {
             amount += dist.amount;
+          }
         }
       }
       const balLeft = amount - receipt.values[1];
-      if (balLeft >= 0)
+      if (balLeft >= 0) {
         return Promise.resolve(balLeft);
-      else {
-        throw new Forbidden(`can not bet more than balance (${amount}).`);
       }
-    }, (err) => {
-      return Promise.reject(err);
-    });
-  } else {
-    return Promise.resolve();
+      throw new Forbidden(`can not bet more than balance (${amount}).`);
+    }, err => Promise.reject(err));
   }
-}
+  return Promise.resolve();
+};
 
 TableManager.prototype.show = function show(tableAddr, ewt, cards) {
   if (!cards || Object.prototype.toString.call(cards) !== '[object Array]' || cards.length !== 2) {
@@ -293,18 +292,18 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
   let hand;
   let deck;
   let dist;
-  let pos = -1;
+  let pos;
   const receipt = this.rc.get(ewt);
   // check receipt type
-  if (receipt.abi[0].name != 'show' && receipt.abi[0].name != 'muck') {
+  if (receipt.abi[0].name !== 'show' && receipt.abi[0].name !== 'muck') {
     throw new BadRequest('only "show" and "muck" receipts permitted in showdown.');
   }
-  var handId = receipt.values[0];
-  //check if this hand exists
+  const handId = receipt.values[0];
+  // check if this hand exists
   return this.db.getHand(tableAddr, handId).then((_hand) => {
     hand = _hand;
     deck = _hand.deck;
-    if (hand.state != 'showdown') {
+    if (hand.state !== 'showdown') {
       throw new BadRequest(`hand ${handId} not in showdown.`);
     }
     pos = this.helper.inLineup(receipt.signer, hand.lineup);
@@ -319,7 +318,7 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
       throw new Forbidden(`seat ${pos} is not an active player.`);
     }
     // check ewt not reused
-    if (hand.lineup[pos].last == ewt) {
+    if (hand.lineup[pos].last === ewt) {
       throw new Unauthorized('you can not reuse receipts.');
     }
 
@@ -329,7 +328,7 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
     }
 
     // check cards
-    if (cards[0] != deck[pos * 2] || cards[1] != deck[pos * 2 + 1]) {
+    if (cards[0] !== deck[pos * 2] || cards[1] !== deck[(pos * 2) + 1]) {
       throw new BadRequest('you submitted wrong cards.');
     }
 
@@ -341,13 +340,11 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
     if (hand.lineup[pos].sitout === 'allin') {
       delete hand.lineup[pos].sitout;
     }
-    //update db
+    // update db
     const changed = Math.floor(Date.now() / 1000);
     return this.db.updateSeat(tableAddr, hand.handId, hand.lineup[pos], pos, hand.state, changed);
-  }).then(() => {
-    return Promise.resolve(dist);
-  });
-}
+  }).then(() => Promise.resolve(dist));
+};
 
 TableManager.prototype.leave = function leave(tableAddr, ewt) {
   let hand;
@@ -358,20 +355,15 @@ TableManager.prototype.leave = function leave(tableAddr, ewt) {
   // check if this hand exists
   return this.db.getLastHand(tableAddr).then((_hand) => {
     hand = _hand;
-    if (hand.state == 'waiting') {
-      if (handId < hand.handId - 1) {
-        throw new BadRequest(`forbidden to exit at handId ${handId}`);
-      }
-    } else {
-      if (handId < hand.handId) {
-        throw new BadRequest(`forbidden to exit at handId ${handId}`);
-      }
+    const minHandId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
+    if (handId < minHandId) {
+      throw new BadRequest(`forbidden to exit at handId ${handId}`);
     }
     // check signer in lineup
     return this.contract.getLineup(tableAddr);
   }).then((rsp) => {
-    for (var i = 0; i < rsp.lineup.length; i++) {
-      if (receipt.signer == rsp.lineup[i].address) {
+    for (let i = 0; i < rsp.lineup.length; i += 1) {
+      if (receipt.signer === rsp.lineup[i].address) {
         pos = i;
         break;
       }
@@ -394,14 +386,12 @@ TableManager.prototype.leave = function leave(tableAddr, ewt) {
       hand.lineup[pos].sitout = 1;
     }
     return this.db.updateLeave(tableAddr, hand.handId, hand.lineup[pos], pos);
-  }).then(function() {
-    // return leave receipt
-    return Promise.resolve({ leaveReceipt });
-  });
-}
+  }).then(() => Promise.resolve({ leaveReceipt }));
+};
 
-TableManager.prototype.netting = function(tableAddr, handId, nettingSig) {
-  return this.db.getHand(tableAddr, parseInt(handId)).then((hand) => {
+TableManager.prototype.netting = function netting(tableAddr, handIdStr, nettingSig) {
+  const handId = parseInt(handIdStr, 10);
+  return this.db.getHand(tableAddr, handId).then((hand) => {
     if (nettingSig === undefined || nettingSig.length < 130 || nettingSig.length > 132) {
       throw new BadRequest(`nettingSig ${nettingSig} invalid.`);
     }
@@ -416,13 +406,13 @@ TableManager.prototype.netting = function(tableAddr, handId, nettingSig) {
     const payload = new Buffer(hand.netting.newBalances.replace('0x', ''), 'hex');
     const hash = ethUtil.sha3(payload);
     const pub = ethUtil.ecrecover(hash, v, r, s);
-    const signer = '0x' + ethUtil.pubToAddress(pub).toString('hex');
+    const signer = `0x${ethUtil.pubToAddress(pub).toString('hex')}`;
     if (hand.netting[signer] !== undefined) {
       throw new Conflict(`signer ${signer} already delivered nettingSig.`);
     }
-    var isSignerInLineup = false;
-    for (var i = 0; i < hand.lineup.length; i++) {
-      if (hand.lineup[i].address == signer) {
+    let isSignerInLineup = false;
+    for (let i = 0; i < hand.lineup.length; i += 1) {
+      if (hand.lineup[i].address === signer) {
         isSignerInLineup = true;
         break;
       }
@@ -430,22 +420,23 @@ TableManager.prototype.netting = function(tableAddr, handId, nettingSig) {
     if (!isSignerInLineup) {
       throw new NotFound(`signer ${signer} not in lineup.`);
     }
-    return this.db.updateNetting(tableAddr, parseInt(handId), signer, nettingSig);
+    return this.db.updateNetting(tableAddr, handId, signer, nettingSig);
   });
-}
+};
 
 TableManager.prototype.timeout = function timeout(tableAddr) {
-  var hand, pos = -1;
+  let hand;
   // get the latest hand to check on
   return this.db.getLastHand(tableAddr).then((_hand) => {
     hand = _hand;
+    let pos;
     try {
       pos = this.helper.getWhosTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
     } catch (e) {
       throw new BadRequest(`could not find next player to act in hand ${hand.handId}`);
     }
 
-    const now = Math.floor(Date.now() / 1000)
+    const now = Math.floor(Date.now() / 1000);
     const leftTime = (hand.changed + 180) - now;
     if (leftTime > 0) {
       throw new BadRequest(`player ${pos} still got ${leftTime} second to act.`);
@@ -453,6 +444,6 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     hand.lineup[pos].sitout = now;
     return this.updateState(tableAddr, hand, pos);
   });
-}
+};
 
 module.exports = TableManager;

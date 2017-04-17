@@ -1,20 +1,19 @@
 import { NotFound } from './errors';
 
-function Db (dynamo) {
+function Db(dynamo) {
   this.dynamo = dynamo;
   this.tableName = 'poker';
 }
 
-Db.prototype.getLastHand = function(tableAddr) {
-  var self = this;
-  return new Promise(function (fulfill, reject) {
-    self.dynamo.query({
-      TableName: self.tableName,
+Db.prototype.getLastHand = function getLastHand(tableAddr) {
+  return new Promise((fulfill, reject) => {
+    this.dynamo.query({
+      TableName: this.tableName,
       KeyConditionExpression: 'tableAddr = :a',
-      ExpressionAttributeValues: {':a': tableAddr},
+      ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
-      ScanIndexForward: false
-    }, function(err, rsp) {
+      ScanIndexForward: false,
+    }, (err, rsp) => {
       if (err) {
         reject(err);
         return;
@@ -25,49 +24,42 @@ Db.prototype.getLastHand = function(tableAddr) {
       fulfill(rsp.Items[0]);
     });
   });
-}
+};
 
-Db.prototype.getHand = function(tableAddr, handId) {
-  var self = this;
-  return new Promise(function (fulfill, reject) {
+Db.prototype.getHand = function getHand(tableAddr, handId) {
+  return new Promise((fulfill, reject) => {
     if (handId < 1) {
-      fulfill({ handId: handId, state: 'showdown', distribution: '0x1234' }); //return the genensis hand
+      // return the genensis hand
+      fulfill({ handId, state: 'showdown', distribution: '0x1234' });
       return;
     }
-    self.dynamo.getItem({
-      TableName: self.tableName,
-      Key: {
-        tableAddr: tableAddr,
-        handId: handId
-      }
-    }, function(err, data){
+    this.dynamo.getItem({
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+    }, (err, data) => {
       if (err) {
         reject(err);
         return;
       }
-      if(!data.Item) {
+      if (!data.Item) {
         throw new NotFound(`handId ${handId} not found.`);
       }
       fulfill(data.Item);
     });
   });
-}
+};
 
-Db.prototype.updateLeave = function(tableAddr, handId, seat, pos) {
-  var self = this;
-  return new Promise(function (fulfill, reject) {
-    var params = {
-      TableName: self.tableName,
-      Key:{
-        tableAddr: tableAddr,
-        handId: handId
-      },
-      UpdateExpression: 'set lineup['+pos+'] = :s',
+Db.prototype.updateLeave = function updateLeave(tableAddr, handId, seat, pos) {
+  return new Promise((fulfill, reject) => {
+    const params = {
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: `set lineup[${pos}] = :s`,
       ExpressionAttributeValues: {
-        ':s': seat
-      }
+        ':s': seat,
+      },
     };
-    self.dynamo.updateItem(params, function(err, rsp) {
+    this.dynamo.updateItem(params, (err, rsp) => {
       if (err) {
         reject(err);
         return;
@@ -75,39 +67,39 @@ Db.prototype.updateLeave = function(tableAddr, handId, seat, pos) {
       fulfill(rsp.Item);
     });
   });
-}
+};
 
-Db.prototype.updateSeat = function(tableAddr, handId, seat, pos, state, changed, streetMaxBet) {
-  var self = this;
-  return new Promise(function (fulfill, reject) {
-    var params = {
-      TableName: self.tableName,
-      Key:{
-        tableAddr: tableAddr,
-        handId: handId
-      },
-      UpdateExpression: 'set lineup['+pos+'] = :l, #hand_state = :s, changed = :c',
+Db.prototype.updateSeat = function updateSeat(tableAddr,
+  handId, seat, pos, state, changed, streetMaxBet) {
+  return new Promise((fulfill, reject) => {
+    const params = {
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: `set lineup[${pos}] = :l, #hand_state = :s, changed = :c`,
       ExpressionAttributeValues: {
         ':l': seat,
         ':s': state,
-        ':c': changed
+        ':c': changed,
       },
       ExpressionAttributeNames: {
-        "#hand_state": "state"
-      }
+        '#hand_state': 'state',
+      },
     };
     if (streetMaxBet && streetMaxBet > 0) {
       let attribute = 'preMaxBet';
-      if (state == 'showdown')
+      if (state === 'showdown') {
         attribute = 'riverMaxBet';
-      if (state == 'river')
+      }
+      if (state === 'river') {
         attribute = 'turnMaxBet';
-      if (state == 'turn')
+      }
+      if (state === 'turn') {
         attribute = 'flopMaxBet';
-      params.UpdateExpression += ', ' + attribute + ' = :m';
+      }
+      params.UpdateExpression += `, ${attribute} = :m`;
       params.ExpressionAttributeValues[':m'] = streetMaxBet;
     }
-    self.dynamo.updateItem(params, function(err, rsp) {
+    this.dynamo.updateItem(params, (err, rsp) => {
       if (err) {
         reject(err);
         return;
@@ -115,27 +107,26 @@ Db.prototype.updateSeat = function(tableAddr, handId, seat, pos, state, changed,
       fulfill(rsp.Item);
     });
   });
-}
+};
 
-Db.prototype.updateNetting = function(tableAddr, handId, signer, nettingSig) {
-  var self = this;
-  return new Promise(function (fulfill, reject) {
-    var params = {
-      TableName: self.tableName,
-      Key:{
-          tableAddr: tableAddr,
-          handId: handId
+Db.prototype.updateNetting = function updateNetting(tableAddr, handId, signer, nettingSig) {
+  return new Promise((fulfill, reject) => {
+    const params = {
+      TableName: this.tableName,
+      Key: {
+        tableAddr,
+        handId,
       },
       UpdateExpression: 'set netting.#signer = :s',
-      ExpressionAttributeNames:{
-        '#signer': signer
+      ExpressionAttributeNames: {
+        '#signer': signer,
       },
       ExpressionAttributeValues: {
-        ':s': nettingSig
+        ':s': nettingSig,
       },
-      ReturnValues: 'ALL_NEW'
+      ReturnValues: 'ALL_NEW',
     };
-    self.dynamo.updateItem(params, function(err, rsp) {
+    this.dynamo.updateItem(params, (err, rsp) => {
       if (err) {
         reject(err);
         return;
@@ -143,6 +134,6 @@ Db.prototype.updateNetting = function(tableAddr, handId, signer, nettingSig) {
       fulfill(rsp.Item);
     });
   });
-}
+};
 
 module.exports = Db;
