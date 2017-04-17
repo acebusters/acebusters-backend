@@ -1,3 +1,4 @@
+import { NotFound } from './errors';
 
 function Db (dynamo) {
   this.dynamo = dynamo;
@@ -19,8 +20,7 @@ Db.prototype.getLastHand = function(tableAddr) {
         return;
       }
       if (!rsp.Items || rsp.Items.length < 1) {
-        reject('Not Found: table with address ' + tableAddr + ' unknown.');
-        return;
+        throw new NotFound(`table with address ${tableAddr} unknown.`);
       }
       fulfill(rsp.Items[0]);
     });
@@ -46,8 +46,7 @@ Db.prototype.getHand = function(tableAddr, handId) {
         return;
       }
       if(!data.Item) {
-        reject('Not Found: handId ' + handId + ' not found.');
-        return;
+        throw new NotFound(`handId ${handId} not found.`);
       }
       fulfill(data.Item);
     });

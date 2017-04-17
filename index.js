@@ -22,28 +22,33 @@ exports.handler = function(event, context, callback) {
   if (typeof web3 === 'undefined') {
     web3 = new Web3(new Web3.providers.HttpProvider(event['stage-variables'].providerUrl));
   }
-  
-  var handleRequest,
-    manager = new TableManager(new Db(dynamo), new TableContract(web3), rc, process.env.ORACLE_PRIV),
-    path = event.context['resource-path'];
-  if (path.indexOf('pay') > -1) {
-    handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
-  } else if (path.indexOf('info') > -1) {
-    handleRequest = manager.info(event.params.path.tableAddr, event['stage-variables'].tableContracts);
-  } else if (path.indexOf('netting') > -1) {
-    handleRequest = manager.netting(event.params.path.tableAddr, event.params.path.handId, event.nettingSig);
-  } else if (path.indexOf('hand') > -1) {
-    handleRequest = manager.hand(event.params.path.tableAddr, event.params.path.handId);
-  } else if (path.indexOf('config') > -1) {
-    handleRequest = manager.getConfig(event['stage-variables']);
-  } else if (path.indexOf('show') > -1) {
-    handleRequest = manager.show(event.params.path.tableAddr, event.params.header.Authorization, event.cards);
-  } else if (path.indexOf('leave') > -1) {
-    handleRequest = manager.leave(event.params.path.tableAddr, event.params.header.Authorization);
-  } else if (path.indexOf('timeout') > -1) {
-    handleRequest = manager.timeout(event.params.path.tableAddr);
-  } else {
-    handleRequest = Promise.reject('Error: unexpected path: ' + path);
+
+  let handleRequest;
+  const manager = new TableManager(new Db(dynamo), new TableContract(web3), rc, process.env.ORACLE_PRIV);
+  const path = event.context['resource-path'];
+  try {
+
+    if (path.indexOf('pay') > -1) {
+      handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
+    } else if (path.indexOf('info') > -1) {
+      handleRequest = manager.info(event.params.path.tableAddr, event['stage-variables'].tableContracts);
+    } else if (path.indexOf('netting') > -1) {
+      handleRequest = manager.netting(event.params.path.tableAddr, event.params.path.handId, event.nettingSig);
+    } else if (path.indexOf('hand') > -1) {
+      handleRequest = manager.hand(event.params.path.tableAddr, event.params.path.handId);
+    } else if (path.indexOf('config') > -1) {
+      handleRequest = manager.getConfig(event['stage-variables']);
+    } else if (path.indexOf('show') > -1) {
+      handleRequest = manager.show(event.params.path.tableAddr, event.params.header.Authorization, event.cards);
+    } else if (path.indexOf('leave') > -1) {
+      handleRequest = manager.leave(event.params.path.tableAddr, event.params.header.Authorization);
+    } else if (path.indexOf('timeout') > -1) {
+      handleRequest = manager.timeout(event.params.path.tableAddr);
+    } else {
+      handleRequest = Promise.reject('Error: unexpected path: ' + path);
+    }
+  } catch (err) {
+
   }
 
   handleRequest
