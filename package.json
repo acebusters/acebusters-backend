@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "npm run lint:js",
-    "lint:eslint": "eslint --ignore-path .gitignore --ignore-pattern internals/scripts",
+    "lint:eslint": "eslint --fix --ignore-path .gitignore --ignore-pattern internals/scripts",
     "lint:js": "npm run lint:eslint -- . ",
     "build": "npm run build:init && npm run build:js && npm run build:install",
     "build:init": "rm -rf dist && mkdir dist",
@@ -47,10 +47,12 @@
   "dependencies": {
     "aws-sdk": "^2.5.3",
     "babel-runtime": "^6.11.6",
+    "bignumber.js": "^4.0.1",
     "dynamodb-doc": "^1.0.0",
     "ethereum-web-token": "^0.1.12",
     "ethereumjs-util": "^4.5.0",
     "poker-helper": "0.3.13",
+    "raven": "^1.2.1",
     "web3": "^0.18.2"
   }
 }

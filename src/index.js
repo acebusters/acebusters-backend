@@ -23,11 +23,9 @@ TableManager.prototype.getConfig = function getConfig(stageVars) {
 };
 
 TableManager.prototype.info = function info(tableAddr, tableContracts) {
-  return this.db.getLastHand(tableAddr).then((hand) => {
-    return Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
+  return this.db.getLastHand(tableAddr).then(hand => Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
       hand.state, hand.changed, hand.deck, hand.preMaxBet, hand.flopMaxBet,
-      hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting));
-  }, (err) => {
+      hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting)), (err) => {
     let tables = [];
     if (tableContracts) {
       tables = tableContracts.split(',');
@@ -47,12 +45,10 @@ TableManager.prototype.info = function info(tableAddr, tableContracts) {
 
 TableManager.prototype.getHand = function getHand(tableAddr, handIdStr) {
   const handId = parseInt(handIdStr, 10);
-  return this.db.getHand(tableAddr, handId).then((hand) => {
-    return Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
+  return this.db.getHand(tableAddr, handId).then(hand => Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
       hand.dealer, hand.sb, hand.state, hand.changed, hand.deck, hand.preMaxBet,
       hand.flopMaxBet, hand.turnMaxBet, hand.riverMaxBet, hand.distribution,
-      hand.netting));
-  });
+      hand.netting)));
 };
 
 TableManager.prototype.pay = function pay(tableAddr, ewt) {
@@ -151,12 +147,10 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
           } else {
             hand.lineup[pos].sitout = now;
           }
+        } else if (receipt.values[1] === hand.sb * 2) {
+          delete hand.lineup[pos].sitout;
         } else {
-          if (receipt.values[1] === hand.sb * 2) {
-            delete hand.lineup[pos].sitout;
-          } else {
-            throw new BadRequest('pay BB when passed dealer in sitout.');
-          }
+          throw new BadRequest('pay BB when passed dealer in sitout.');
         }
       } else {
         if (!turn && activeCount > 1) {
@@ -167,22 +161,18 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
           throw new BadRequest('small blind not valid.');
         }
       }
-    } else {
-      if (receipt.abi[0].name === 'sitOut') {
-        if (receipt.values[1] <= 0) {
-          throw new Unauthorized('need to pay for after state waiting.');
-        } else {
-          if (hand.lineup[pos].sitout) {
+    } else if (receipt.abi[0].name === 'sitOut') {
+      if (receipt.values[1] <= 0) {
+        throw new Unauthorized('need to pay for after state waiting.');
+      } else if (hand.lineup[pos].sitout) {
             // allow people to come back from sitout by paying BB
-            if (receipt.values[1] >= hand.sb * 2) {
-              delete hand.lineup[pos].sitout;
-            } else {
-              throw Unauthorized('need to pay BB to return.');
-            }
-          } else {
-            hand.lineup[pos].sitout = now;
-          }
+        if (receipt.values[1] >= hand.sb * 2) {
+          delete hand.lineup[pos].sitout;
+        } else {
+          throw Unauthorized('need to pay BB to return.');
         }
+      } else {
+        hand.lineup[pos].sitout = now;
       }
     }
     if (hand.state === 'dealing') {
@@ -197,7 +187,7 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         }
       }
     }
-    if ( (prevReceipt && prevReceipt.values[1] < receipt.values[1]) || (!prevReceipt && receipt.values[1] > 0)) {
+    if ((prevReceipt && prevReceipt.values[1] < receipt.values[1]) || (!prevReceipt && receipt.values[1] > 0)) {
       // calc bal
       return this.calcBalance(tableAddr, pos, receipt).then((balLeft) => {
         hand.lineup[pos].last = ewt;
@@ -290,7 +280,7 @@ TableManager.prototype.calcBalance = function calcBalance(tableAddr, pos, receip
         return Promise.resolve(balLeft);
       }
       throw new Forbidden(`can not bet more than balance (${amount}).`);
-    }, (err) => Promise.reject(err));
+    }, err => Promise.reject(err));
   }
   return Promise.resolve();
 };
@@ -353,9 +343,7 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
     // update db
     const changed = Math.floor(Date.now() / 1000);
     return this.db.updateSeat(tableAddr, hand.handId, hand.lineup[pos], pos, hand.state, changed);
-  }).then(() => {
-    return Promise.resolve(dist);
-  });
+  }).then(() => Promise.resolve(dist));
 };
 
 TableManager.prototype.leave = function leave(tableAddr, ewt) {
