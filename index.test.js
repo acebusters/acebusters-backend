@@ -94,7 +94,7 @@ describe('Oracle pay', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('currently playing 1');
+      expect(err.message).to.contain('currently playing 1');
       done();
     }).catch(done);
   });
@@ -119,7 +119,7 @@ describe('Oracle pay', function() {
     var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('Forbidden');
+      expect(err.message).to.contain('Forbidden');
       done();
     }).catch(done);
   });
@@ -149,7 +149,7 @@ describe('Oracle pay', function() {
 
     const blind = new EWT(ABI_BET).bet(3, 50).sign(P2_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('Forbidden: exitHand 2 exceeded.');
+      expect(err.message).to.contain('Forbidden: exitHand 2 exceeded.');
       done();
     }).catch(done);
   });
@@ -180,7 +180,7 @@ describe('Oracle pay', function() {
 
     const blind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('Forbidden: exitHand 2 exceeded.');
+      expect(err.message).to.contain('Forbidden: exitHand 2 exceeded.');
       done();
     }).catch(done);
   });
@@ -206,7 +206,7 @@ describe('Oracle pay', function() {
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
     const blind = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('not enough players');
+      expect(err.message).to.contain('not enough players');
       done();
     }).catch(done);
   });
@@ -233,7 +233,7 @@ describe('Oracle pay', function() {
 
     const blind = new EWT(ABI_BET).bet(1, 80).sign(P1_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('small blind not valid');
+      expect(err.message).to.contain('small blind not valid');
       done();
     }).catch(done);
   });
@@ -255,7 +255,7 @@ describe('Oracle pay', function() {
 
     const smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     oracle.pay(tableAddr, smallBlind).catch(function(err) {
-      expect(err).to.contain('not your turn');
+      expect(err.message).to.contain('not your turn');
       done();
     }).catch(done);
   });
@@ -407,7 +407,7 @@ describe('Oracle pay', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('Forbidden');
+      expect(err.message).to.contain('Forbidden');
       done();
     }).catch(done);
   });
@@ -428,7 +428,7 @@ describe('Oracle pay', function() {
     var bigBlind = new EWT(ABI_BET).bet(1, 80).sign(P2_KEY);
 
     oracle.pay(tableAddr, bigBlind).catch(function(err) {
-      expect(err).to.contain('not valid');
+      expect(err.message).to.contain('not valid');
       done();
     }).catch(done);
   });
@@ -568,7 +568,7 @@ describe('Oracle pay', function() {
 
     const bet = new EWT(ABI_BET).bet(3, 10000).sign(P2_KEY);
     oracle.pay(tableAddr, bet).catch(function(err) {
-      expect(err).to.contain('can not bet more than balance');
+      expect(err.message).to.contain('can not bet more than balance');
       done();
     }).catch(done);
   });
@@ -590,7 +590,7 @@ describe('Oracle pay', function() {
 
     var tooMuchBet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
     oracle.pay(tableAddr, tooMuchBet).catch(function(err) {
-      expect(err).to.contain('can not bet more than balance');
+      expect(err.message).to.contain('can not bet more than balance');
       done();
     }).catch(done);
   });
@@ -607,7 +607,7 @@ describe('Oracle pay', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.pay(tableAddr, blind).catch(function(err) {
-      expect(err).to.contain('Unauthorized');
+      expect(err.message).to.contain('Unauthorized');
       done();
     }).catch(done);
   });
@@ -790,7 +790,7 @@ describe('Oracle pay', function() {
     const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
 
     oracle.pay(tableAddr, sitout).catch(function(err) {
-      expect(err).to.contain('Unauthorized');
+      expect(err.message).to.contain('Unauthorized');
       done();
     }).catch(done);
   });
@@ -853,7 +853,7 @@ describe('Oracle pay', function() {
     const sitout = new EWT(ABI_SIT_OUT).sitOut(13, 100).sign(P1_KEY);
 
     oracle.pay(tableAddr, sitout).catch(function(err) {
-      expect(err).to.contain('can not toggle sitout');
+      expect(err.message).to.contain('can not toggle sitout');
       done();
     }).catch(done);
   });
@@ -944,7 +944,7 @@ describe('Oracle pay', function() {
 
     const bet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
     oracle.pay(tableAddr, bet).catch(function(err) {
-      expect(err).to.contain('no bet after fold.');
+      expect(err.message).to.contain('no bet after fold.');
       done();
     }).catch(done);
   });
@@ -969,7 +969,7 @@ describe('Oracle pay', function() {
 
     const bet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
     oracle.pay(tableAddr, bet).catch(function(err) {
-      expect(err).to.contain('can not toggle sitout');
+      expect(err.message).to.contain('can not toggle sitout');
       done();
     }).catch(done);
   });
@@ -992,7 +992,7 @@ describe('Oracle pay', function() {
 
     const check = new EWT(ABI_CHECK_TURN).checkTurn(3, 100).sign(P2_KEY);
     new Oracle(new Db(dynamo), null, rc).pay(tableAddr, check).catch(function(err) {
-      expect(err).to.contain('checkTurn only during turn');
+      expect(err.message).to.contain('checkTurn only during turn');
       done();
     }).catch(done);
   });
@@ -1116,7 +1116,7 @@ describe('Oracle pay', function() {
 
     const check = new EWT(ABI_CHECK_FLOP).checkFlop(3, 120).sign(P2_KEY);
     new Oracle(new Db(dynamo), null, rc).pay(tableAddr, check).catch(function(err) {
-      expect(err).to.contain('check should not raise');
+      expect(err.message).to.contain('check should not raise');
       done();
     }).catch(done);
   });
@@ -1299,8 +1299,8 @@ describe('Oracle pay', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.pay(tableAddr, lowBet).catch(function(err) {
-      expect(err).to.contain('Unauthorized');
-      expect(err).to.contain('match or raise');
+      expect(err.message).to.contain('Unauthorized');
+      expect(err.message).to.contain('match or raise');
       done();
     }).catch(done);
   });
@@ -1366,7 +1366,7 @@ describe('Oracle info', function() {
     sinon.stub(dynamo, 'query').yields(null, { Items: []});
 
     new Oracle(new Db(dynamo), null, rc).info(tableAddr, 'tablex,table').catch(function(err) {
-      expect(err).to.contain('Not Found:');
+      expect(err.message).to.contain('Not Found:');
       done();
     }).catch(done);
   });
@@ -1577,7 +1577,7 @@ describe('Oracle show', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show1, [0, 1]).catch(function(err) {
-      expect(err).to.contain('not in showdown');
+      expect(err.message).to.contain('not in showdown');
       done();
     }).catch(done);
   });
@@ -1596,13 +1596,15 @@ describe('Oracle show', function() {
       state: 'showdown',
       deck: deck
     }});
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
-
-    oracle.show(tableAddr, bet, [0, 1]).catch(function(err) {
-      expect(err).to.contain('only "show" and "muck" receipts');
+    try {
+      oracle.show(tableAddr, bet, [0, 1]);
+    } catch(err) {
+      expect(err.message).to.contain('only "show" and "muck" receipts');
       done();
-    }).catch(done);
+    };
+    throw new Error('should have thrown');
   });
 
   it('should allow to showdown with 1 winner.', function(done) {
@@ -1691,7 +1693,7 @@ describe('Oracle show', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
-      expect(err).to.contain('not allowed in showdown');
+      expect(err.message).to.contain('not allowed in showdown');
       done();
     }).catch(done);
   });
@@ -1716,7 +1718,7 @@ describe('Oracle show', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
-      expect(err).to.contain('same or highter amount');
+      expect(err.message).to.contain('same or highter amount');
       done();
     }).catch(done);
   });
@@ -1745,7 +1747,7 @@ describe('Oracle show', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
-      expect(err).to.contain('is not an active player');
+      expect(err.message).to.contain('is not an active player');
       done();
     }).catch(done);
   });
@@ -1798,7 +1800,7 @@ describe('Oracle leave', function() {
     var oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.leave(tableAddr, leave).catch(function(err) {
-      expect(err).to.contain('forbidden');
+      expect(err.message).to.contain('forbidden');
       done();
     }).catch(done);
   });
@@ -1918,7 +1920,7 @@ describe('Oracle timing', function() {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).catch(function(err) {
-      expect(err).to.contain('second to act');
+      expect(err.message).to.contain('second to act');
       done();
     }).catch(done);
   });
@@ -1966,7 +1968,7 @@ describe('Oracle timing', function() {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).catch(function(err) {
-      expect(err).to.contain('Bad Request');
+      expect(err.message).to.contain('Bad Request');
       done();
     }).catch(done);
   });
