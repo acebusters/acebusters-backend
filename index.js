@@ -1,16 +1,12 @@
-const AWS = require('aws-sdk');
-const Web3 = require('web3');
-const doc = require('dynamodb-doc');
-AWS.config.update({region: 'eu-west-1'});
+import Web3 from 'web3';
+import doc from 'dynamodb-doc';
+import Db from './src/db';
+import TableContract from './src/tableContract';
+import TableManager from './src/index';
+import { ReceiptCache } from 'poker-helper';
 
-const Db = require('./src/db');
-const TableContract = require('./src/tableContract');
-const TableManager = require('./src/index');
-var ReceiptCache = require('poker-helper').ReceiptCache;
-
-var web3, dynamo = new doc.DynamoDB();
-
-var rc = new ReceiptCache();
+let web3, dynamo = new doc.DynamoDB();
+let rc = new ReceiptCache();
 
 exports.handler = function(event, context, callback) {
 
@@ -27,7 +23,6 @@ exports.handler = function(event, context, callback) {
   const manager = new TableManager(new Db(dynamo), new TableContract(web3), rc, process.env.ORACLE_PRIV);
   const path = event.context['resource-path'];
   try {
-
     if (path.indexOf('pay') > -1) {
       handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
     } else if (path.indexOf('info') > -1) {
@@ -35,7 +30,7 @@ exports.handler = function(event, context, callback) {
     } else if (path.indexOf('netting') > -1) {
       handleRequest = manager.netting(event.params.path.tableAddr, event.params.path.handId, event.nettingSig);
     } else if (path.indexOf('hand') > -1) {
-      handleRequest = manager.hand(event.params.path.tableAddr, event.params.path.handId);
+      handleRequest = manager.getHand(event.params.path.tableAddr, event.params.path.handId);
     } else if (path.indexOf('config') > -1) {
       handleRequest = manager.getConfig(event['stage-variables']);
     } else if (path.indexOf('show') > -1) {
@@ -48,14 +43,26 @@ exports.handler = function(event, context, callback) {
       handleRequest = Promise.reject('Error: unexpected path: ' + path);
     }
   } catch (err) {
-
+    if (err.name) {
+      callback(err.message);
+    } else {
+      callback(`Error: ${err.message}`);
+    }
+    return;
   }
 
   handleRequest
-  .then(function(data){
+  .then((data) => {
     callback(null, data);
   })
-  .catch(function(err){
+  .catch((err) => {
+    if (err.name) {
+      // these are known errors: 4xx
+      callback(err.message);
+    } else {
+      // this shall map to http 500
+      callback(`Error: ${err.message}`);
+    }
     console.log(err.stack);
     callback(err);
   });

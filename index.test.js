@@ -1,13 +1,15 @@
-var expect = require('chai').expect;
-var sinon = require('sinon');
-require('chai').use(require('sinon-chai'));
-const EWT = require('ethereum-web-token');
-var BigNumber = require('bignumber.js');
-var ReceiptCache = require('poker-helper').ReceiptCache;
+import chai, { expect } from 'chai';
+import sinonChai from 'sinon-chai';
+import sinon from 'sinon';
+import EWT from 'ethereum-web-token';
+import { PokerHelper, ReceiptCache } from 'poker-helper';
+import BigNumber from 'bignumber.js';
+import Oracle from './src/index';
+import Db from './src/db';
+import TableContract from './src/tableContract';
 
-const Oracle = require('./src/index');
-const Db = require('./src/db');
-const TableContract = require('./src/tableContract');
+chai.use(sinonChai);
+const pokerHelper = new PokerHelper();
 
 // BET can replace lower bet
 // BET can replace SIT_OUT during dealing state
@@ -56,21 +58,21 @@ const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cb
 
 const deck = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
 
-var dynamo = {
+const dynamo = {
   getItem: function(){},
   putItem: function(){},
   updateItem: function(){},
   query: function(){}
 };
 
-var web3 = {
+const web3 = {
   eth: {
     contract: function(){}
   },
   at: function(){}
 }
 
-var contract = {
+const contract = {
   getLineup: {
     call: function(){}
   },
@@ -79,32 +81,27 @@ var contract = {
   }
 }
 
-var rc = new ReceiptCache();
+const rc = new ReceiptCache();
 sinon.stub(web3.eth, 'contract').returns(web3);
 sinon.stub(web3, 'at').returns(contract);
 
 describe('Oracle pay', function() {
 
-  it('should reject receipt with unknown hand Ids.', function(done) {
-    var blind = new EWT(ABI_BET).bet(2, 100).sign(P1_KEY);
-
+  it('should reject receipt with unknown hand Ids.', (done) => {
     sinon.stub(dynamo, 'getItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{ handId: 1 }]});
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
-
+    const blind = new EWT(ABI_BET).bet(2, 100).sign(P1_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
       expect(err.message).to.contain('currently playing 1');
       done();
     }).catch(done);
   });
 
-  it('should prevent small blind from player not in lineup.', function(done) {
-    var blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var lineup = [0, [P2_ADDR, P3_ADDR], [50000, 50000], [0, 0]];
-
+  it('should prevent small blind from player not in lineup.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [P2_ADDR, P3_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       state: 'waiting',
       handId: 1,
@@ -115,16 +112,16 @@ describe('Oracle pay', function() {
         address: P3_ADDR
       }]
     }]});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-
+    const blind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
       expect(err.message).to.contain('Forbidden');
       done();
     }).catch(done);
   });
 
-  it('should prevent SB from leaving player.', function(done) {
+  it('should prevent SB from leaving player.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
       [P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000)],
@@ -144,7 +141,6 @@ describe('Oracle pay', function() {
         address: P3_ADDR
       }]
     }]});
-
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const blind = new EWT(ABI_BET).bet(3, 50).sign(P2_KEY);
@@ -154,7 +150,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent BB from leaving player.', function(done) {
+  it('should prevent BB from leaving player.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
       [P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000)],
@@ -175,7 +171,6 @@ describe('Oracle pay', function() {
         last: new EWT(ABI_BET).bet(3, 50).sign(P3_KEY)
       }]
     }]});
-
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const blind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
@@ -185,7 +180,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent game with less than 2 players.', function(done) {
+  it('should prevent game with less than 2 players.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
@@ -202,8 +197,8 @@ describe('Oracle pay', function() {
         address: EMPTY_ADDR
       }]
     }]});
-
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
     const blind = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
       expect(err.message).to.contain('not enough players');
@@ -211,7 +206,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent blind with wrong value.', function(done) {
+  it('should prevent blind with wrong value.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
@@ -238,7 +233,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should check position for small blind with 2 players.', function(done) {
+  it('should check position for small blind with 2 players.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
@@ -260,7 +255,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should check position for small blind with 2 players.', function(done) {
+  it('should check position for small blind with 2 players.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, EMPTY_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0), new BigNumber(0)]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
@@ -276,15 +271,15 @@ describe('Oracle pay', function() {
       }]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
+    const smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
     oracle.pay(tableAddr, smallBlind).then(function(rsp) {
       done();
     }).catch(done);
   });
 
-  it('should allow to play small blind with 3+ players.', function(done) {
+  it('should allow to play small blind with 3+ players.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
@@ -301,8 +296,8 @@ describe('Oracle pay', function() {
       state: 'waiting',
       deck: deck
     }]});
-
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
     const smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
     oracle.pay(tableAddr, smallBlind).then(function(rsp) {
       expect(rsp.cards.length).to.eql(2);
@@ -311,7 +306,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to play big blind with 3+ players.', function(done) {
+  it('should allow to play big blind with 3+ players.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
@@ -329,7 +324,6 @@ describe('Oracle pay', function() {
       }],
       deck: deck
     }]});
-
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const bet3 = new EWT(ABI_BET).bet(1, 100).sign(P3_KEY);
@@ -339,25 +333,29 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should keed state dealing while 0 receipts submitted.', function(done) {
-    const bet2 = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
-    const bet3 = new EWT(ABI_BET).bet(1, 100).sign(P3_KEY);
-    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: bet2}, {address: P3_ADDR, last: bet3}, {address: P4_ADDR}];
-
+  it('should keed state dealing while 0 receipts submitted.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, {Items:[{
       dealer: 0,
       handId: 1,
       state: 'dealing',
-      lineup: lineup,
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(1, 50).sign(P2_KEY),
+      }, {
+        address: P3_ADDR,
+        last: new EWT(ABI_BET).bet(1, 100).sign(P3_KEY),
+      }, {
+        address: P4_ADDR
+      }],
       deck: deck
     }]});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const bet4 = new EWT(ABI_BET).bet(1, 0).sign(P4_KEY);
-
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-
     oracle.pay(tableAddr, bet4).then(function(rsp) {
       expect(rsp.cards.length).to.eql(2);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
@@ -365,7 +363,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should set state preflop after last 0 receipts.', function(done) {
+  it('should set state preflop after last 0 receipts.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, {Items:[{
       dealer: 3,
       handId: 1,
@@ -395,46 +393,42 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent big blind from not in lineup.', function(done) {
-    var blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    var lineup = [{address: '0x1256'}, {address: '0x1234'}];
-
+  it('should prevent big blind from not in lineup.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, {Items:[{
       handId: 1,
-      lineup: lineup
+      lineup: [{address: '0x1256'}, {address: '0x1234'}]
     }]});
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
-
+    const blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     oracle.pay(tableAddr, blind).catch(function(err) {
       expect(err.message).to.contain('Forbidden');
       done();
     }).catch(done);
   });
 
-  it('should prevent big blind too small.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var lineup = [{address: P1_ADDR, last: smallBlind}, {address: P2_ADDR}];
-
+  it('should prevent big blind too small.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, {Items:[{
-      lineup: lineup,
       handId: 1,
       state: 'dealing',
-      dealer: 0
+      dealer: 0,
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(1, 50).sign(P1_KEY),
+      }, {
+        address: P2_ADDR,
+      }],
     }]});
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
-
-    var bigBlind = new EWT(ABI_BET).bet(1, 80).sign(P2_KEY);
-
+    const bigBlind = new EWT(ABI_BET).bet(1, 80).sign(P2_KEY);
     oracle.pay(tableAddr, bigBlind).catch(function(err) {
       expect(err.message).to.contain('not valid');
       done();
     }).catch(done);
   });
 
-  it('should keep preflop until BB checked.', function(done) {
-
+  it('should keep preflop until BB checked.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(1),
       [P1_ADDR, P2_ADDR, P3_ADDR], 
@@ -458,8 +452,8 @@ describe('Oracle pay', function() {
       dealer: 0
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
     const bet = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     oracle.pay(tableAddr, bet).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
@@ -467,7 +461,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should proceed to flop when BB gave checkPre.', function(done) {
+  it('should proceed to flop when BB gave checkPre.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(1),
       [P1_ADDR, P2_ADDR], 
@@ -489,9 +483,9 @@ describe('Oracle pay', function() {
       dealer: 0
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-    var pfCheck = new EWT(ABI_CHECK_PRE).checkPre(1, 100).sign(P2_KEY);
+    const pfCheck = new EWT(ABI_CHECK_PRE).checkPre(1, 100).sign(P2_KEY);
     oracle.pay(tableAddr, pfCheck).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':m', 100)));
@@ -500,31 +494,35 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to pay big blind.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(3, 50).sign(P1_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
-    var lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]];
-    var lastBet = new EWT(ABI_BET).bet(2, 10000).sign(P2_KEY);
-    var dist = new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 2000).toString('hex')]).sign(P1_KEY);
-
+  it('should allow to pay big blind.', (done) => {
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
       handId: 2,
-      lineup: [{address: P1_ADDR}, {address: P2_ADDR, last: lastBet}],
-      distribution: dist
+      lineup: [{
+        address: P1_ADDR
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(2, 10000).sign(P2_KEY)
+      }],
+      distribution: new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 2000).toString('hex')]).sign(P1_KEY)
     }});
     sinon.stub(dynamo, 'query').yields(null, {Items:[{
       handId: 3,
       sb: 50,
-      lineup: [{address: P1_ADDR, last: smallBlind}, {address: P2_ADDR}],
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(3, 50).sign(P1_KEY)
+      }, {
+        address: P2_ADDR
+      }],
       deck: deck,
       state: 'dealing',
       dealer: 0
     }]});
-    sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-
+    const bigBlind = new EWT(ABI_BET).bet(3, 100).sign(P2_KEY);
     oracle.pay(tableAddr, bigBlind).then(function(rsp) {
       expect(rsp).to.eql({
         cards: [2, 3]
@@ -534,7 +532,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent betting more than balance.', function(done) {
+  it('should prevent betting more than balance.', (done) => {
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
@@ -573,46 +571,45 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent betting more than balance in same hand.', function(done) {
-    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
-    const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-
+  it('should prevent betting more than balance in same hand.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {Items:[{
       handId: 1,
-      lineup: [{address: P1_ADDR, last: bet1}, {address: P2_ADDR, last: bet2}],
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY),
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(1, 100).sign(P2_KEY),
+      }],
       state: 'flop',
       dealer: 0
     }]});
-    var lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(500), new BigNumber(150)], [0, 0]];
+    const lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(500), new BigNumber(150)], [0, 0]];
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-
-    var tooMuchBet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
+    const tooMuchBet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
     oracle.pay(tableAddr, tooMuchBet).catch(function(err) {
       expect(err.message).to.contain('can not bet more than balance');
       done();
     }).catch(done);
   });
 
-  it('should prevent reusing receipts.', function(done) {
-    var blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR, last: blind}];
-
+  it('should prevent reusing receipts.', (done) => {
+    const blind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, {Items:[{
       handId: 1,
-      lineup: lineup
+      lineup: [{ address: P1_ADDR}, {address: P2_ADDR, last: blind}]
     }]});
-
-    var oracle = new Oracle(new Db(dynamo), null, rc);
-
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    
     oracle.pay(tableAddr, blind).catch(function(err) {
       expect(err.message).to.contain('Unauthorized');
       done();
     }).catch(done);
   });
 
-  it('should allow to fold.', function(done) {
+  it('should allow to fold.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       dealer: 0,
@@ -644,7 +641,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to go all in.', function(done) {
+  it('should allow to go all in.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       state: 'flop',
@@ -662,9 +659,9 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P2_ADDR], [new BigNumber(1000), new BigNumber(100), new BigNumber(1000)], [new BigNumber(0), new BigNumber(0), new BigNumber(0)]]);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const allin = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
     oracle.pay(tableAddr, allin).then(function(rsp) {
       expect(rsp).to.eql({});
       const seat = {
@@ -678,7 +675,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to go all in with one active player left.', function(done) {
+  it('should allow to go all in with one active player left.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       state: 'flop',
@@ -693,9 +690,9 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(1000), new BigNumber(100)], [new BigNumber(0), new BigNumber(0)]]);
-
-    const allin = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const allin = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);    
     oracle.pay(tableAddr, allin).then(function(rsp) {
       const seat = {
         address: P2_ADDR,
@@ -708,29 +705,25 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should advance to showdown when last active player calls all-in.', function(done) {
-    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
-    const allin = new EWT(ABI_BET).bet(1, 1000).sign(P2_KEY);
-
+  it('should advance to showdown when last active player calls all-in.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       state: 'flop',
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: bet1
+        last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY),
       }, {
         address: P2_ADDR,
-        last: allin,
-        sitout: 'allin'
+        last: new EWT(ABI_BET).bet(1, 1000).sign(P2_KEY),
+        sitout: 'allin',
       }]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(2000), new BigNumber(1000)], [0, 0]]);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    var call = new EWT(ABI_BET).bet(1, 1000).sign(P1_KEY);
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
-
+    const call = new EWT(ABI_BET).bet(1, 1000).sign(P1_KEY);
     oracle.pay(tableAddr, call).then(function(rsp) {
       expect(rsp).to.eql({});
       const seat = {
@@ -743,7 +736,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to sitout in state waiting.', function(done) {
+  it('should allow to sitout in state waiting.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       dealer: 0,
@@ -752,11 +745,9 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
-
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
-
     oracle.pay(tableAddr, sitout).then(function(rsp) {
       expect(rsp).to.eql({});
       const seat = {
@@ -768,7 +759,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent 0 sitout after state waiting.', function(done) {
+  it('should prevent 0 sitout after state waiting.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       dealer: 0,
@@ -784,18 +775,16 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
-
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
-
     oracle.pay(tableAddr, sitout).catch(function(err) {
       expect(err.message).to.contain('Unauthorized');
       done();
     }).catch(done);
   });
 
-  it('should allow to sitout if BB.', function(done) {
+  it('should allow to sitout if BB.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       dealer: 0,
@@ -811,11 +800,9 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
-
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 1).sign(P3_KEY);
-
     oracle.pay(tableAddr, sitout).then(function(rsp) {
       expect(rsp).to.eql({});
       const seat = {
@@ -827,7 +814,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent sitout toggle in same hand.', function(done) {
+  it('should prevent sitout toggle in same hand.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {Items:[{
       handId: 13,
       dealer: 0,
@@ -847,18 +834,16 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
-
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(13, 100).sign(P1_KEY);
-
     oracle.pay(tableAddr, sitout).catch(function(err) {
       expect(err.message).to.contain('can not toggle sitout');
       done();
     }).catch(done);
   });
 
-  it('should allow to come back from sitout in waiting.', function(done) {
+  it('should allow to come back from sitout in waiting.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {Items:[{
       handId: 13,
       dealer: 0,
@@ -875,11 +860,9 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
-
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(13, 100).sign(P2_KEY);
-
     oracle.pay(tableAddr, sitout).then(function(rsp) {
       expect(rsp).to.eql({});
       const seat = {
@@ -891,7 +874,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should switch to flop after fold when remaining pl. are even', function(done) {
+  it('should switch to flop after fold when remaining pl. are even', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, {Items:[{
       handId: 1,
       dealer: 3,
@@ -914,7 +897,6 @@ describe('Oracle pay', function() {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const fold3 = new EWT(ABI_FOLD).fold(1, 100).sign(P3_KEY);
@@ -925,7 +907,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent bet after fold.', function(done) {
+  it('should prevent bet after fold.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, {Items:[{
       handId: 1,
       state: 'preflop',
@@ -949,7 +931,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent bet during sitout.', function(done) {
+  it('should prevent bet during sitout.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 1,
       state: 'flop',
@@ -974,9 +956,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent check during wrong state.', function(done) {
-    
-
+  it('should prevent check during wrong state.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 3,
       state: 'flop',
@@ -997,7 +977,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to come back from sitout in waiting.', function(done) {
+  it('should allow to come back from sitout in waiting.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
       [P1_ADDR, P2_ADDR],
@@ -1017,9 +997,9 @@ describe('Oracle pay', function() {
       }]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const bet = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
     oracle.pay(tableAddr, bet).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
       const seat = { address: P2_ADDR, last: bet };
@@ -1028,7 +1008,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to come back from sitout in waiting with 3 players.', function(done) {
+  it('should allow to come back from sitout in waiting with 3 players.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
       [P1_ADDR, P2_ADDR, P3_ADDR],
@@ -1051,9 +1031,9 @@ describe('Oracle pay', function() {
       }]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const bet = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
     oracle.pay(tableAddr, bet).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
       const seat = { address: P2_ADDR, last: bet };
@@ -1062,7 +1042,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to come back from sitout by paying BB sitout receipt.', function(done) {
+  it('should allow to come back from sitout by paying BB sitout receipt.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
       [P1_ADDR, P2_ADDR, , P2_ADDR],
@@ -1086,9 +1066,9 @@ describe('Oracle pay', function() {
       }]
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const action = new EWT(ABI_SIT_OUT).sitOut(1, 100).sign(P2_KEY);
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
     oracle.pay(tableAddr, action).then(function(rsp) {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       const seat = {
@@ -1100,7 +1080,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent check to raise.', function(done) {
+  it('should prevent check to raise.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 3,
       state: 'flop',
@@ -1121,11 +1101,11 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to deal.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P3_KEY);
+  it('should allow to deal.', (done) => {
+    const smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P2_KEY);
+    const bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P3_KEY);
     
-    var lineup = [
+    const lineup = [
       {address: P1_ADDR},
       {address: P2_ADDR, last: smallBlind},
       {address: P3_ADDR, last: bigBlind}
@@ -1139,9 +1119,9 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
-    var zeroBlind = new EWT(ABI_BET).bet(1, 0).sign(P1_KEY);
+    const zeroBlind = new EWT(ABI_BET).bet(1, 0).sign(P1_KEY);
 
     oracle.pay(tableAddr, zeroBlind).then(function(rsp) {
       expect(rsp.cards.length).to.eql(2);
@@ -1150,7 +1130,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to deal with sitout', function(done) {
+  it('should allow to deal with sitout', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
@@ -1182,16 +1162,16 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to check', function(done) {
-    var check1 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P1_KEY);
+  it('should allow to check', (done) => {
+    const check1 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 150).sign(P2_KEY);
     const bet3 = new EWT(ABI_BET).bet(1, 150).sign(P3_KEY);
-    var lineup = [
+    const lineup = [
       {address: P1_ADDR, last: check1},
       {address: P2_ADDR, last: bet2},
       {address: P3_ADDR, last: bet3}
     ];
-    var check2 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P2_KEY);
+    const check2 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P2_KEY);
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 1,
@@ -1202,7 +1182,7 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     oracle.pay(tableAddr, check2).then(function(rsp) {
       expect(rsp).to.eql({
@@ -1213,16 +1193,16 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to check multiple rounds', function(done) {
-    var check1 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P1_KEY);
-    var check2 = new EWT(ABI_CHECK_TURN).checkTurn(1, 150).sign(P2_KEY);
-    var check3 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P3_KEY);
-    var lineup = [
+  it('should allow to check multiple rounds', (done) => {
+    const check1 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P1_KEY);
+    const check2 = new EWT(ABI_CHECK_TURN).checkTurn(1, 150).sign(P2_KEY);
+    const check3 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P3_KEY);
+    const lineup = [
       {address: P1_ADDR, last: check1},
       {address: P2_ADDR, last: check2},
       {address: P3_ADDR, last: check3}
     ];
-    var check3a = new EWT(ABI_CHECK_TURN).checkTurn(1, 150).sign(P3_KEY);
+    const check3a = new EWT(ABI_CHECK_TURN).checkTurn(1, 150).sign(P3_KEY);
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 1,
@@ -1233,7 +1213,7 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     oracle.pay(tableAddr, check3a).then(function(rsp) {
       expect(rsp).to.eql({
@@ -1244,7 +1224,7 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should allow to flop with sitout', function(done) {
+  it('should allow to flop with sitout', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
@@ -1278,11 +1258,11 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should prevent playing lower bet.', function(done) {
-    var smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    var bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    var lowBet = new EWT(ABI_BET).bet(1, 0).sign(P1_KEY);
-    var lineup = [
+  it('should prevent playing lower bet.', (done) => {
+    const smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
+    const bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
+    const lowBet = new EWT(ABI_BET).bet(1, 0).sign(P1_KEY);
+    const lineup = [
       {address: P1_ADDR, last: smallBlind},
       {address: P2_ADDR, last: bigBlind}
     ];
@@ -1296,7 +1276,7 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.pay(tableAddr, lowBet).catch(function(err) {
       expect(err.message).to.contain('Unauthorized');
@@ -1305,11 +1285,11 @@ describe('Oracle pay', function() {
     }).catch(done);
   });
 
-  it('should keep hand state if game ends.', function(done) {
+  it('should keep hand state if game ends.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
 
-    var lineup = [
+    const lineup = [
       {address: P1_ADDR, last: bet1},
       {address: P2_ADDR, last: bet2}
     ];
@@ -1323,9 +1303,9 @@ describe('Oracle pay', function() {
     }]});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
-    var fold = new EWT(ABI_FOLD).fold(1, 50).sign(P1_KEY);
+    const fold = new EWT(ABI_FOLD).fold(1, 50).sign(P1_KEY);
 
     oracle.pay(tableAddr, fold).then(function(rsp) {
       const seat = {address: P1_ADDR, last: fold};
@@ -1348,7 +1328,7 @@ describe('Oracle pay', function() {
 
 describe('Oracle info', function() {
 
-  it('should allow to get uninitialized info.', function(done) {
+  it('should allow to get uninitialized info.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: []});
 
     new Oracle(new Db(dynamo), null, rc).info(tableAddr, tableAddr).then(function(rsp) {
@@ -1362,7 +1342,7 @@ describe('Oracle info', function() {
     }).catch(done);
   });
 
-  it('should not return uninitialized info from unknown tables.', function(done) {
+  it('should not return uninitialized info from unknown tables.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: []});
 
     new Oracle(new Db(dynamo), null, rc).info(tableAddr, 'tablex,table').catch(function(err) {
@@ -1371,7 +1351,7 @@ describe('Oracle info', function() {
     }).catch(done);
   });
 
-  it('should allow to get preflop info.', function(done) {
+  it('should allow to get preflop info.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 0,
       deck: deck,
@@ -1396,7 +1376,7 @@ describe('Oracle info', function() {
     }).catch(done);
   });
 
-  it('should allow to get flop info.', function(done) {
+  it('should allow to get flop info.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
         dealer: 0,
@@ -1423,7 +1403,7 @@ describe('Oracle info', function() {
     }).catch(done);
   });
 
-  it('should allow to get turn info.', function(done) {
+  it('should allow to get turn info.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
         dealer: 0,
@@ -1452,7 +1432,7 @@ describe('Oracle info', function() {
     }).catch(done);
   });
 
-  it('should allow to get river info.', function(done) {
+  it('should allow to get river info.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
         handId: 0,
         dealer: 0,
@@ -1483,10 +1463,10 @@ describe('Oracle info', function() {
     }).catch(done);
   });
 
-  it('should allow to get showdown info.', function(done) {
-    var show1 = new EWT(ABI_SHOW).show(0, 50).sign(P1_KEY);
-    var muck2 = new EWT(ABI_FOLD).fold(0, 50).sign(P2_KEY);
-    var lineup = [
+  it('should allow to get showdown info.', (done) => {
+    const show1 = new EWT(ABI_SHOW).show(0, 50).sign(P1_KEY);
+    const muck2 = new EWT(ABI_FOLD).fold(0, 50).sign(P2_KEY);
+    const lineup = [
       {address: P1_ADDR, last: show1},
       {address: P2_ADDR, last: muck2}
     ];
@@ -1540,7 +1520,7 @@ describe('Oracle info', function() {
 
 describe('Oracle get Hand', function() {
 
-  it('should allow to get hand.', function(done) {
+  it('should allow to get hand.', (done) => {
   
     sinon.stub(dynamo, 'getItem').yields(null, {Item:{
       state: 'river',
@@ -1549,9 +1529,9 @@ describe('Oracle get Hand', function() {
       deck: deck
     }});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
-    oracle.hand(tableAddr, "1").then(function(rsp) {
+    oracle.getHand(tableAddr, "1").then(function(rsp) {
       expect(rsp.distribution).to.eql('dist');
       done();
     }).catch(done);
@@ -1566,15 +1546,15 @@ describe('Oracle get Hand', function() {
 
 describe('Oracle show', function() {
 
-  it('should prevent show before showdown', function(done) {
-    var show1 = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
+  it('should prevent show before showdown', (done) => {
+    const show1 = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, {Item:{
       state: 'river',
       deck: deck
     }});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show1, [0, 1]).catch(function(err) {
       expect(err.message).to.contain('not in showdown');
@@ -1582,10 +1562,10 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
-  it('should prevent bet in showdown', function(done) {
+  it('should prevent bet in showdown', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    var lineup = [
+    const lineup = [
       {address: P1_ADDR, last: bet1},
       {address: P2_ADDR, last: bet2},
     ];
@@ -1607,10 +1587,10 @@ describe('Oracle show', function() {
     throw new Error('should have thrown');
   });
 
-  it('should allow to showdown with 1 winner.', function(done) {
+  it('should allow to showdown with 1 winner.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    var lineup = [
+    const lineup = [
       {address: P1_ADDR, last: bet1},
       {address: P2_ADDR, last: bet2},
     ];
@@ -1622,13 +1602,13 @@ describe('Oracle show', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
-    var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
+    const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
-      var trueIsh = sinon.match(function (value) {
-        var p = value.ExpressionAttributeValues[':l'];
+      const trueIsh = sinon.match(function (value) {
+        const p = value.ExpressionAttributeValues[':l'];
         return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show);
       }, "trueIsh");
       expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
@@ -1636,7 +1616,7 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
-  it('should allow to show for all-in player.', function(done) {
+  it('should allow to show for all-in player.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
 
@@ -1654,13 +1634,13 @@ describe('Oracle show', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
-    var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
+    const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     oracle.show(tableAddr, show, [12, 11]).then(function(rsp) {
-      var trueIsh = sinon.match(function (value) {
-        var p = value.ExpressionAttributeValues[':l'];
+      const trueIsh = sinon.match(function (value) {
+        const p = value.ExpressionAttributeValues[':l'];
         return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show && !p.sitout);
       }, "trueIsh");
       expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
@@ -1668,7 +1648,7 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
-  it('should prevent show by timedout player.', function(done) {
+  it('should prevent show by timedout player.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     const bet3 = new EWT(ABI_BET).bet(1, 50).sign(P3_KEY);
@@ -1689,8 +1669,8 @@ describe('Oracle show', function() {
       deck: deck
     }});
 
-    var show = new EWT(ABI_SHOW).show(1, 100).sign(P3_KEY);
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const show = new EWT(ABI_SHOW).show(1, 100).sign(P3_KEY);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
       expect(err.message).to.contain('not allowed in showdown');
@@ -1698,7 +1678,7 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
-  it('should prevent show with smaller amount.', function(done) {
+  it('should prevent show with smaller amount.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
 
@@ -1714,8 +1694,8 @@ describe('Oracle show', function() {
       deck: deck
     }});
 
-    var show = new EWT(ABI_SHOW).show(1, 20).sign(P2_KEY);
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const show = new EWT(ABI_SHOW).show(1, 20).sign(P2_KEY);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
       expect(err.message).to.contain('same or highter amount');
@@ -1723,7 +1703,7 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
-  it('should prevent show by folded player.', function(done) {
+  it('should prevent show by folded player.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     const fold = new EWT(ABI_FOLD).fold(1, 50).sign(P3_KEY);
@@ -1743,8 +1723,8 @@ describe('Oracle show', function() {
       deck: deck
     }});
 
-    var show = new EWT(ABI_SHOW).show(1, 100).sign(P3_KEY);
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const show = new EWT(ABI_SHOW).show(1, 100).sign(P3_KEY);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.show(tableAddr, show, [4, 5]).catch(function(err) {
       expect(err.message).to.contain('is not an active player');
@@ -1752,10 +1732,10 @@ describe('Oracle show', function() {
     }).catch(done);
   });
 
-  it('should allow to showdown with 2 winners.', function(done) {
+  it('should allow to showdown with 2 winners.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    var lineup = [
+    const lineup = [
       {address: P1_ADDR, last: bet1},
       {address: P2_ADDR, last: bet2},
     ];
@@ -1767,9 +1747,9 @@ describe('Oracle show', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
-    var show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
+    const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
     oracle.show(tableAddr, show, [0, 1]).then(function(rsp) {
       const seat = {address: P1_ADDR, last: show, cards: [0, 1]};
@@ -1787,9 +1767,9 @@ describe('Oracle show', function() {
 
 describe('Oracle leave', function() {
 
-  it('should prevent leaving in completed hand.', function(done) {
-    var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
-    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
+  it('should prevent leaving in completed hand.', (done) => {
+    const leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
+    const lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 3,
@@ -1797,7 +1777,7 @@ describe('Oracle leave', function() {
       lineup: lineup
     }]});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
     oracle.leave(tableAddr, leave).catch(function(err) {
       expect(err.message).to.contain('forbidden');
@@ -1805,9 +1785,9 @@ describe('Oracle leave', function() {
     }).catch(done);
   });
 
-  it('should allow to leave in next hand.', function(done) {
-    var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
-    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
+  it('should allow to leave in next hand.', (done) => {
+    const leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
+    const lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 1,
@@ -1817,10 +1797,10 @@ describe('Oracle leave', function() {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
     oracle.leave(tableAddr, leave).then(function(rsp) {
-      var leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
+      const leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
       const seat = {
         address: P1_ADDR,
@@ -1832,9 +1812,9 @@ describe('Oracle leave', function() {
     }).catch(done);
   });
 
-  it('should allow to leave in previous hand, if this hand hasn\'t started.', function(done) {
-    var leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
-    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
+  it('should allow to leave in previous hand, if this hand hasn\'t started.', (done) => {
+    const leave = new EWT(ABI_LEAVE).leave(2, 0).sign(P1_KEY);
+    const lineup = [{ address: P1_ADDR}, {address: P2_ADDR}];
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 3,
@@ -1844,10 +1824,10 @@ describe('Oracle leave', function() {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
     oracle.leave(tableAddr, leave).then(function(rsp) {
-      var leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
+      const leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
       expect(rsp).to.eql({ leaveReceipt: leaveReceipt });
       const seat = {
         address: P1_ADDR,
@@ -1870,8 +1850,8 @@ describe('Oracle leave', function() {
 
 describe('Oracle netting', function() {
 
-  it('should allow to deliver netting.', function(done) {
-    var lineup = [{ address: P1_ADDR}, {address: P2_ADDR}, {address: P4_ADDR}];
+  it('should allow to deliver netting.', (done) => {
+    const lineup = [{ address: P1_ADDR}, {address: P2_ADDR}, {address: P4_ADDR}];
 
     const netting = {
         newBalances: '0x000000025b96c8e5858279b31f644501a140e8a7000000000000000082e8c6cf42c8d1ff9594b17a3f50e94a12cc860f000000000000e86cf3beac30c498d9e26865f34fcaa57dbb935b0d740000000000009e34e10f3d125e5f4c753a6456fc37123cf17c6900f2'
@@ -1884,7 +1864,7 @@ describe('Oracle netting', function() {
     }});
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    var oracle = new Oracle(new Db(dynamo), null, rc);
+    const oracle = new Oracle(new Db(dynamo), null, rc);
 
 
     oracle.netting(tableAddr, 2, nettingSig).then(function() {
@@ -1902,7 +1882,7 @@ describe('Oracle netting', function() {
 
 describe('Oracle timing', function() {
 
-  it('should not timeout if time not up.', function(done) {
+  it('should not timeout if time not up.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
@@ -1925,7 +1905,7 @@ describe('Oracle timing', function() {
     }).catch(done);
   });
 
-  it('should allow to put player into sitout.', function(done) {
+  it('should allow to put player into sitout.', (done) => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
@@ -1953,7 +1933,7 @@ describe('Oracle timing', function() {
     }).catch(done);
   });
 
-  it('should handle sitout on hand state complete.', function(done) {
+  it('should handle sitout on hand state complete.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [ { 
       handId: 1,
       dealer: 0,
