@@ -15,8 +15,7 @@ const rc = new ReceiptCache();
 const handleError = function handleError(err, callback) {
   Raven.captureException(err, (sendErr) => {
     if (sendErr) {
-      console.log('Failed to send captured exception to Sentry');
-      console.log(JSON.stringify(sendErr));
+      console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
       callback(sendErr);
       return;
     }
@@ -28,7 +27,7 @@ const handleError = function handleError(err, callback) {
       callback(`Error: ${err.message}`);
     }
   });
-}
+};
 
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL, {
@@ -42,25 +41,28 @@ exports.handler = function handler(event, context, callback) {
   }
 
   let handleRequest;
-  const manager = new TableManager(new Db(dynamo), new TableContract(web3), rc, process.env.ORACLE_PRIV);
+  const manager = new TableManager(new Db(dynamo),
+    new TableContract(web3), rc, process.env.ORACLE_PRIV);
   const path = event.context['resource-path'];
+  const tableAddr = event.params.path.tableAddr;
+  const handId = event.params.path.handId;
   try {
     if (path.indexOf('pay') > -1) {
-      handleRequest = manager.pay(event.params.path.tableAddr, event.params.header.Authorization);
+      handleRequest = manager.pay(tableAddr, event.params.header.Authorization);
     } else if (path.indexOf('info') > -1) {
-      handleRequest = manager.info(event.params.path.tableAddr, event['stage-variables'].tableContracts);
+      handleRequest = manager.info(tableAddr, event['stage-variables'].tableContracts);
     } else if (path.indexOf('netting') > -1) {
-      handleRequest = manager.netting(event.params.path.tableAddr, event.params.path.handId, event.nettingSig);
+      handleRequest = manager.netting(tableAddr, handId, event.nettingSig);
     } else if (path.indexOf('hand') > -1) {
-      handleRequest = manager.getHand(event.params.path.tableAddr, event.params.path.handId);
+      handleRequest = manager.getHand(tableAddr, handId);
     } else if (path.indexOf('config') > -1) {
       handleRequest = manager.getConfig(event['stage-variables']);
     } else if (path.indexOf('show') > -1) {
-      handleRequest = manager.show(event.params.path.tableAddr, event.params.header.Authorization, event.cards);
+      handleRequest = manager.show(tableAddr, event.params.header.Authorization, event.cards);
     } else if (path.indexOf('leave') > -1) {
-      handleRequest = manager.leave(event.params.path.tableAddr, event.params.header.Authorization);
+      handleRequest = manager.leave(tableAddr, event.params.header.Authorization);
     } else if (path.indexOf('timeout') > -1) {
-      handleRequest = manager.timeout(event.params.path.tableAddr);
+      handleRequest = manager.timeout(tableAddr);
     } else {
       handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
     }

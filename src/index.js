@@ -23,9 +23,11 @@ TableManager.prototype.getConfig = function getConfig(stageVars) {
 };
 
 TableManager.prototype.info = function info(tableAddr, tableContracts) {
-  return this.db.getLastHand(tableAddr).then(hand => Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
+  return this.db.getLastHand(tableAddr).then(hand => Promise.resolve(
+    this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
       hand.state, hand.changed, hand.deck, hand.preMaxBet, hand.flopMaxBet,
-      hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting)), (err) => {
+      hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting,
+    )), (err) => {
     let tables = [];
     if (tableContracts) {
       tables = tableContracts.split(',');
@@ -45,10 +47,12 @@ TableManager.prototype.info = function info(tableAddr, tableContracts) {
 
 TableManager.prototype.getHand = function getHand(tableAddr, handIdStr) {
   const handId = parseInt(handIdStr, 10);
-  return this.db.getHand(tableAddr, handId).then(hand => Promise.resolve(this.helper.renderHand(hand.handId, hand.lineup,
-      hand.dealer, hand.sb, hand.state, hand.changed, hand.deck, hand.preMaxBet,
-      hand.flopMaxBet, hand.turnMaxBet, hand.riverMaxBet, hand.distribution,
-      hand.netting)));
+  return this.db.getHand(tableAddr, handId).then(hand => Promise.resolve(
+    this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
+      hand.state, hand.changed, hand.deck, hand.preMaxBet, hand.flopMaxBet,
+      hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting,
+    ),
+  ));
 };
 
 TableManager.prototype.pay = function pay(tableAddr, ewt) {
@@ -175,19 +179,21 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         hand.lineup[pos].sitout = now;
       }
     }
+    const recAmount = receipt.values[1];
     if (hand.state === 'dealing') {
       // check if receipt is big blind?
       if (turn && receipt.abi[0].name === 'bet') {
         const bigBlindPos = this.helper.getBbPos(hand.lineup, hand.dealer, hand.state);
-        const nextToAct = this.helper.getWhosTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
+        const nextToAct = this.helper.getWhosTurn(hand.lineup,
+          hand.dealer, hand.state, hand.sb * 2);
         if (nextToAct === bigBlindPos) {
-          if (receipt.values[1] !== hand.sb * 2) {
+          if (recAmount !== hand.sb * 2) {
             throw new BadRequest('big blind not valid.');
           }
         }
       }
     }
-    if ((prevReceipt && prevReceipt.values[1] < receipt.values[1]) || (!prevReceipt && receipt.values[1] > 0)) {
+    if ((prevReceipt && prevReceipt.values[1] < recAmount) || (!prevReceipt && recAmount > 0)) {
       // calc bal
       return this.calcBalance(tableAddr, pos, receipt).then((balLeft) => {
         hand.lineup[pos].last = ewt;
@@ -210,7 +216,8 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
   const hand = handParam;
   const changed = Math.floor(Date.now() / 1000);
   const max = this.helper.getMaxBet(hand.lineup, hand.state);
-  const bettingComplete = this.helper.isBettingDone(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
+  const bettingComplete = this.helper.isBettingDone(hand.lineup,
+    hand.dealer, hand.state, hand.sb * 2);
   const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
   let streetMaxBet;
   if (bettingComplete && !handComplete) {
@@ -242,7 +249,8 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
     hand.state = 'showdown';
   }
   // update db
-  return this.db.updateSeat(tableAddr, hand.handId, hand.lineup[pos], pos, hand.state, changed, streetMaxBet);
+  return this.db.updateSeat(tableAddr,
+    hand.handId, hand.lineup[pos], pos, hand.state, changed, streetMaxBet);
 };
 
 TableManager.prototype.calcBalance = function calcBalance(tableAddr, pos, receipt) {

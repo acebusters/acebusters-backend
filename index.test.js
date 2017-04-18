@@ -3,6 +3,7 @@ import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
 import EWT from 'ethereum-web-token';
 import { ReceiptCache } from 'poker-helper';
+import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
 import Oracle from './src/index';
 import Db from './src/db';
@@ -53,7 +54,8 @@ const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
 
-const deck = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25];
+const deck = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+  11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25];
 
 const dynamo = {
   getItem() {},
@@ -580,7 +582,12 @@ describe('Oracle pay', () => {
       state: 'flop',
       dealer: 0,
     }] });
-    const lineup = [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(500), new BigNumber(150)], [0, 0]];
+    const lineup = [
+      new BigNumber(1),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(500), new BigNumber(150)],
+      [0, 0],
+    ];
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
@@ -1587,7 +1594,8 @@ describe('Oracle show', () => {
     sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
       lineup,
       state: 'showdown',
-      deck: [12, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 0, 13, 14, 15, 22, 17, 18, 19, 20, 21, 36, 23, 24, 25],
+      deck: [12, 11, 2, 3, 4, 5, 6, 7, 8, 9,
+        10, 1, 0, 13, 14, 15, 22, 17, 18, 19, 20, 21, 36, 23, 24, 25],
     } });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
@@ -1598,7 +1606,7 @@ describe('Oracle show', () => {
     oracle.show(tableAddr, show, [12, 11]).then(() => {
       const trueIsh = sinon.match((value) => {
         const p = value.ExpressionAttributeValues[':l'];
-        return (p.cards[0] == 12 && p.cards[1] == 11 && p.last == show);
+        return (p.cards[0] === 12 && p.cards[1] === 11 && p.last === show);
       }, 'trueIsh');
       expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
       done();
@@ -1619,7 +1627,8 @@ describe('Oracle show', () => {
         last: bet2,
       }],
       state: 'showdown',
-      deck: [12, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 0, 13, 14, 15, 22, 17, 18, 19, 20, 21, 36, 23, 24, 25],
+      deck: [12, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 0,
+        13, 14, 15, 22, 17, 18, 19, 20, 21, 36, 23, 24, 25],
     } });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
@@ -1627,7 +1636,7 @@ describe('Oracle show', () => {
 
     const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
-    oracle.show(tableAddr, show, [12, 11]).then((rsp) => {
+    oracle.show(tableAddr, show, [12, 11]).then(() => {
       const trueIsh = sinon.match((value) => {
         const p = value.ExpressionAttributeValues[':l'];
         return (p.cards[0] === 12 && p.cards[1] === 11 && p.last === show && !p.sitout);
