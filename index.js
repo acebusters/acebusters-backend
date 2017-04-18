@@ -11,8 +11,6 @@ let web3Provider;
 let dynamo;
 
 exports.handler = function handler(event, context, callback) {
-  console.log('Request received:\n', JSON.stringify(event));
-
   Raven.config(process.env.SENTRY_URL, {
     captureUnhandledRejections: true,
   }).install(() => {
@@ -39,13 +37,11 @@ exports.handler = function handler(event, context, callback) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }
     Promise.all(requests).then((data) => {
-      console.log(JSON.stringify(data));
       callback(null, data);
     }).catch((err) => {
       Raven.captureException(err, (sendErr) => {
         if (sendErr) {
-          console.log('Failed to send captured exception to Sentry');
-          console.log(JSON.stringify(sendErr));
+          console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
           callback(sendErr);
           return;
         }
@@ -53,7 +49,7 @@ exports.handler = function handler(event, context, callback) {
       });
     });
   } else {
-    console.log('Context received:\n', JSON.stringify(context));
+    console.log('Context received:\n', JSON.stringify(context)); // eslint-disable-line no-console
     callback(null, 'no action taken.');
   }
 };

@@ -23,20 +23,20 @@ const sign = function sign(payload, privStr) {
 
 const contains = function contains(needle) {
     // Per spec, the way to identify NaN is that it is not equal to itself
-  const findNaN = needle !== needle;
+  const findNaN = needle !== needle;  // eslint-disable-line no-self-compare
   let indexOf;
 
   if (!findNaN && typeof Array.prototype.indexOf === 'function') {
     indexOf = Array.prototype.indexOf;
   } else {
-    indexOf = function indexOf(needle) {
+    indexOf = (ndl) => {
       let i = -1;
       let index = -1;
 
       for (i = 0; i < this.length; i += 1) {
         const item = this[i];
 
-        if ((findNaN && item !== item) || item === needle) {
+        if ((findNaN && item !== item) || item === ndl) { // eslint-disable-line no-self-compare
           index = i;
           break;
         }
@@ -140,7 +140,7 @@ EventWorker.prototype.process = function process(msg) {
     }));
   }
 
-  if (msgType == 'Kick') {
+  if (msgType === 'Kick') {
     tasks.push(this.kickPlayer(msgBody.tableAddr, msgBody.pos));
   }
 
@@ -171,14 +171,14 @@ EventWorker.prototype.process = function process(msg) {
 EventWorker.prototype.err = function err(e) {
   this.sentry.captureException(e, (sendErr) => {
     if (sendErr) {
-      console.error(`Failed to send captured exception to Sentry: ${sendErr}`);
+      console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line  no-console
     }
   });
   return e;
 };
 
 EventWorker.prototype.log = function log(message, context) {
-  const cntxt = (context) ? context : {};
+  const cntxt = (context) || {};
   cntxt.level = (cntxt.level) ? cntxt.level : 'info';
   return new Promise((fulfill, reject) => {
     this.sentry.captureMessage(message, cntxt, (error, eventId) => {
@@ -211,18 +211,16 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaveReceipt
     return Promise.all([lineupProm, logProm]);
   }).then((rsp) => {
     if (rsp[0].lastHandNetted >= leave.handId) {
-      return this.table.payout(tableAddr, leave.signerAddr).then((_txHash) => {
-        return this.log('tx: table.payout()', {
-          tags: { tableAddr },
-          extra: {
-            txHash: _txHash,
-            signerAddr: leave.signerAddr,
-          },
-        });
-      });
+      return this.table.payout(tableAddr, leave.signerAddr).then(_txHash => this.log('tx: table.payout()', {
+        tags: { tableAddr },
+        extra: {
+          txHash: _txHash,
+          signerAddr: leave.signerAddr,
+        },
+      }));
     }
     return Promise.resolve('');
-  }).then((payoutHash) => Promise.resolve([txHash, payoutHash]));
+  }).then(payoutHash => Promise.resolve([txHash, payoutHash]));
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
@@ -243,7 +241,7 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
         break;
       }
     }
-    if(!found) {
+    if (!found) {
       return Promise.reject(`player ${addr} not in lineup.`);
     }
     // check if on sitout for more than 5 minutes
@@ -260,12 +258,10 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
 };
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
-  return this.table.net(tableAddr).then((txHash) => {
-    return this.log('tx: table.net()', {
-      tags: { tableAddr },
-      extra: { txHash }
-    });
-  });
+  return this.table.net(tableAddr).then(txHash => this.log('tx: table.net()', {
+    tags: { tableAddr },
+    extra: { txHash },
+  }));
 };
 
 EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
@@ -315,7 +311,7 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
     txHash1 = _txHash;
     const logProm = this.log('tx: table.submitDists()', {
       tags: { tableAddr },
-      extra: { txHash: txHash1, distsHex, distSigs }
+      extra: { txHash: txHash1, distsHex, distSigs },
     });
     const betsProm = this.table.submitBets(tableAddr, betsHex, betSigs);
     return Promise.all([betsProm, logProm]);
@@ -323,11 +319,10 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
     txHash = rsp[0];
     return this.log('tx: table.submitBets()', {
       tags: { tableAddr },
-      extra: { txHash: txHash, betsHex, betSigs }
+      extra: { txHash, betsHex, betSigs },
     });
-  }).then(() => {
-    return Promise.resolve([txHash1, txHash]);
-  });
+  })
+  .then(() => Promise.resolve([txHash1, txHash]));
 };
 
 EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
@@ -345,7 +340,7 @@ EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
     }
     return Promise.all(deletes);
   });
-}
+};
 
 EventWorker.prototype.payoutPlayers = function payoutPlayers(tableAddr) {
   return this.table.getLineup(tableAddr).then((rsp) => {
@@ -367,20 +362,17 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
   let sigs = '0x';
   return this.db.getHand(tableAddr, handId).then((_hand) => {
     hand = _hand;
-    for (const addr in hand.netting) {
-      if (hand.netting.hasOwnProperty(addr) &&
-        addr !== 'newBalances') {
+    Object.keys(hand.netting).forEach((addr) => {
+      if (addr !== 'newBalances') {
         sigs += hand.netting[addr].replace('0x', '');
       }
-    }
-    return this.table.settle(tableAddr, hand.netting.newBalances, sigs);
-  }).then((txHash) => {
-    return this.log('tx: table.settle()', {
-      tags: { tableAddr: tableAddr },
-      extra: { bals: hand.netting.newBalances, sigs, txHash },
     });
-  });
-}
+    return this.table.settle(tableAddr, hand.netting.newBalances, sigs);
+  }).then(txHash => this.log('tx: table.settle()', {
+    tags: { tableAddr },
+    extra: { bals: hand.netting.newBalances, sigs, txHash },
+  }));
+};
 
 EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) {
   const balances = { [this.oracleAddr]: 0 };
@@ -398,7 +390,7 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     return Promise.all(hands);
   }).then((hands) => {
     // prevent overwriting netting
-    if (hands[hands.length-1].netting) {
+    if (hands[hands.length - 1].netting) {
       return Promise.resolve('netting already found');
     }
     // sum up previous hands
@@ -420,14 +412,10 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     const balBuf = bufferShim.alloc((balLength * recLength) + 20);
     balBuf.write(tableAddr.replace('0x', ''), 0, 20, 'hex');
     balBuf.writeUInt32BE(handId, 0);
-    let i = 0;
-    for (const key in balances) {
-      if (balances.hasOwnProperty(key)) {
-        ethUtil.setLength(balances[key], 8).copy(balBuf, (i * recLength) + 20);
-        balBuf.write(key.replace('0x', ''), (i * recLength) + 28, 20, 'hex');
-        i += 1;
-      }
-    }
+    Object.keys(balances).forEach((key, i) => {
+      ethUtil.setLength(balances[key], 8).copy(balBuf, (i * recLength) + 20);
+      balBuf.write(key.replace('0x', ''), (i * recLength) + 28, 20, 'hex');
+    });
     // write netting
     return this.db.updateNetting(tableAddr, handId, {
       newBalances: `0x${balBuf.toString('hex')}`,
@@ -480,7 +468,7 @@ EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
     }
     // update db
     return this.db.updateSeat(tableAddr, hand.handId,
-      hand.lineup[joinPos], joinPos, changed, hand.dealer);
+      hand.lineup[joinPos], joinPos, hand.changed, hand.dealer);
   });
 };
 
@@ -557,6 +545,7 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
   if (!hand || !hand.deck || !hand.lineup) {
     return Promise.reject(`hand ${hand} at table ${tableAddr} invalid.`);
   }
+
   let i;
   let j;
   const pots = [];
@@ -666,11 +655,9 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
 
   // distribute pots
   const dists = [];
-  for (const winnerAddr in winners) {
-    if (winners.hasOwnProperty(winnerAddr)) {
-      dists.push(EWT.concat(winnerAddr, winners[winnerAddr]).toString('hex'));
-    }
-  }
+  Object.keys(winners).forEach((winnerAddr) => {
+    dists.push(EWT.concat(winnerAddr, winners[winnerAddr]).toString('hex'));
+  });
   let claimId = 0;
   if (hand.distribution) {
     claimId = this.rc.get(hand.distribution).values[1] + 1;
@@ -735,7 +722,7 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
         prevHand.lineup[i].address === lineup[i].address) {
         // ignore empty seats
         if (lineup[i].address === EMPTY_ADDR) {
-          continue;
+          continue; // eslint-disable-line no-continue
         }
         // copy over all sitouts
         if (prevHand.lineup[i].sitout) {
