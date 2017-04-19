@@ -2,13 +2,7 @@ import ethUtil from 'ethereumjs-util';
 import EWT from 'ethereum-web-token';
 import bufferShim from 'buffer-shims';
 import crypto from 'crypto';
-import Solver from 'pokersolver';
 import { PokerHelper, Receipt } from 'poker-helper';
-
-
-const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
-const SUITS = ['c', 'd', 'h', 's'];
-const RAKE = 0.01;
 
 const ABI_DIST = [{ name: 'distribution', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }, { type: 'bytes32[]' }] }];
 
@@ -19,34 +13,6 @@ const sign = function sign(payload, privStr) {
   const hash = ethUtil.sha3(payload);
   const sig = ethUtil.ecsign(hash, priv);
   return sig.r.toString('hex') + sig.s.toString('hex') + sig.v.toString(16);
-};
-
-const contains = function contains(needle) {
-    // Per spec, the way to identify NaN is that it is not equal to itself
-  const findNaN = needle !== needle;  // eslint-disable-line no-self-compare
-  let indexOf;
-
-  if (!findNaN && typeof Array.prototype.indexOf === 'function') {
-    indexOf = Array.prototype.indexOf;
-  } else {
-    indexOf = (ndl) => {
-      let i = -1;
-      let index = -1;
-
-      for (i = 0; i < this.length; i += 1) {
-        const item = this[i];
-
-        if ((findNaN && item !== item) || item === ndl) { // eslint-disable-line no-self-compare
-          index = i;
-          break;
-        }
-      }
-
-      return index;
-    };
-  }
-
-  return indexOf.call(this, needle) > -1;
 };
 
 const shuffle = function shuffle() {
@@ -542,117 +508,13 @@ EventWorker.prototype.getBalances = function getBalances(tableAddr, lineup, lhn,
 };
 
 EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, hand) {
-  if (!hand || !hand.deck || !hand.lineup) {
+  if (!hand.deck) {
     return Promise.reject(`hand ${hand} at table ${tableAddr} invalid.`);
   }
-
-  let i;
-  let j;
-  const pots = [];
-  const players = [];
-  let active;
-  let last;
-  // create pots
-  for (i = 0; i < hand.lineup.length; i += 1) {
-    last = (hand.lineup[i].last) ? EWT.parse(hand.lineup[i].last) : null;
-    if (last) {
-      active = false;
-      if (hand.state === 'showdown') {
-        if (last.abi[0].name === 'show' || last.abi[0].name === 'muck') {
-          if (!contains.call(pots, last.values[1])) {
-            pots.push(last.values[1]);
-          }
-          active = true;
-        }
-      } else if (this.helper.isActivePlayer(hand.lineup, i)
-          || hand.lineup[i].sitout === 'allin') {
-        if (!contains.call(pots, last.values[1])) {
-          pots.push(last.values[1]);
-        }
-        active = true;
-      }
-      players.push({
-        pos: i,
-        active,
-        amount: last.values[1],
-      });
-    }
-  }
-  // console.log(JSON.stringify(pots));
-
-  // sort the pots
-  pots.sort((a, b) => a - b);
-  const evals = [];
-  for (i = 0; i < pots.length; i += 1) {
-    evals.push({ limit: pots[i], size: 0, chal: [], winners: [] });
-  }
-
-  // distribute players on evals
-  for (i = 0; i < evals.length; i += 1) {
-    for (j = 0; j < players.length; j += 1) {
-      if (players[j].amount > 0) {
-        let contribution = evals[i].limit;
-        if (evals[i].limit > players[j].amount) {
-          contribution = players[j].amount;
-        }
-        evals[i].size += contribution;
-        players[j].amount -= contribution;
-        if (players[j].active) {
-          evals[i].chal.push(players[j].pos);
-        }
-      }
-    }
-  }
-  // console.log(JSON.stringify(evals));
-
-  // solve hands
-  const deck = [];
-  for (i = 0; i < hand.deck.length; i += 1) {
-    deck[i] = VALUES[hand.deck[i] % 13] + SUITS[Math.floor(hand.deck[i] / 13)];
-  }
-  for (i = 0; i < evals.length; i += 1) {
-    const hands = [];
-    for (j = 0; j < evals[i].chal.length; j += 1) {
-      const h = [];
-      // hole cards
-      h.push(deck[evals[i].chal[j] * 2]);
-      h.push(deck[(evals[i].chal[j] * 2) + 1]);
-      // board cards
-      h.push(deck[20]);
-      h.push(deck[21]);
-      h.push(deck[22]);
-      h.push(deck[23]);
-      h.push(deck[24]);
-      hands.push(Solver.Hand.solve(h));
-    }
-    const wnrs = Solver.Hand.winners(hands);
-    for (j = 0; j < wnrs.length; j += 1) {
-      const pos = evals[i].chal[hands.indexOf(wnrs[j])];
-      evals[i].winners.push(pos);
-    }
-  }
-  // console.log(JSON.stringify(evals));
-
-  // sum up pots by players and calc rake
-  const winners = {};
-  for (i = 0; i < evals.length; i += 1) {
-    let total = evals[i].size;
-    for (j = 0; j < evals[i].winners.length; j += 1) {
-      const addr = hand.lineup[evals[i].winners[j]].address;
-      if (!winners[addr]) {
-        winners[addr] = 0;
-      }
-      const share = Math.floor((evals[i].size - (evals[i].size * RAKE)) / evals[i].winners.length);
-      total -= share;
-      winners[addr] += share;
-    }
-    if (!winners[this.oracleAddr]) {
-      winners[this.oracleAddr] = 0;
-    }
-    winners[this.oracleAddr] += total;
-  }
-  // console.dir(winners);
-
+  const boardCards = hand.deck.slice(21, 26);
+  const rakePerMil = 10;
+  const winners = this.helper.calcDistribution(hand.lineup,
+    hand.state, boardCards, rakePerMil, this.oracleAddr);
   // distribute pots
   const dists = [];
   Object.keys(winners).forEach((winnerAddr) => {
