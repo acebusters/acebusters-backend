@@ -178,6 +178,7 @@ describe('Stream worker HandComplete event', () => {
       }, {
         address: P3_ADDR,
         last: new EWT(ABI_SHOW).show(2, 850).sign(P3_PRIV),
+        cards: [9, 23],
       }, {
         address: P4_ADDR,
         last: new EWT(ABI_FOLD).fold(2, 350).sign(P4_PRIV),
@@ -283,12 +284,14 @@ describe('Stream worker HandComplete event', () => {
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV),
+        cards: [24, 25],
       }, {
         address: P3_ADDR,
         last: new EWT(ABI_SIT_OUT).sitOut(3, 100).sign(P3_PRIV),
       }, {
         address: P2_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV),
+        cards: [4, 5],
       }],
       changed: 234,
       deck: [24, 25, 0, 1, 4, 5, 6, 7, 8, 9,
@@ -344,9 +347,11 @@ describe('Stream worker HandComplete event', () => {
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV),
+        cards: [24, 25],
       }, {
         address: P2_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV),
+        cards: [0, 1],
       }],
       changed: 234,
       deck: [24, 25, 0, 1, 4, 5, 6, 7, 8,
@@ -401,10 +406,12 @@ describe('Stream worker HandComplete event', () => {
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P1_PRIV),
+        cards: [24, 25],
         exitHand: 3,
       }, {
         address: P2_ADDR,
         last: new EWT(ABI_SHOW).show(3, 1000).sign(P2_PRIV),
+        cards: [0, 1],
       }],
       changed: 234,
       deck: [24, 25, 0, 1, 4, 5, 6, 7, 8,
@@ -458,9 +465,11 @@ describe('Stream worker HandComplete event', () => {
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_SHOW).show(4, 1050).sign(P1_PRIV),
+        cards: [0, 1],
       }, {
         address: P2_ADDR,
         last: new EWT(ABI_SHOW).show(4, 1050).sign(P2_PRIV),
+        cards: [2, 3],
       }],
       deck,
     }] });
@@ -474,53 +483,6 @@ describe('Stream worker HandComplete event', () => {
         EWT.concat(P1_ADDR, 1039).toString('hex'),
         EWT.concat(P2_ADDR, 1039).toString('hex'),
         EWT.concat(ORACLE_ADDR, 22).toString('hex'),
-      ]).sign(ORACLE_PRIV);
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand4)));
-      expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 5)));
-      done();
-    }).catch(done);
-  });
-
-  it('should calc dist for sidepot.', (done) => {
-    const event = {
-      Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
-    };
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(3),
-      [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR],
-      [new BigNumber(400), new BigNumber(2000), new BigNumber(2000), new BigNumber(2000)],
-      [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)],
-    ]);
-    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
-    sinon.stub(dynamo, 'query').yields(null, { Items: [{
-      handId: 4,
-      state: 'showdown',
-      lineup: [{
-        address: P1_ADDR,
-        last: new EWT(ABI_SHOW).show(4, 400).sign(P1_PRIV),
-        sitout: 'allin',
-      }, {
-        address: P2_ADDR,
-        last: new EWT(ABI_SHOW).show(4, 1100).sign(P2_PRIV),
-      }, {
-        address: P3_ADDR,
-        last: new EWT(ABI_SHOW).show(4, 1100).sign(P3_PRIV),
-      }, {
-        address: P4_ADDR,
-        last: new EWT(ABI_FOLD).fold(4, 50).sign(P4_PRIV),
-      }],
-      deck: [24, 25, 0, 1, 4, 5, 6, 7,
-        8, 9, 10, 11, 22, 23, 14, 15, 16, 17, 18, 19, 20, 21, 12, 13, 2, 3],
-    }] });
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(dynamo, 'putItem').yields(null, {});
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
-
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
-    Promise.all(worker.process(event)).then(() => {
-      const distHand4 = new EWT(ABI_DIST).distribution(4, 0, [
-        EWT.concat(P1_ADDR, 1237).toString('hex'),
-        EWT.concat(ORACLE_ADDR, 27).toString('hex'),
-        EWT.concat(P2_ADDR, 1386).toString('hex'),
       ]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand4)));
       expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 5)));
