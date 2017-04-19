@@ -99,15 +99,6 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
       delete hand.lineup[pos].sitout;
     }
 
-    // check bet not too small
-    if (hand.state !== 'waiting' && hand.state !== 'dealing' &&
-      receipt.abi[0].name === 'bet') {
-      const max = this.helper.getMaxBet(hand.lineup, hand.state);
-      if (receipt.values[1] < max.amount) {
-        throw new Unauthorized(`you have to match or raise ${max.amount}`);
-      }
-    }
-
     // make sure to replace receipts in right order
     if (hand.lineup[pos].last) {
       prevReceipt = this.rc.get(hand.lineup[pos].last);
@@ -199,6 +190,15 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         hand.lineup[pos].last = ewt;
         if (balLeft === 0) {
           hand.lineup[pos].sitout = 'allin';
+        } else {
+          // check bet not too small
+          if (hand.state !== 'waiting' && hand.state !== 'dealing' &&
+            receipt.abi[0].name === 'bet') {
+            const max = this.helper.getMaxBet(hand.lineup, hand.state);
+            if (receipt.values[1] < max.amount) {
+              throw new Unauthorized(`you have to match or raise ${max.amount}`);
+            }
+          }
         }
         return this.updateState(tableAddr, hand, pos);
       });

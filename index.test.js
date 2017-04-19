@@ -613,7 +613,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to fold.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       dealer: 0,
       state: 'dealing',
@@ -645,7 +645,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to go all in.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       state: 'flop',
       dealer: 0,
@@ -679,7 +679,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to go all in with one active player left.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       state: 'flop',
       dealer: 0,
@@ -709,24 +709,24 @@ describe('Oracle pay', () => {
   });
 
   it('should advance to showdown when last active player calls all-in.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
-      handId: 1,
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
       state: 'flop',
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY),
+        last: new EWT(ABI_BET).bet(3, 100).sign(P1_KEY),
       }, {
         address: P2_ADDR,
-        last: new EWT(ABI_BET).bet(1, 1000).sign(P2_KEY),
+        last: new EWT(ABI_BET).bet(3, 1000).sign(P2_KEY),
         sitout: 'allin',
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(2000), new BigNumber(1000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(2000), new BigNumber(1000)], [0, 0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const call = new EWT(ABI_BET).bet(1, 1000).sign(P1_KEY);
+    const call = new EWT(ABI_BET).bet(3, 1000).sign(P1_KEY);
     oracle.pay(tableAddr, call).then((rsp) => {
       expect(rsp).to.eql({});
       const seat = {
@@ -739,8 +739,47 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
+  it('should allow to call-in.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'turn',
+      dealer: 2,
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(3, 1400).sign(P1_KEY),
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(3, 800).sign(P2_KEY),
+      }, {
+        address: P3_ADDR,
+        last: new EWT(ABI_BET).bet(3, 800).sign(P3_KEY),
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(2),
+      [P1_ADDR, P2_ADDR, P3_ADDR],
+      [new BigNumber(2000), new BigNumber(1000), new BigNumber(2000)],
+      [new BigNumber(0), new BigNumber(0), new BigNumber(0)]
+    ]);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const callIn = new EWT(ABI_BET).bet(3, 1000).sign(P2_KEY);
+    oracle.pay(tableAddr, callIn).then((rsp) => {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P2_ADDR,
+        last: callIn,
+        sitout: 'allin',
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'turn')));
+      done();
+    }).catch(done);
+  });
+
   it('should allow to sitout in state waiting.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       dealer: 0,
       state: 'waiting',
@@ -763,7 +802,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent 0 sitout after state waiting.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       dealer: 0,
       state: 'dealing',
@@ -788,7 +827,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to sitout if BB.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       dealer: 0,
       state: 'dealing',
@@ -878,7 +917,7 @@ describe('Oracle pay', () => {
   });
 
   it('should switch to flop after fold when remaining pl. are even', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, {}).onFirstCall().yields(null, { Items: [{
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       dealer: 3,
       sb: 50,
@@ -1262,25 +1301,30 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent playing lower bet.', (done) => {
-    const smallBlind = new EWT(ABI_BET).bet(1, 50).sign(P1_KEY);
-    const bigBlind = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-    const lowBet = new EWT(ABI_BET).bet(1, 0).sign(P1_KEY);
-    const lineup = [
-      { address: P1_ADDR, last: smallBlind },
-      { address: P2_ADDR, last: bigBlind },
-    ];
-
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(1),
+      [P1_ADDR, P2_ADDR, P3_ADDR],
+      [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
+      [0, 0]
+    ]);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
-      handId: 1,
-      lineup,
+      handId: 2,
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(2, 50).sign(P1_KEY),
+      },{
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(2, 100).sign(P2_KEY),
+      }],
       state: 'turn',
       deck,
       dealer: 0,
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const oracle = new Oracle(new Db(dynamo), null, rc);
-
+    const lowBet = new EWT(ABI_BET).bet(2, 60).sign(P1_KEY);
     oracle.pay(tableAddr, lowBet).catch((err) => {
       expect(err.message).to.contain('Unauthorized');
       expect(err.message).to.contain('match or raise');
@@ -1545,7 +1589,7 @@ describe('Oracle show', () => {
   it('should prevent show before showdown', (done) => {
     const show1 = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       state: 'river',
       deck,
     } });
@@ -1567,7 +1611,7 @@ describe('Oracle show', () => {
     ];
     const bet = new EWT(ABI_BET).bet(1, 200).sign(P1_KEY);
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup,
       state: 'showdown',
       deck,
@@ -1591,7 +1635,7 @@ describe('Oracle show', () => {
       { address: P2_ADDR, last: bet2 },
     ];
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup,
       state: 'showdown',
       deck: [12, 11, 2, 3, 4, 5, 6, 7, 8, 9,
@@ -1614,28 +1658,23 @@ describe('Oracle show', () => {
   });
 
   it('should allow to show for all-in player.', (done) => {
-    const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
-    const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
-
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
-        last: bet1,
+        last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY),
         sitout: 'allin',
       }, {
         address: P2_ADDR,
-        last: bet2,
+        last: new EWT(ABI_BET).bet(1, 100).sign(P2_KEY),
       }],
       state: 'showdown',
       deck: [12, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 0,
         13, 14, 15, 22, 17, 18, 19, 20, 21, 36, 23, 24, 25],
     } });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-
     const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
 
     const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
-
     oracle.show(tableAddr, show, [12, 11]).then(() => {
       const trueIsh = sinon.match((value) => {
         const p = value.ExpressionAttributeValues[':l'];
@@ -1651,7 +1690,7 @@ describe('Oracle show', () => {
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     const bet3 = new EWT(ABI_BET).bet(1, 50).sign(P3_KEY);
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
         last: bet1,
@@ -1680,7 +1719,7 @@ describe('Oracle show', () => {
     const bet1 = new EWT(ABI_BET).bet(1, 100).sign(P1_KEY);
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
         last: bet1,
@@ -1706,7 +1745,7 @@ describe('Oracle show', () => {
     const bet2 = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
     const fold = new EWT(ABI_FOLD).fold(1, 50).sign(P3_KEY);
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
         last: bet1,
@@ -1738,7 +1777,7 @@ describe('Oracle show', () => {
       { address: P2_ADDR, last: bet2 },
     ];
 
-    sinon.stub(dynamo, 'getItem').yields(null, {}).onFirstCall().yields(null, { Item: {
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup,
       state: 'showdown',
       deck,
