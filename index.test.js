@@ -225,28 +225,28 @@ describe('Stream worker HandComplete event', () => {
   });
 
   it('should create pre-showdown distribution.', (done) => {
-    const fold = new EWT(ABI_FOLD).fold(2, 50).sign(P1_PRIV);
-    const bet2 = new EWT(ABI_BET).bet(2, 100).sign(P2_PRIV);
-
+    const tableAddr = '0xa2decf075b96c8e5858279b31f644501a140e8a7';
     const event = {
-      Subject: 'HandComplete::0xa2decf075b96c8e5858279b31f644501a140e8a7',
-      Message: JSON.stringify({
-        tableAddr: '0xa2decf075b96c8e5858279b31f644501a140e8a7',
-        handId: 2,
-      }),
+      Subject: `HandComplete::${tableAddr}`,
+      Message: JSON.stringify({ tableAddr, handId: 2 }),
     };
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(1),
       [P1_ADDR, P2_ADDR],
-      [new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(500), new BigNumber(500)],
       [new BigNumber(0), new BigNumber(0)],
     ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 2,
-      lineup: [
-        { address: P1_ADDR, last: fold },
-        { address: P2_ADDR, last: bet2 },
-      ],
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_FOLD).fold(2, 200).sign(P1_PRIV),
+      },{
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(2, 500).sign(P2_PRIV),
+        sitout: 'allin',
+      }],
       state: 'turn',
       deck,
       dealer: 0,
@@ -255,15 +255,30 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'),
+      null, new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
-        EWT.concat(P2_ADDR, 148).toString('hex'),
-        EWT.concat(ORACLE_ADDR, 2).toString('hex'),
+        EWT.concat(P2_ADDR, 693).toString('hex'),
+        EWT.concat(ORACLE_ADDR, 7).toString('hex'),
       ]).sign(ORACLE_PRIV);
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
-      expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 3)));
-      expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('dealer', 1)));
+      expect(dynamo.updateItem).calledWith(
+        sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
+      expect(dynamo.putItem).calledWith({ Item: {
+        tableAddr,
+        handId: 3,
+        deck: sinon.match.any,
+        state: 'waiting',
+        dealer: 1,
+        sb: 50,
+        lineup: [{
+          address: P1_ADDR,
+        }, {
+          address: P2_ADDR,
+        }],
+        changed: sinon.match.any,
+      },
+        TableName: 'poker' });
       done();
     }).catch(done);
   });

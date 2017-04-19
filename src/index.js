@@ -587,8 +587,9 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
           continue; // eslint-disable-line no-continue
         }
         // copy over all sitouts
-        if (prevHand.lineup[i].sitout) {
-          lineup[i].sitout = prevHand.lineup[i].sitout;
+        const sitout = prevHand.lineup[i].sitout;
+        if (sitout && typeof sitout === 'number') {
+          lineup[i].sitout = sitout;
         }
         // copy over all exitHands
         if (prevHand.lineup[i].exitHand) {
