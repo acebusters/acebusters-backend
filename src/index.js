@@ -95,8 +95,6 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
       if (activeCount === 0 || !hand.lineup[pos].sitout) {
         throw new BadRequest('not enough players to start game.');
       }
-      // player coming back from sitout.
-      delete hand.lineup[pos].sitout;
     }
 
     // make sure to replace receipts in right order
@@ -132,22 +130,20 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
     if (receipt.abi[0].name === 'checkRiver' && hand.state !== 'river') {
       throw new BadRequest('checkRiver only during river.');
     }
-
-    turn = this.helper.isTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2, receipt.signer);
-    if (hand.state === 'waiting') {
-      if (receipt.abi[0].name === 'sitOut') {
-        if (receipt.values[1] === 0) {
-          if (hand.lineup[pos].sitout) {
-            throw new BadRequest('pay BB when passed dealer in sitout.');
-          } else {
-            hand.lineup[pos].sitout = now;
-          }
-        } else if (receipt.values[1] === hand.sb * 2) {
-          delete hand.lineup[pos].sitout;
-        } else {
-          throw new BadRequest('pay BB when passed dealer in sitout.');
-        }
+    try {
+      turn = this.helper.isTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2, receipt.signer);
+    } catch (err) {
+      // we can not determine turn
+    }
+    if (receipt.abi[0].name === 'sitOut') {
+      if (hand.lineup[pos].sitout) {
+        delete hand.lineup[pos].sitout;
       } else {
+        hand.lineup[pos].sitout = now;
+      }
+    }
+    if (receipt.abi[0].name === 'bet') {
+      if (hand.state === 'waiting') {
         if (!turn && activeCount > 1) {
           throw new BadRequest('not your turn to pay small blind.');
         }
@@ -155,19 +151,6 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         if (receipt.values[1] !== hand.sb) {
           throw new BadRequest('small blind not valid.');
         }
-      }
-    } else if (receipt.abi[0].name === 'sitOut') {
-      if (receipt.values[1] <= 0) {
-        throw new Unauthorized('need to pay for after state waiting.');
-      } else if (hand.lineup[pos].sitout) {
-            // allow people to come back from sitout by paying BB
-        if (receipt.values[1] >= hand.sb * 2) {
-          delete hand.lineup[pos].sitout;
-        } else {
-          throw Unauthorized('need to pay BB to return.');
-        }
-      } else {
-        hand.lineup[pos].sitout = now;
       }
     }
     const recAmount = receipt.values[1];
@@ -190,14 +173,12 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         hand.lineup[pos].last = ewt;
         if (balLeft === 0) {
           hand.lineup[pos].sitout = 'allin';
-        } else {
-          // check bet not too small
-          if (hand.state !== 'waiting' && hand.state !== 'dealing' &&
+        } else if (hand.state !== 'waiting' && hand.state !== 'dealing' &&
             receipt.abi[0].name === 'bet') {
-            const max = this.helper.getMaxBet(hand.lineup, hand.state);
-            if (receipt.values[1] < max.amount) {
-              throw new Unauthorized(`you have to match or raise ${max.amount}`);
-            }
+          // check bet not too small
+          const max = this.helper.getMaxBet(hand.lineup, hand.state);
+          if (receipt.values[1] < max.amount) {
+            throw new Unauthorized(`you have to match or raise ${max.amount}`);
           }
         }
         return this.updateState(tableAddr, hand, pos);
@@ -236,10 +217,10 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
     if (hand.state === 'dealing') {
       hand.state = 'preflop';
     }
+    if (hand.state === 'waiting') {
+      hand.state = 'dealing';
+    }
     streetMaxBet = max.amount;
-  }
-  if (hand.state === 'waiting') {
-    hand.state = 'dealing';
   }
 
   // take care of all-in
