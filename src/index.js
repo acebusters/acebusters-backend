@@ -137,7 +137,11 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
     }
     if (receipt.abi[0].name === 'sitOut') {
       if (hand.lineup[pos].sitout) {
-        delete hand.lineup[pos].sitout;
+        if (hand.state === 'waiting' || receipt.values[1] > 0) {
+          delete hand.lineup[pos].sitout;
+        } else {
+          throw new BadRequest('have to pay to return after waiting.');
+        }
       } else {
         hand.lineup[pos].sitout = now;
       }

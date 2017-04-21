@@ -1059,7 +1059,7 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
-  it('should allow to come back from sitout by paying BB sitout receipt.', (done) => {
+  it('should allow to come back from sitout by paying sitout receipt > 0.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(0),
       [P1_ADDR, P2_ADDR, P2_ADDR],
@@ -1070,7 +1070,7 @@ describe('Oracle pay', () => {
       handId: 1,
       sb: 50,
       state: 'flop',
-      dealer: 1,
+      dealer: 0,
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_BET).bet(1, 150).sign(P1_KEY),
@@ -1085,7 +1085,7 @@ describe('Oracle pay', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const action = new EWT(ABI_SIT_OUT).sitOut(1, 100).sign(P2_KEY);
+    const action = new EWT(ABI_SIT_OUT).sitOut(1, 1).sign(P2_KEY);
     oracle.pay(tableAddr, action).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       const seat = {
@@ -1095,6 +1095,38 @@ describe('Oracle pay', () => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
       done();
     }).catch(done);
+  });
+
+  it('should prevent to come back from sitout after waiting without paying.', (done) => {
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(1),
+      [P1_ADDR, P2_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
+      [0, 0],
+    ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      sb: 50,
+      state: 'preflop',
+      dealer: 0,
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(3, 50).sign(P1_KEY),
+      }, {
+        address: P2_ADDR,
+        sitout: 1,
+      }, {
+        address: P3_ADDR,
+        last: new EWT(ABI_BET).bet(3, 100).sign(P1_KEY),
+      }],
+    }] });
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const action = new EWT(ABI_SIT_OUT).sitOut(3, 0).sign(P2_KEY);
+    oracle.pay(tableAddr, action).catch((err) => {
+      expect(err.message).to.contain('have to pay');
+      done();
+    });
   });
 
   it('should prevent check to raise.', (done) => {
