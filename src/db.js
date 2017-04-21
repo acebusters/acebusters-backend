@@ -15,13 +15,12 @@ Db.prototype.getLastHand = function getLastHand(tableAddr) {
       ScanIndexForward: false,
     }, (err, rsp) => {
       if (err) {
-        reject(err);
-        return;
+        return reject(err);
       }
       if (!rsp.Items || rsp.Items.length < 1) {
-        throw new NotFound(`table with address ${tableAddr} unknown.`);
+        return reject(new NotFound(`table with address ${tableAddr} unknown.`));
       }
-      fulfill(rsp.Items[0]);
+      return fulfill(rsp.Items[0]);
     });
   });
 };
@@ -31,21 +30,20 @@ Db.prototype.getHand = function getHand(tableAddr, handId) {
     if (handId < 1) {
       // return the genensis hand
       fulfill({ handId, state: 'showdown', distribution: '0x1234' });
-      return;
+    } else {
+      this.dynamo.getItem({
+        TableName: this.tableName,
+        Key: { tableAddr, handId },
+      }, (err, data) => {
+        if (err) {
+          return reject(err);
+        }
+        if (!data.Item) {
+          return reject(new NotFound(`handId ${handId} not found.`));
+        }
+        return fulfill(data.Item);
+      });
     }
-    this.dynamo.getItem({
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-    }, (err, data) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      if (!data.Item) {
-        throw new NotFound(`handId ${handId} not found.`);
-      }
-      fulfill(data.Item);
-    });
   });
 };
 
@@ -61,10 +59,9 @@ Db.prototype.updateLeave = function updateLeave(tableAddr, handId, seat, pos) {
     };
     this.dynamo.updateItem(params, (err, rsp) => {
       if (err) {
-        reject(err);
-        return;
+        return reject(err);
       }
-      fulfill(rsp.Item);
+      return fulfill(rsp.Item);
     });
   });
 };
@@ -101,10 +98,9 @@ Db.prototype.updateSeat = function updateSeat(tableAddr,
     }
     this.dynamo.updateItem(params, (err, rsp) => {
       if (err) {
-        reject(err);
-        return;
+        return reject(err);
       }
-      fulfill(rsp.Item);
+      return fulfill(rsp.Item);
     });
   });
 };
@@ -128,10 +124,9 @@ Db.prototype.updateNetting = function updateNetting(tableAddr, handId, signer, n
     };
     this.dynamo.updateItem(params, (err, rsp) => {
       if (err) {
-        reject(err);
-        return;
+        return reject(err);
       }
-      fulfill(rsp.Item);
+      return fulfill(rsp.Item);
     });
   });
 };

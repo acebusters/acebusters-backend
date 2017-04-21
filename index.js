@@ -13,13 +13,13 @@ const dynamo = new doc.DynamoDB();
 const rc = new ReceiptCache();
 
 const handleError = function handleError(err, callback) {
-  Raven.captureException(err, (sendErr) => {
+  Raven.captureException(err, { server_name: 'account_service' }, (sendErr) => {
     if (sendErr) {
       console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
       callback(sendErr);
       return;
     }
-    if (err.name) {
+    if (err.errName) {
       // these are known errors: 4xx
       callback(err.message);
     } else {
@@ -30,11 +30,7 @@ const handleError = function handleError(err, callback) {
 };
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL, {
-    captureUnhandledRejections: true,
-  }).install(() => {
-    callback(null, 'This is thy sheath; there rust, and let me die.');
-  });
+  Raven.config(process.env.SENTRY_URL).install();
 
   if (typeof web3 === 'undefined') {
     web3 = new Web3(new Web3.providers.HttpProvider(event['stage-variables'].providerUrl));

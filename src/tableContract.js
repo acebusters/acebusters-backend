@@ -9,8 +9,7 @@ TableContract.prototype.getLineup = function getLineup(tableAddr) {
   return new Promise((fulfill, reject) => {
     contract.getLineup.call((err, lineup) => {
       if (err) {
-        reject(err);
-        return;
+        return reject(err);
       }
       const rv = [];
       for (let i = 0; i < lineup[1].length; i += 1) {
@@ -22,7 +21,7 @@ TableContract.prototype.getLineup = function getLineup(tableAddr) {
           rv[i].exitHand = lineup[3][i];
         }
       }
-      fulfill({
+      return fulfill({
         lastHandNetted: lineup[0],
         lineup: rv,
       });
