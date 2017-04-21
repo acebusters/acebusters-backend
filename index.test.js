@@ -966,7 +966,7 @@ describe('Oracle pay', () => {
 
     const bet = new EWT(ABI_BET).bet(1, 200).sign(P2_KEY);
     oracle.pay(tableAddr, bet).catch((err) => {
-      expect(err.message).to.contain('can not toggle sitout');
+      expect(err.message).to.contain('Bad Request: wait for next hand');
       done();
     }).catch(done);
   });

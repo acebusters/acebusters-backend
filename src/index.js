@@ -105,8 +105,11 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
       }
 
       if (prevReceipt.abi[0].name === 'sitOut') {
-        if (receipt.abi[0].name === 'bet' || receipt.abi[0].name === 'sitOut') {
+        if (receipt.abi[0].name === 'sitOut') {
           throw new BadRequest('can not toggle sitout in same hand.');
+        }
+        if (receipt.values[1] > 0 && prevReceipt.values[1] > 0) {
+          throw new BadRequest('wait for next hand.');
         }
       }
 
