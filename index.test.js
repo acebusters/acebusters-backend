@@ -760,7 +760,7 @@ describe('Oracle pay', () => {
       new BigNumber(2),
       [P1_ADDR, P2_ADDR, P3_ADDR],
       [new BigNumber(2000), new BigNumber(1000), new BigNumber(2000)],
-      [new BigNumber(0), new BigNumber(0), new BigNumber(0)]
+      [new BigNumber(0), new BigNumber(0), new BigNumber(0)],
     ]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
@@ -1306,14 +1306,14 @@ describe('Oracle pay', () => {
       new BigNumber(1),
       [P1_ADDR, P2_ADDR, P3_ADDR],
       [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
-      [0, 0]
+      [0, 0],
     ]);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 2,
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_BET).bet(2, 50).sign(P1_KEY),
-      },{
+      }, {
         address: P2_ADDR,
         last: new EWT(ABI_BET).bet(2, 100).sign(P2_KEY),
       }],

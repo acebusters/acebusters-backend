@@ -32,7 +32,7 @@ TableManager.prototype.info = function info(tableAddr, tableContracts) {
     if (tableContracts) {
       tables = tableContracts.split(',');
     }
-    if (err.name && err.name === 'NotFound' &&
+    if (err && err.errName === 'NotFound' &&
       tables.indexOf(tableAddr) > -1) {
       return Promise.resolve({
         handId: 0,
