@@ -8,6 +8,7 @@ import BigNumber from 'bignumber.js';
 
 import EventWorker from './src/index';
 import Table from './src/tableContract';
+import Controller from './src/controllerContract';
 import Factory from './src/factoryContract';
 import Db from './src/db';
 
@@ -64,7 +65,13 @@ const contract = {
   create: {
     sendTransaction() {},
   },
+  changeSigner: {
+    sendTransaction() {},
+  },
   getLineup: {
+    call() {},
+  },
+  getAccount: {
     call() {},
   },
   smallBlind: {
@@ -242,7 +249,7 @@ describe('Stream worker HandComplete event', () => {
       lineup: [{
         address: P1_ADDR,
         last: new EWT(ABI_FOLD).fold(2, 200).sign(P1_PRIV),
-      },{
+      }, {
         address: P2_ADDR,
         last: new EWT(ABI_BET).bet(2, 500).sign(P2_PRIV),
         sitout: 'allin',
@@ -590,8 +597,8 @@ describe('Stream worker other events', () => {
   it('should handle TableLeave event.', (done) => {
     const handId = 2;
     const tableAddr = EMPTY_ADDR;
-    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV);
-    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV);
+    const leaveReceipt = new Receipt(tableAddr).leave(handId, P1_ADDR).sign(ORACLE_PRIV);
+    const leaveHex = Receipt.parseToParams(leaveReceipt);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -611,11 +618,11 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
 
     Promise.all(worker.process(event)).then(() => {
-      expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.leave()', {
         level: sinon.match.any,
         tags: { tableAddr, handId },
-        extra: { leaveHex, txHash: '0x112233' },
+        extra: { leaveReceipt, txHash: '0x112233' },
       });
       done();
     }).catch(done);
@@ -682,8 +689,8 @@ describe('Stream worker other events', () => {
   it('should handle TableLeave and Payout if netting not needed.', (done) => {
     const handId = 2;
     const tableAddr = EMPTY_ADDR;
-    const leaveReceipt = Receipt.leave(tableAddr, handId, P1_ADDR).sign(ORACLE_PRIV);
-    const leaveHex = Receipt.leave(tableAddr, handId, P1_ADDR).signToHex(ORACLE_PRIV);
+    const leaveReceipt = new Receipt(tableAddr).leave(handId, P1_ADDR).sign(ORACLE_PRIV);
+    const leaveHex = Receipt.parseToParams(leaveReceipt);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -704,18 +711,23 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
 
     Promise.all(worker.process(event)).then(() => {
-      expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(contract.payoutFrom.sendTransaction).calledWith(P1_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
-      expect(sentry.captureMessage).calledWith('tx: table.leave()', {
-        level: sinon.match.any,
-        tags: { tableAddr, handId },
-        extra: { txHash: '0x112233', leaveHex },
-      });
+      expect(sentry.captureMessage).callCount(2);
       expect(sentry.captureMessage).calledWith('tx: table.payout()', {
         level: sinon.match.any,
         tags: { tableAddr },
-        extra: { txHash: '0x445566', signerAddr: P1_ADDR },
+        extra: {
+          txHash: '0x445566',
+          signerAddr: P1_ADDR,
+        },
       });
+      expect(sentry.captureMessage).calledWith('tx: table.leave()', {
+        level: sinon.match.any,
+        tags: { tableAddr, handId },
+        extra: { txHash: '0x112233', leaveReceipt },
+      });
+
       done();
     }).catch(done);
   });
@@ -751,12 +763,13 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
-      const leaveHex = Receipt.leave(tableAddr, 2, P1_ADDR).signToHex(ORACLE_PRIV);
-      expect(contract.leave.sendTransaction).calledWith(leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      const leaveReceipt = new Receipt(tableAddr).leave(2, P1_ADDR).sign(ORACLE_PRIV);
+      const leaveHex = Receipt.parseToParams(leaveReceipt);
+      expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith('tx: table.leave()', {
         level: sinon.match.any,
         tags: { tableAddr, handId: 2 },
-        extra: { txHash: '0x112233', leaveHex },
+        extra: { txHash: '0x112233', leaveReceipt },
       });
       expect(contract.payoutFrom.sendTransaction).callCount(1);
       done();
@@ -906,9 +919,9 @@ describe('Stream worker other events', () => {
     }).catch(done);
   });
 
-  it('should handle EmailConfirmed event.', (done) => {
+  it('should handle WalletCreated event.', (done) => {
     const event = {
-      Subject: 'EmailConfirmed::0x1234',
+      Subject: 'WalletCreated::0x1234',
       Message: JSON.stringify({
         signerAddr: P1_ADDR,
         accountId: 'someuuid',
@@ -925,6 +938,39 @@ describe('Stream worker other events', () => {
         extra: { accountId: 'someuuid', signerAddr: P1_ADDR },
         level: 'info',
         user: { id: P1_ADDR },
+      });
+      done();
+    }).catch(done);
+  });
+
+  it('should handle WalletReset event.', (done) => {
+    const event = {
+      Subject: 'WalletReset::0x1234',
+      Message: JSON.stringify({
+        oldSignerAddr: P1_ADDR,
+        newSignerAddr: P2_ADDR,
+      }),
+    };
+    const contrAddr = P3_ADDR;
+    sinon.stub(contract.getAccount, 'call').yields(null, ['0x1122', contrAddr, new BigNumber(5)]);
+    sinon.stub(contract.changeSigner, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+    const recoveryReceipt = new Receipt(contrAddr).recover(5, P2_ADDR).sign(ORACLE_PRIV);
+    const recoveryHex = Receipt.parseToParams(recoveryReceipt);
+
+    const worker = new EventWorker(null, new Factory(web3, '0x1255', '0x1234'),
+      null, null, sentry, new Controller(web3, P3_ADDR), ORACLE_PRIV);
+    Promise.all(worker.process(event)).then(() => {
+      expect(contract.changeSigner.sendTransaction).calledWith(
+        ...recoveryHex, { from: P3_ADDR, gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith(sinon.match.any, {
+        extra: {
+          oldAddr: P1_ADDR,
+          newAddr: P2_ADDR,
+          recoveryReceipt,
+          txHash: '0x123456',
+        },
+        level: 'info',
       });
       done();
     }).catch(done);

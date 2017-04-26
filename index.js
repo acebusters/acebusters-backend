@@ -5,6 +5,7 @@ import Raven from 'raven';
 import Db from './src/db';
 import EventWorker from './src/index';
 import Table from './src/tableContract';
+import Controller from './src/controllerContract';
 import Factory from './src/factoryContract';
 
 let web3Provider;
@@ -25,6 +26,7 @@ exports.handler = function handler(event, context, callback) {
     }
     web3 = new Web3(web3Provider);
     const table = new Table(web3, process.env.SENDER_ADDR);
+    const controller = new Controller(web3, process.env.SENDER_ADDR);
     const factory = new Factory(web3, process.env.SENDER_ADDR, process.env.FACTORY_ADDR);
 
     if (!dynamo) {
@@ -32,7 +34,8 @@ exports.handler = function handler(event, context, callback) {
     }
 
     let requests = [];
-    const worker = new EventWorker(table, factory, new Db(dynamo), process.env.ORACLE_PRIV, Raven);
+    const worker = new EventWorker(table, factory, new Db(dynamo),
+      process.env.ORACLE_PRIV, Raven, controller, process.env.RECOVERY_PRIV);
     for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }

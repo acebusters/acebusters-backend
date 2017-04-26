@@ -6,6 +6,23 @@ function FactoryContract(web3, senderAddr, factoryAddr) {
   this.factoryAddr = factoryAddr;
 }
 
+FactoryContract.prototype.getAccount = function getAccount(signerAddr) {
+  const contract = this.web3.eth.contract(FACTORY_ABI).at(this.factoryAddr);
+  return new Promise((fulfill, reject) => {
+    contract.getAccount.call(signerAddr, (err, val) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      fulfill({
+        signer: val[0],
+        controller: val[1],
+        lastNonce: val[2].toNumber(),
+      });
+    });
+  });
+};
+
 FactoryContract.prototype.createAccount = function createAccount(signerAddr) {
   const contract = this.web3.eth.contract(FACTORY_ABI).at(this.factoryAddr);
   return new Promise((fulfill, reject) => {

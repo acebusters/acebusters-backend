@@ -29,14 +29,21 @@ const shuffle = function shuffle() {
   return array;
 };
 
-const EventWorker = function EventWorker(table, factory, db, oraclePriv, sentry) {
+const EventWorker = function EventWorker(table,
+  factory, db, oraclePriv, sentry, controller, recoveryPriv) {
   this.table = table;
   this.factory = factory;
+  this.controller = controller;
   this.db = db;
   if (oraclePriv) {
     this.oraclePriv = oraclePriv;
     const priv = new Buffer(oraclePriv.replace('0x', ''), 'hex');
     this.oracleAddr = `0x${ethUtil.privateToAddress(priv).toString('hex')}`;
+  }
+  if (recoveryPriv) {
+    this.recoveryPriv = recoveryPriv;
+    const recPrivBuf = new Buffer(recoveryPriv.replace('0x', ''), 'hex');
+    this.recoveryAddr = `0x${ethUtil.privateToAddress(recPrivBuf).toString('hex')}`;
   }
   this.helper = new PokerHelper();
   this.sentry = sentry;
@@ -93,19 +100,23 @@ EventWorker.prototype.process = function process(msg) {
     tasks.push(this.submitNetting(msgBody.tableAddr, msgBody.handId));
   }
 
-  // react to email confirmed. deploy proxy and controller
-  // on the chain.
-  if (msgType === 'EmailConfirmed') {
+  // react to new wallet. deploy proxy and controller on the chain.
+  if (msgType === 'WalletCreated') {
     tasks.push(this.factory.createAccount(msgBody.signerAddr));
-    tasks.push(this.log(`EmailConfirmed: ${msgBody.signerAddr}`, {
+    tasks.push(this.log(`WalletCreated: ${msgBody.signerAddr}`, {
       user: {
         id: msgBody.signerAddr,
       },
-      level: 'info',
       extra: msgBody,
     }));
   }
 
+  // react to wallet reset. send recovery transaction to controller.
+  if (msgType === 'WalletReset') {
+    tasks.push(this.walletReset(msgBody.oldSignerAddr, msgBody.newSignerAddr));
+  }
+
+  // kick a player from a table.
   if (msgType === 'Kick') {
     tasks.push(this.kickPlayer(msgBody.tableAddr, msgBody.pos));
   }
@@ -157,12 +168,24 @@ EventWorker.prototype.log = function log(message, context) {
   });
 };
 
+EventWorker.prototype.walletReset = function walletReset(oldAddr, newAddr) {
+  let recoveryReceipt;
+  return this.factory.getAccount(oldAddr).then((rsp) => {
+    recoveryReceipt = new Receipt(rsp.controller)
+      .recover(rsp.lastNonce, newAddr).sign(this.recoveryPriv);
+    const recoveryHex = Receipt.parseToParams(recoveryReceipt);
+    return this.controller.changeSigner(rsp.controller, recoveryHex);
+  }).then(txHash => this.log(`tx: controller.changeSigner(${oldAddr}, ${newAddr})`, {
+    extra: { txHash, recoveryReceipt, oldAddr, newAddr },
+  }));
+};
+
 EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaveReceipt) {
   let leaveHex;
   let leave;
   let txHash;
   try {
-    leaveHex = Receipt.parseToHex(leaveReceipt);
+    leaveHex = Receipt.parseToParams(leaveReceipt);
     leave = Receipt.parse(leaveReceipt);
   } catch (error) {
     return Promise.reject(error);
@@ -171,17 +194,17 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaveReceipt
     txHash = _txHash;
     const logProm = this.log('tx: table.leave()', {
       tags: { tableAddr, handId: leave.handId },
-      extra: { txHash, leaveHex },
+      extra: { txHash, leaveReceipt },
     });
     const lineupProm = this.table.getLineup(tableAddr);
     return Promise.all([lineupProm, logProm]);
   }).then((rsp) => {
     if (rsp[0].lastHandNetted >= leave.handId) {
-      return this.table.payout(tableAddr, leave.signerAddr).then(_txHash => this.log('tx: table.payout()', {
+      return this.table.payout(tableAddr, leave.leaverAddr).then(_txHash => this.log('tx: table.payout()', {
         tags: { tableAddr },
         extra: {
           txHash: _txHash,
-          signerAddr: leave.signerAddr,
+          signerAddr: leave.leaverAddr,
         },
       }));
     }
@@ -217,7 +240,7 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
       return Promise.reject(`player ${addr} still got ${hand.lineup[pos].sitout - old} seconds to sit out, not yet to be kicked.`);
     }
     const handId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
-    const leaveReceipt = Receipt.leave(tableAddr, handId, addr).sign(this.oraclePriv);
+    const leaveReceipt = new Receipt(tableAddr).leave(handId, addr).sign(this.oraclePriv);
     return this.submitLeave(tableAddr, leaveReceipt);
     // TODO: set exitHand flag in db?
   });
