@@ -8,7 +8,7 @@ function TableContract(web3, senderAddr) {
 TableContract.prototype.leave = function leave(tableAddr, leaveReceipt) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
-    contract.leave.sendTransaction(leaveReceipt,
+    contract.leave.sendTransaction(...leaveReceipt,
       { from: this.senderAddr, gas: 200000 },
       (err, val) => {
         if (err) {
