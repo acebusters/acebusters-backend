@@ -13,10 +13,8 @@ let dynamo;
 
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL, {
-    captureUnhandledRejections: true,
-  }).install(() => {
-    callback(null, 'This is thy sheath; there rust, and let me die.');
-  });
+    serverName: 'event-worker',
+  }).install();
 
   if (event.Records && event.Records instanceof Array) {
     let web3;

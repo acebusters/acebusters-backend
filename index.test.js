@@ -604,7 +604,8 @@ describe('Stream worker other events', () => {
       Subject: `TableLeave::${tableAddr}`,
       Message: JSON.stringify({
         tableAddr,
-        leaveReceipt,
+        leaverAddr: P1_ADDR,
+        exitHand: handId,
       }),
     };
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(handId - 1),
@@ -615,7 +616,7 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, 'sentry');
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
@@ -696,7 +697,8 @@ describe('Stream worker other events', () => {
       Subject: `TableLeave::${tableAddr}`,
       Message: JSON.stringify({
         tableAddr,
-        leaveReceipt,
+        leaverAddr: P1_ADDR,
+        exitHand: handId,
       }),
     };
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(handId),
@@ -708,7 +710,7 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
@@ -719,7 +721,7 @@ describe('Stream worker other events', () => {
         tags: { tableAddr },
         extra: {
           txHash: '0x445566',
-          signerAddr: P1_ADDR,
+          leaverAddr: P1_ADDR,
         },
       });
       expect(sentry.captureMessage).calledWith('tx: table.leave()', {

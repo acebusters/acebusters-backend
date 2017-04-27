@@ -1,6 +1,6 @@
 import ethUtil from 'ethereumjs-util';
 import EWT from 'ethereum-web-token';
-import bufferShim from 'buffer-shims';
+import 'buffer-v6-polyfill';
 import crypto from 'crypto';
 import { PokerHelper, Receipt } from 'poker-helper';
 
@@ -66,7 +66,7 @@ EventWorker.prototype.process = function process(msg) {
   // handle TableLeave event:
   // fordward receipt signed by oracle to table.
   if (msgType === 'TableLeave') {
-    tasks.push(this.submitLeave(msgBody.tableAddr, msgBody.leaveReceipt));
+    tasks.push(this.submitLeave(msgBody.tableAddr, msgBody.leaverAddr, msgBody.exitHand));
   }
 
   // have the table propress in netting
@@ -180,31 +180,30 @@ EventWorker.prototype.walletReset = function walletReset(oldAddr, newAddr) {
   }));
 };
 
-EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaveReceipt) {
+EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, exitHand) {
   let leaveHex;
-  let leave;
   let txHash;
+  const leaveReceipt = new Receipt(tableAddr).leave(exitHand, leaverAddr).sign(this.oraclePriv);
   try {
     leaveHex = Receipt.parseToParams(leaveReceipt);
-    leave = Receipt.parse(leaveReceipt);
   } catch (error) {
     return Promise.reject(error);
   }
   return this.table.leave(tableAddr, leaveHex).then((_txHash) => {
     txHash = _txHash;
     const logProm = this.log('tx: table.leave()', {
-      tags: { tableAddr, handId: leave.handId },
+      tags: { tableAddr, handId: exitHand },
       extra: { txHash, leaveReceipt },
     });
     const lineupProm = this.table.getLineup(tableAddr);
     return Promise.all([lineupProm, logProm]);
   }).then((rsp) => {
-    if (rsp[0].lastHandNetted >= leave.handId) {
-      return this.table.payout(tableAddr, leave.leaverAddr).then(_txHash => this.log('tx: table.payout()', {
+    if (rsp[0].lastHandNetted >= exitHand) {
+      return this.table.payout(tableAddr, leaverAddr).then(_txHash => this.log('tx: table.payout()', {
         tags: { tableAddr },
         extra: {
           txHash: _txHash,
-          signerAddr: leave.leaverAddr,
+          leaverAddr,
         },
       }));
     }
@@ -240,8 +239,7 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
       return Promise.reject(`player ${addr} still got ${hand.lineup[pos].sitout - old} seconds to sit out, not yet to be kicked.`);
     }
     const handId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
-    const leaveReceipt = new Receipt(tableAddr).leave(handId, addr).sign(this.oraclePriv);
-    return this.submitLeave(tableAddr, leaveReceipt);
+    return this.submitLeave(tableAddr, addr, handId);
     // TODO: set exitHand flag in db?
   });
 };
@@ -398,7 +396,7 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     // build receipt
     const balLength = Object.keys(balances).length;
     const recLength = 28;
-    const balBuf = bufferShim.alloc((balLength * recLength) + 20);
+    const balBuf = Buffer.alloc((balLength * recLength) + 20);
     balBuf.write(tableAddr.replace('0x', ''), 0, 20, 'hex');
     balBuf.writeUInt32BE(handId, 0);
     Object.keys(balances).forEach((key, i) => {
