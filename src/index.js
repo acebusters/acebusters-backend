@@ -371,7 +371,7 @@ TableManager.prototype.leave = function leave(tableAddr, ewt) {
     if (hand.lineup[pos] && hand.lineup[pos].exitHand) {
       throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} already set.`);
     }
-    leaveReceipt = Receipt.leave(tableAddr, handId, receipt.signer).sign(this.oraclePriv);
+    leaveReceipt = new Receipt(tableAddr).leave(handId, receipt.signer).sign(this.oraclePriv);
     // put leave receipt into lineup and set exitHand
     if (!hand.lineup[pos]) {
       hand.lineup[pos] = {};

@@ -56,6 +56,7 @@ const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cb
 
 const deck = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
   11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25];
+const bn0 = new BigNumber(0);
 
 const dynamo = {
   getItem() {},
@@ -123,7 +124,7 @@ describe('Oracle pay', () => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
       [P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000)],
-      [new BigNumber(0), new BigNumber(0)],
+      [bn0, bn0],
     ]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       state: 'waiting',
@@ -152,7 +153,7 @@ describe('Oracle pay', () => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
       [P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000)],
-      [new BigNumber(0), new BigNumber(0)],
+      [bn0, bn0],
     ]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       state: 'dealing',
@@ -181,9 +182,9 @@ describe('Oracle pay', () => {
   it('should prevent game with less than 2 players.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
-      new BigNumber(0),
+      bn0,
       [P1_ADDR, EMPTY_ADDR],
-      [new BigNumber(50000), new BigNumber(0)],
+      [new BigNumber(50000), bn0],
       [0, 0],
     ]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
@@ -207,7 +208,7 @@ describe('Oracle pay', () => {
   it('should prevent blind with wrong value.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
-      new BigNumber(0),
+      bn0,
       [P1_ADDR, P2_ADDR],
       [new BigNumber(50000), new BigNumber(50000)],
       [0, 0],
@@ -232,7 +233,7 @@ describe('Oracle pay', () => {
   });
 
   it('should check position for small blind with 2 players.', (done) => {
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       dealer: 1,
@@ -254,7 +255,7 @@ describe('Oracle pay', () => {
   });
 
   it('should check position for small blind with 2 players.', (done) => {
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, EMPTY_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [new BigNumber(0), new BigNumber(0), new BigNumber(0)]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, EMPTY_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [bn0, bn0, bn0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       dealer: 1,
@@ -278,7 +279,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to play small blind with 3+ players.', (done) => {
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
@@ -305,7 +306,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to play big blind with 3+ players.', (done) => {
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
@@ -332,7 +333,7 @@ describe('Oracle pay', () => {
   });
 
   it('should keed state dealing while 0 receipts submitted.', (done) => {
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       dealer: 0,
@@ -379,7 +380,7 @@ describe('Oracle pay', () => {
       }],
       deck,
     }] });
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
@@ -555,7 +556,7 @@ describe('Oracle pay', () => {
       dealer: 0,
     }] });
     sinon.stub(contract.getLineup, 'call').yields(null, [
-      new BigNumber(0),
+      bn0,
       [P1_ADDR, P2_ADDR],
       [new BigNumber(50000), new BigNumber(25000)],
       [0, 0],
@@ -629,7 +630,7 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const fold = new EWT(ABI_FOLD).fold(1, 50).sign(P2_KEY);
@@ -661,7 +662,7 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P2_ADDR], [new BigNumber(1000), new BigNumber(100), new BigNumber(1000)], [new BigNumber(0), new BigNumber(0), new BigNumber(0)]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P2_ADDR], [new BigNumber(1000), new BigNumber(100), new BigNumber(1000)], [bn0, bn0, bn0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const allin = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
@@ -678,7 +679,7 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
-  it('should allow to go all in with one active player left.', (done) => {
+  it('should allow to call-in heads up and go to showdown.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       state: 'flop',
@@ -687,12 +688,22 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
         last: new EWT(ABI_BET).bet(1, 100).sign(P1_KEY),
       }, {
+        address: EMPTY_ADDR,
+      }, {
         address: P2_ADDR,
         last: new EWT(ABI_BET).bet(1, 50).sign(P2_KEY),
+      }, {
+        address: P3_ADDR,
+        sitout: 1,
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(1000), new BigNumber(100)], [new BigNumber(0), new BigNumber(0)]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      bn0,
+      [P1_ADDR, EMPTY_ADDR, P2_ADDR, P3_ADDR],
+      [new BigNumber(1000), bn0, new BigNumber(100), new BigNumber(1000)],
+      [bn0, bn0, bn0, bn0],
+    ]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const allin = new EWT(ABI_BET).bet(1, 100).sign(P2_KEY);
@@ -712,10 +723,15 @@ describe('Oracle pay', () => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'flop',
-      dealer: 0,
+      dealer: 1,
       lineup: [{
+        address: EMPTY_ADDR,
+      }, {
         address: P1_ADDR,
         last: new EWT(ABI_BET).bet(3, 100).sign(P1_KEY),
+      }, {
+        address: P4_ADDR,
+        sitout: 1,
       }, {
         address: P2_ADDR,
         last: new EWT(ABI_BET).bet(3, 1000).sign(P2_KEY),
@@ -723,7 +739,11 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(2000), new BigNumber(1000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(2),
+      [EMPTY_ADDR, P1_ADDR, P4_ADDR, P2_ADDR],
+      [bn0, new BigNumber(2000), new BigNumber(2000), new BigNumber(1000)],
+      [bn0, bn0, bn0, bn0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const call = new EWT(ABI_BET).bet(3, 1000).sign(P1_KEY);
@@ -760,7 +780,7 @@ describe('Oracle pay', () => {
       new BigNumber(2),
       [P1_ADDR, P2_ADDR, P3_ADDR],
       [new BigNumber(2000), new BigNumber(1000), new BigNumber(2000)],
-      [new BigNumber(0), new BigNumber(0), new BigNumber(0)],
+      [bn0, bn0, bn0],
     ]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
@@ -786,7 +806,7 @@ describe('Oracle pay', () => {
       lineup: [{ address: P1_ADDR }, { address: P2_ADDR }, { address: P3_ADDR }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
@@ -816,7 +836,7 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
@@ -845,7 +865,7 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 1).sign(P3_KEY);
@@ -910,7 +930,7 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
@@ -994,7 +1014,7 @@ describe('Oracle pay', () => {
 
   it('should allow to come back from sitout in waiting.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
-      new BigNumber(0),
+      bn0,
       [P1_ADDR, P2_ADDR],
       [new BigNumber(50000), new BigNumber(50000)],
       [0, 0],
@@ -1027,7 +1047,7 @@ describe('Oracle pay', () => {
 
   it('should allow to come back from sitout in waiting with 3 players.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
-      new BigNumber(0),
+      bn0,
       [P1_ADDR, P2_ADDR, P3_ADDR],
       [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
       [0, 0, 0],
@@ -1061,7 +1081,7 @@ describe('Oracle pay', () => {
 
   it('should allow to come back from sitout by paying sitout receipt > 0.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [
-      new BigNumber(0),
+      bn0,
       [P1_ADDR, P2_ADDR, P2_ADDR],
       [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
       [0, 0],
@@ -1180,7 +1200,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to deal with sitout', (done) => {
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       state: 'dealing',
@@ -1221,7 +1241,7 @@ describe('Oracle pay', () => {
       { address: P3_ADDR, last: bet3 },
     ];
     const check2 = new EWT(ABI_CHECK_FLOP).checkFlop(1, 150).sign(P2_KEY);
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 1,
       lineup,
@@ -1252,7 +1272,7 @@ describe('Oracle pay', () => {
       { address: P3_ADDR, last: check3 },
     ];
     const check3a = new EWT(ABI_CHECK_TURN).checkTurn(1, 150).sign(P3_KEY);
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 1,
       lineup,
@@ -1836,13 +1856,13 @@ describe('Oracle leave', () => {
       state: 'flop',
       lineup,
     }] });
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
     oracle.leave(tableAddr, leave).then((rsp) => {
-      const leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
+      const leaveReceipt = 'AYYP.MbNfcKegEU83YmwUt331Ta9JbUekitk0hQfcPYUy524=.ZQjT+vteFSjxrh0nNEhcwnLIrWuJBmdlTWk2ujcK41U=.G93u/wARIjMAAAAC876sMMSY2eJoZfNPyqV9u5NbDXQ=';
       expect(rsp).to.eql({ leaveReceipt });
       const seat = {
         address: P1_ADDR,
@@ -1863,13 +1883,13 @@ describe('Oracle leave', () => {
       state: 'waiting',
       lineup,
     }] });
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(0), [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
     oracle.leave(tableAddr, leave).then((rsp) => {
-      const leaveReceipt = 'AYYP.AAAAAt3u/wARIjPzvqwwxJjZ4mhl80/KpX27k1sNdA==.LzaiEUre4AotA6U2watHmglfWC5siFxSMFdQ+G/+zGwc6HC+Jdn3ScoXPwbfatuzRYfmgODVrqxASHD61Sg+5xw=';
+      const leaveReceipt = 'AYYP.MbNfcKegEU83YmwUt331Ta9JbUekitk0hQfcPYUy524=.ZQjT+vteFSjxrh0nNEhcwnLIrWuJBmdlTWk2ujcK41U=.G93u/wARIjMAAAAC876sMMSY2eJoZfNPyqV9u5NbDXQ=';
       expect(rsp).to.eql({ leaveReceipt });
       const seat = {
         address: P1_ADDR,
