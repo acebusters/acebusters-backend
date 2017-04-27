@@ -51,16 +51,13 @@ describe('Stream scanner', function() {
         NewImage: {
           handId: { N: '3' },
           lineup: { L: [
-            { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
+            { M: { address: { S: P1_ADDR } } },
             { M: {
               address: {
-                S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2'
+                S: P2_ADDR
               },
               exitHand: {
                 N: '2'
-              },
-              leaveReceipt: {
-                S: '0x99'
               }
             }},
           ]}
@@ -68,8 +65,8 @@ describe('Stream scanner', function() {
         OldImage: {
           handId: { N: '3' },
           lineup: { L: [
-            { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
-            { M: { address: { S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' } } }
+            { M: { address: { S: P1_ADDR } } },
+            { M: { address: { S: P2_ADDR } } }
           ]}
         }
       }
@@ -84,7 +81,7 @@ describe('Stream scanner', function() {
       expect(sns.publish).calledWith({
         Subject: 'TableLeave::0x77aabb11ee',
         Message: JSON.stringify({
-          leaveReceipt: '0x99',
+          leaverAddr: P2_ADDR,
           tableAddr: '0x77aabb11ee'
         }),
         TopicArn: topicArn
@@ -132,16 +129,13 @@ describe('Stream scanner', function() {
         NewImage: {
           handId: { N: '3' },
           lineup: { L: [
-            { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
+            { M: { address: { S: P1_ADDR } } },
             { M: {
               address: {
-                S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2'
+                S: P2_ADDR
               },
               exitHand: {
                 N: '3'
-              },
-              leaveReceipt: {
-                S: '0x99'
               }
             }},
           ]}
@@ -149,8 +143,8 @@ describe('Stream scanner', function() {
         OldImage: {
           handId: { N: '3' },
           lineup: { L: [
-            { M: { address: { S: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' } } },
-            { M: { address: { S: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' } } }
+            { M: { address: { S: P1_ADDR } } },
+            { M: { address: { S: P2_ADDR } } }
           ]}
         }
       }
@@ -165,7 +159,7 @@ describe('Stream scanner', function() {
       expect(sns.publish).calledWith({
         Subject: 'TableLeave::0x77aabb11ee',
         Message: JSON.stringify({
-          leaveReceipt: '0x99',
+          leaverAddr: P2_ADDR,
           tableAddr: '0x77aabb11ee'
         }),
         TopicArn: topicArn

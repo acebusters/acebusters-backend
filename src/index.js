@@ -86,7 +86,7 @@ StreamScanner.prototype.process = function process(record) {
 
     // send leave receipt to contract
     tasks.push(this.notify('TableLeave::' + keys.tableAddr, {
-      leaveReceipt: newHand.lineup[pos].leaveReceipt,
+      leaverAddr: newHand.lineup[pos].address,
       tableAddr: keys.tableAddr
     }, this.topicArn));
     // also, if the leave is for last hand, we can create a distribution already
