@@ -1861,13 +1861,10 @@ describe('Oracle leave', () => {
 
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
-    oracle.leave(tableAddr, leave).then((rsp) => {
-      const leaveReceipt = 'AYYP.MbNfcKegEU83YmwUt331Ta9JbUekitk0hQfcPYUy524=.ZQjT+vteFSjxrh0nNEhcwnLIrWuJBmdlTWk2ujcK41U=.G93u/wARIjMAAAAC876sMMSY2eJoZfNPyqV9u5NbDXQ=';
-      expect(rsp).to.eql({ leaveReceipt });
+    oracle.leave(tableAddr, leave).then(() => {
       const seat = {
         address: P1_ADDR,
         exitHand: 2,
-        leaveReceipt,
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
       done();
@@ -1888,14 +1885,11 @@ describe('Oracle leave', () => {
 
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
 
-    oracle.leave(tableAddr, leave).then((rsp) => {
-      const leaveReceipt = 'AYYP.MbNfcKegEU83YmwUt331Ta9JbUekitk0hQfcPYUy524=.ZQjT+vteFSjxrh0nNEhcwnLIrWuJBmdlTWk2ujcK41U=.G93u/wARIjMAAAAC876sMMSY2eJoZfNPyqV9u5NbDXQ=';
-      expect(rsp).to.eql({ leaveReceipt });
+    oracle.leave(tableAddr, leave).then(() => {
       const seat = {
         address: P1_ADDR,
         exitHand: 2,
         sitout: 1,
-        leaveReceipt,
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
       done();

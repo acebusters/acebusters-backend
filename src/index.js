@@ -1,6 +1,6 @@
 import EWT from 'ethereum-web-token';
 import ethUtil from 'ethereumjs-util';
-import { PokerHelper, Receipt } from 'poker-helper';
+import { PokerHelper } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
 const TableManager = function TableManager(db, contract, receiptCache, oraclePriv) {
@@ -345,7 +345,6 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
 TableManager.prototype.leave = function leave(tableAddr, ewt) {
   let hand;
   let pos = -1;
-  let leaveReceipt;
   const receipt = this.rc.get(ewt);
   const handId = receipt.values[0];
   // check if this hand exists
@@ -364,25 +363,20 @@ TableManager.prototype.leave = function leave(tableAddr, ewt) {
         break;
       }
     }
-    if (pos < 0) {
+    if (pos < 0 || !hand.lineup[pos]) {
       throw new Forbidden(`address ${receipt.signer} not in lineup.`);
     }
     // check signer not submitting another leave receipt
-    if (hand.lineup[pos] && hand.lineup[pos].exitHand) {
+    if (hand.lineup[pos].exitHand) {
       throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} already set.`);
     }
-    leaveReceipt = new Receipt(tableAddr).leave(handId, receipt.signer).sign(this.oraclePriv);
-    // put leave receipt into lineup and set exitHand
-    if (!hand.lineup[pos]) {
-      hand.lineup[pos] = {};
-    }
-    hand.lineup[pos].leaveReceipt = leaveReceipt;
+    // set exitHand
     hand.lineup[pos].exitHand = receipt.values[0];
     if (receipt.values[0] < hand.handId) {
       hand.lineup[pos].sitout = 1;
     }
     return this.db.updateLeave(tableAddr, hand.handId, hand.lineup[pos], pos);
-  }).then(() => Promise.resolve({ leaveReceipt }));
+  });
 };
 
 TableManager.prototype.netting = function netting(tableAddr, handIdStr, nettingSig) {
