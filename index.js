@@ -2,18 +2,26 @@ import Web3 from 'web3';
 import doc from 'dynamodb-doc';
 import { ReceiptCache } from 'poker-helper';
 import Raven from 'raven';
+import Pusher from 'pusher';
 
 import Db from './src/db';
 import TableContract from './src/tableContract';
 import TableManager from './src/index';
 
+var pusher = new Pusher({
+  appId: '314687',
+  key: 'd4832b88a2a81f296f53',
+  secret: 'f8e280d370f8870fcfaa',
+  cluster: 'eu',
+  encrypted: true
+});
 
 let web3;
 const dynamo = new doc.DynamoDB();
 const rc = new ReceiptCache();
 
 const handleError = function handleError(err, callback) {
-  Raven.captureException(err, { server_name: 'account_service' }, (sendErr) => {
+  Raven.captureException(err, { server_name: 'oracle-cashgame' }, (sendErr) => {
     if (sendErr) {
       console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
       callback(sendErr);
@@ -38,7 +46,7 @@ exports.handler = function handler(event, context, callback) {
 
   let handleRequest;
   const manager = new TableManager(new Db(dynamo),
-    new TableContract(web3), rc, process.env.ORACLE_PRIV);
+    new TableContract(web3), rc, process.env.ORACLE_PRIV, pusher);
   const path = event.context['resource-path'];
   const tableAddr = event.params.path.tableAddr;
   const handId = event.params.path.handId;
@@ -51,6 +59,8 @@ exports.handler = function handler(event, context, callback) {
       handleRequest = manager.netting(tableAddr, handId, event.nettingSig);
     } else if (path.indexOf('hand') > -1) {
       handleRequest = manager.getHand(tableAddr, handId);
+    } else if (path.indexOf('message') > -1) {
+      handleRequest = manager.handleMessage(event.msgReceipt);
     } else if (path.indexOf('config') > -1) {
       handleRequest = manager.getConfig(event['stage-variables']);
     } else if (path.indexOf('show') > -1) {

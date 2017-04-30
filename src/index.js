@@ -1,9 +1,10 @@
 import EWT from 'ethereum-web-token';
 import ethUtil from 'ethereumjs-util';
-import { PokerHelper } from 'poker-helper';
+import 'buffer-v6-polyfill';
+import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
-const TableManager = function TableManager(db, contract, receiptCache, oraclePriv) {
+const TableManager = function TableManager(db, contract, receiptCache, oraclePriv, pusher) {
   this.db = db;
   this.rc = receiptCache;
   this.helper = new PokerHelper(this.rc);
@@ -13,7 +14,19 @@ const TableManager = function TableManager(db, contract, receiptCache, oraclePri
     const priv = new Buffer(oraclePriv.replace('0x', ''), 'hex');
     this.oracleAddr = `0x${ethUtil.privateToAddress(priv).toString('hex')}`;
   }
+  this.pusher = pusher;
 };
+
+TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
+  return new Promise((fulfill, reject) => {
+    try {
+      const rsp = this.pusher.trigger(topic, 'update', msg);
+      fulfill(rsp);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
 
 TableManager.prototype.getConfig = function getConfig(stageVars) {
   return Promise.resolve({
@@ -53,6 +66,25 @@ TableManager.prototype.getHand = function getHand(tableAddr, handIdStr) {
       hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting,
     ),
   ));
+};
+
+TableManager.prototype.handleMessage = function handleMessage(msgReceipt) {
+  let msg;
+  try {
+    msg = Receipt.parse(msgReceipt);
+  } catch (err) {
+    throw new Unauthorized(`invalid message receipt ${msgReceipt}`);
+  }
+  if (msg.type !== Type.MESSAGE) {
+    throw new BadRequest(`receipt type ${msg.type} not allowed.`);
+  }
+  return this.db.getLastHand(msg.tableAddr).then((hand) => {
+    const pos = this.helper.inLineup(msg.signer, hand.lineup);
+    if (pos < 0) {
+      throw new Forbidden(`address ${msg.signer} not in lineup.`);
+    }
+    return this.publishUpdate(msg.tableAddr, msgReceipt);
+  });
 };
 
 TableManager.prototype.pay = function pay(tableAddr, ewt) {

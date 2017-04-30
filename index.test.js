@@ -5,6 +5,7 @@ import EWT from 'ethereum-web-token';
 import { ReceiptCache } from 'poker-helper';
 import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
+import { Receipt } from 'poker-helper';
 import Oracle from './src/index';
 import Db from './src/db';
 import TableContract from './src/tableContract';
@@ -79,6 +80,10 @@ const contract = {
   smallBlind: {
     call() {},
   },
+};
+
+const pusher = {
+  trigger: function(){}
 };
 
 const rc = new ReceiptCache();
@@ -2008,5 +2013,69 @@ describe('Oracle timing', () => {
   afterEach(() => {
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+  });
+});
+
+describe('Oracle messaging', () => {
+  it('allow to post message.', (done) => {
+    const msgReceipt = new Receipt(tableAddr).message('testMsg').sign(P1_KEY);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      lineup: [{
+        address: P1_ADDR,
+      }, {
+        address: EMPTY_ADDR,
+      }],
+    }] });
+    sinon.stub(pusher, 'trigger').returns(null);
+    const oracle = new Oracle(new Db(dynamo), null, null, null, pusher);
+    oracle.handleMessage(msgReceipt).then(() => {
+      expect(pusher.trigger).callCount(1);
+      expect(pusher.trigger).calledWith(tableAddr, 'update', msgReceipt);
+      done();
+    }).catch(done);
+  });
+
+  it('prevent invalid messages.', () => {
+    const invalidReceipt = 'KQ10.iSuPOR8qKErzme54FxE+IvyLrcy46rP2w/fbxVtLuEA=';
+    try {
+      new Oracle().handleMessage(invalidReceipt);
+    } catch (err) {
+      expect(err.message).to.contain('Unauthorized: invalid message');
+      return;
+    }
+    throw new Error('should have thrown');
+  });
+
+  it('prevent non-message receipts.', () => {
+    const rakeReq = new Receipt(tableAddr).rakeRequest(17).sign(P1_KEY);
+    try {
+      new Oracle().handleMessage(rakeReq);
+    } catch (err) {
+      expect(err.message).to.contain('Bad Request: receipt type');
+      return;
+    }
+    throw new Error('should have thrown');
+  });
+
+  it('prevent message signer not in lineup.', (done) => {
+    const msgReceipt = new Receipt(tableAddr).message('testMsg').sign(P1_KEY);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      lineup: [{
+        address: P2_ADDR,
+      }, {
+        address: EMPTY_ADDR,
+      }],
+    }] });
+    const oracle = new Oracle(new Db(dynamo));
+
+    oracle.handleMessage(msgReceipt).catch((err) => {
+      expect(err.message).to.contain(`Forbidden: address ${P1_ADDR} not in lineup.`);
+      done();
+    }).catch(done);;
+  });
+
+  afterEach(() => {
+    if (pusher.trigger.restore) pusher.trigger.restore();
+    if (dynamo.query.restore) dynamo.query.restore();
   });
 });
