@@ -932,10 +932,10 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.create, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(null, new Factory(web3, '0x1255', '0x1234'), null, null, sentry);
+    const worker = new EventWorker(null, new Factory(web3, '0x1255', '0x1234'), null, null, sentry, null, ORACLE_PRIV);
     Promise.all(worker.process(event)).then((rsp) => {
       expect(rsp[0]).to.eql('0x123456');
-      expect(contract.create.sendTransaction).calledWith(P1_ADDR, '0x1255', 259200, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(contract.create.sendTransaction).calledWith(P1_ADDR, ORACLE_ADDR, 259200, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match.any, {
         extra: { accountId: 'someuuid', signerAddr: P1_ADDR },
         level: 'info',
