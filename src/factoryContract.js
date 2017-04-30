@@ -23,10 +23,10 @@ FactoryContract.prototype.getAccount = function getAccount(signerAddr) {
   });
 };
 
-FactoryContract.prototype.createAccount = function createAccount(signerAddr) {
+FactoryContract.prototype.createAccount = function createAccount(signerAddr, recoveryAddr) {
   const contract = this.web3.eth.contract(FACTORY_ABI).at(this.factoryAddr);
   return new Promise((fulfill, reject) => {
-    contract.create.sendTransaction(signerAddr, this.senderAddr, 259200,
+    contract.create.sendTransaction(signerAddr, recoveryAddr, 259200,
       { from: this.senderAddr, gas: 2000000 },
       (err, val) => {
         if (err) {

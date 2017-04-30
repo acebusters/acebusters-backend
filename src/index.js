@@ -102,7 +102,7 @@ EventWorker.prototype.process = function process(msg) {
 
   // react to new wallet. deploy proxy and controller on the chain.
   if (msgType === 'WalletCreated') {
-    tasks.push(this.factory.createAccount(msgBody.signerAddr));
+    tasks.push(this.factory.createAccount(msgBody.signerAddr, this.recoveryAddr));
     tasks.push(this.log(`WalletCreated: ${msgBody.signerAddr}`, {
       user: {
         id: msgBody.signerAddr,
