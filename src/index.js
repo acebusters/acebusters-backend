@@ -172,7 +172,7 @@ EventWorker.prototype.walletReset = function walletReset(oldAddr, newAddr) {
   let recoveryReceipt;
   return this.factory.getAccount(oldAddr).then((rsp) => {
     recoveryReceipt = new Receipt(rsp.controller)
-      .recover(rsp.lastNonce, newAddr).sign(this.recoveryPriv);
+      .recover(rsp.lastNonce + 1, newAddr).sign(this.recoveryPriv);
     const recoveryHex = Receipt.parseToParams(recoveryReceipt);
     return this.controller.changeSigner(rsp.controller, recoveryHex);
   }).then(txHash => this.log(`tx: controller.changeSigner(${oldAddr}, ${newAddr})`, {

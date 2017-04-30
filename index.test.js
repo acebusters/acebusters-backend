@@ -957,7 +957,7 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.getAccount, 'call').yields(null, ['0x1122', contrAddr, new BigNumber(5)]);
     sinon.stub(contract.changeSigner, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    const recoveryReceipt = new Receipt(contrAddr).recover(5, P2_ADDR).sign(ORACLE_PRIV);
+    const recoveryReceipt = new Receipt(contrAddr).recover(6, P2_ADDR).sign(ORACLE_PRIV);
     const recoveryHex = Receipt.parseToParams(recoveryReceipt);
 
     const worker = new EventWorker(null, new Factory(web3, '0x1255', '0x1234'),
