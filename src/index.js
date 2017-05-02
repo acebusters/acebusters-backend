@@ -99,8 +99,19 @@ StreamScanner.prototype.process = function process(record) {
   }
 
   // check hand complete
-  if (ph.isHandComplete(newHand.lineup, newHand.dealer, newHand.state) === true &&
-    ( !oldHand.lineup || ph.isHandComplete(oldHand.lineup, oldHand.dealer, oldHand.state) === false )) {
+  let newHandComplete = false;
+  let oldHandComplete = false;
+  try {
+    oldHandComplete = ph.isHandComplete(oldHand.lineup, oldHand.dealer, oldHand.state);
+    newHandComplete = ph.isHandComplete(newHand.lineup, newHand.dealer, newHand.state);
+  } catch (err) {
+    try {
+      newHandComplete = ph.isHandComplete(newHand.lineup, newHand.dealer, newHand.state);
+    } catch (err) {
+      // give up
+    }
+  }
+  if (newHandComplete === true && oldHandComplete === false) {
     tasks.push(this.notify('HandComplete::'+keys.tableAddr, {
       tableAddr: keys.tableAddr,
       handId: newHand.handId

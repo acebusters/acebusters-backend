@@ -52,7 +52,7 @@
     "babel-runtime": "^6.11.6",
     "dynamodb-data-types": "^3.0.0",
     "ethereum-web-token": "^0.1.11",
-    "poker-helper": "^0.3.15",
+    "poker-helper": "^0.3.16",
     "pusher": "^1.5.1",
     "raven": "^1.2.0",
     "utf8": "^2.1.2"
