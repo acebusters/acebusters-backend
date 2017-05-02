@@ -13,7 +13,7 @@ let dynamo;
 
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL, {
-    serverName: 'event-worker',
+    server_name: 'event-worker',
   }).install();
 
   if (event.Records && event.Records instanceof Array) {

@@ -376,6 +376,9 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     }
     return Promise.all(hands);
   }).then((hands) => {
+    if (hands.length === 0) {
+      return Promise.resolve('netting not needed');
+    }
     // prevent overwriting netting
     if (hands[hands.length - 1].netting) {
       return Promise.resolve('netting already found');
