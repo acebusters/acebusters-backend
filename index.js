@@ -1,49 +1,52 @@
 import AWS from 'aws-sdk';
 import Pusher from 'pusher';
 import { ReceiptCache } from 'poker-helper';
-
+import Raven from 'raven';
 import StreamWorker from './src/index';
 
-var pusher = new Pusher({
+const pusher = new Pusher({
   appId: '314687',
   key: 'd4832b88a2a81f296f53',
   secret: 'f8e280d370f8870fcfaa',
   cluster: 'eu',
-  encrypted: true
+  encrypted: true,
 });
 
-const Raven = require('raven');
-var rc = new ReceiptCache();
+const rc = new ReceiptCache();
 
-exports.handler = function(event, context, callback) {
-  Raven.config('https://8c3e021848b247ddaf627c8040f94e07:5f8ebc3e39a84b36b56cd68f401fa830@sentry.io/153017').install(function() {
-    callback(null, 'This is thy sheath; there rust, and let me die.');
+const handleError = function handleError(err, callback) {
+  Raven.captureException(err, (sendErr) => {
+    if (sendErr) {
+      console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
+      callback(sendErr);
+      return;
+    }
+    callback(null, err);
   });
+};
+
+exports.handler = function handler(event, context, callback) {
+  Raven.config(process.env.SENTRY_URL, {
+    server_name: 'stream-scanner',
+  }).install();
 
   if (event.Records && event.Records instanceof Array) {
-
-    var requests = [];
-    var worker = new StreamWorker(new AWS.SNS(), process.env.TOPIC_ARN, pusher, rc, Raven);
-    for (var i = 0; i < event.Records.length; i++) {
-      requests.push(worker.process(event.Records[i]));
+    const requests = [];
+    const worker = new StreamWorker(new AWS.SNS(), process.env.TOPIC_ARN, pusher, rc, Raven);
+    try {
+      for (let i = 0; i < event.Records.length; i += 1) {
+        requests.push(worker.process(event.Records[i]));
+      }
+    } catch (err) {
+      handleError(err, callback);
     }
-    Promise.all(requests).then(function(data) {
-      console.log(JSON.stringify(data));
+    Promise.all(requests).then((data) => {
       callback(null, data);
-    }).catch(function(err) {
-      Raven.captureException(err, function (sendErr, eventId) {
-        if (sendErr) {
-          console.log('Failed to send captured exception to Sentry');
-          console.log(JSON.stringify(sendErr));
-          callback(sendErr);
-          return;
-        }
-        callback(null, err);
-      });
+    }).catch((err) => {
+      handleError(err, callback);
     });
   } else {
-    console.log('Request received:\n', JSON.stringify(event));
-    console.log('Context received:\n', JSON.stringify(context));
+    console.log('Request received:\n', JSON.stringify(event));  // eslint-disable-line no-console
     callback(null, 'no action taken.');
   }
-}
+};
