@@ -1,26 +1,36 @@
-const AWS = require('aws-sdk');
-const Db = require('./lib/db.js');
-const ScanManager = require('./lib/scanner.js');
-const Contract = require('./lib/contract.js');
+import AWS from 'aws-sdk';
+import Web3 from 'web3';
+import Raven from 'raven';
+import Db from './src/db';
+import ScanManager from './src/scanner';
+import Table from './src/tableContract';
+import Factory from './src/factoryContract';
 
-const Web3 = require('web3');
 const web3 = new Web3();
-
 const simpledb = new AWS.SimpleDB();
 
-exports.handler = function(event, context, callback) {
+exports.handler = function handler(event, context, callback) {
   context.callbackWaitsForEmptyEventLoop = false;
+  const providerUrl = process.env.PROVIDER_URL;
+  const factoryAddr = process.env.FACTORY_ADDR;
+  const topicArn = process.env.TOPIC_ARN;
 
-  if (!event.providerUrl || !event.contractSet)
-    callback('Bad Request: provider or set name not provided');
+  web3.setProvider(new web3.providers.HttpProvider(providerUrl));
 
-  web3.setProvider(new web3.providers.HttpProvider(event.providerUrl));
+  const manager = new ScanManager(new Db(simpledb, 'ab-accounts'),
+    new Table(web3), new AWS.SNS(), new Factory(web3, factoryAddr), topicArn);
 
-  var manager = new ScanManager(new Db(simpledb, process.env.SDB_DOMAIN), new Contract(web3), new AWS.SNS());
-
-  manager.scan(event.contractSet).then(function(data){
+  manager.scan(event.contractSet).then((data) => {
     callback(null, data);
-  }).catch(function(err){
-    callback(err);
+  }).catch((err) => {
+    Raven.captureException(err, { server_name: 'contract-scanner' }, (sendErr) => {
+      if (sendErr) {
+        console.log('Failed to send captured exception to Sentry');
+        console.log(JSON.stringify(sendErr));
+        callback(sendErr);
+        return;
+      }
+      callback(null, err);
+    });
   });
-}
+};
