@@ -48,7 +48,7 @@ ScanManager.prototype.log = function log(message, context) {
 ScanManager.prototype.callTimeout = function callTimeout(tableAddr) {
   return new Promise((fulfill, reject) => {
     this.request.post({
-      url: `evm4rumeob.execute-api.eu-west-1.amazonaws.com/v0/table/${tableAddr}/timeout`,
+      url: `https://evm4rumeob.execute-api.eu-west-1.amazonaws.com/v0/table/${tableAddr}/timeout`,
       json: true,
     }, (error, response) => {
       if (error) {
