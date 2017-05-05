@@ -26,7 +26,7 @@ TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
       reject(err);
     }
   });
-}
+};
 
 TableManager.prototype.getConfig = function getConfig(stageVars) {
   return Promise.resolve({
@@ -235,7 +235,6 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
 TableManager.prototype.updateState = function updateState(tableAddr, handParam, pos) {
   const hand = handParam;
   const changed = Math.floor(Date.now() / 1000);
-  const max = this.helper.getMaxBet(hand.lineup, hand.state);
   const bettingComplete = this.helper.isBettingDone(hand.lineup,
     hand.dealer, hand.state, hand.sb * 2);
   const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
@@ -259,13 +258,13 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
     if (hand.state === 'waiting') {
       hand.state = 'dealing';
     }
-    streetMaxBet = max.amount;
+    streetMaxBet = this.helper.getMaxBet(hand.lineup, hand.state).amount;
   }
 
   // take care of all-in
   const activePlayerCount = this.helper.countActivePlayers(hand.lineup, hand.state);
   const allInPlayerCount = this.helper.countAllIn(hand.lineup);
-  if (bettingComplete && activePlayerCount === 1 && allInPlayerCount > 0) {
+  if (bettingComplete && activePlayerCount <= 1 && allInPlayerCount > 0) {
     hand.state = 'showdown';
   }
   // update db

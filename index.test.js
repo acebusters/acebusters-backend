@@ -2,10 +2,9 @@ import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
 import EWT from 'ethereum-web-token';
-import { ReceiptCache } from 'poker-helper';
 import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
-import { Receipt } from 'poker-helper';
+import { Receipt, ReceiptCache } from 'poker-helper';
 import Oracle from './src/index';
 import Db from './src/db';
 import TableContract from './src/tableContract';
@@ -83,7 +82,7 @@ const contract = {
 };
 
 const pusher = {
-  trigger: function(){}
+  trigger() {},
 };
 
 const rc = new ReceiptCache();
@@ -2010,6 +2009,29 @@ describe('Oracle timing', () => {
     }).catch(done);
   });
 
+  it('should handle sitout on waiting state.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 12,
+      dealer: 0,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR,
+      }, {
+        address: P2_ADDR,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    oracle.timeout(tableAddr).then(() => {
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
+        address: P1_ADDR,
+        sitout: sinon.match.number,
+      })));
+      done();
+    }).catch(done);
+  });
+
   afterEach(() => {
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
@@ -2071,7 +2093,7 @@ describe('Oracle messaging', () => {
     oracle.handleMessage(msgReceipt).catch((err) => {
       expect(err.message).to.contain(`Forbidden: address ${P1_ADDR} not in lineup.`);
       done();
-    }).catch(done);;
+    }).catch(done);
   });
 
   afterEach(() => {

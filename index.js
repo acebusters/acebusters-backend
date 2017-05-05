@@ -8,12 +8,12 @@ import Db from './src/db';
 import TableContract from './src/tableContract';
 import TableManager from './src/index';
 
-var pusher = new Pusher({
+const pusher = new Pusher({
   appId: '314687',
   key: 'd4832b88a2a81f296f53',
   secret: 'f8e280d370f8870fcfaa',
   cluster: 'eu',
-  encrypted: true
+  encrypted: true,
 });
 
 let web3;
