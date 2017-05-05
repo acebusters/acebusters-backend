@@ -2032,6 +2032,50 @@ describe('Oracle timing', () => {
     }).catch(done);
   });
 
+  it('should kick last player in lineup.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 12,
+      dealer: 0,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR,
+      }, {
+        address: EMPTY_ADDR,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    oracle.timeout(tableAddr).then(() => {
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
+        address: P1_ADDR,
+        sitout: sinon.match.number,
+      })));
+      done();
+    }).catch(done);
+  });
+
+  it('should not kick last player in lineup if not timed out.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 12,
+      dealer: 0,
+      changed: Math.floor(Date.now() / 1000) - 20,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR,
+      }, {
+        address: EMPTY_ADDR,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    oracle.timeout(tableAddr).catch((err) => {
+      expect(err.message).to.contain('second to act');
+      done();
+    }).catch(done);
+  });
+
   afterEach(() => {
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();

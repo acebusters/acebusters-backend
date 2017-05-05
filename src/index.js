@@ -454,7 +454,12 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     try {
       pos = this.helper.getWhosTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
     } catch (e) {
-      throw new BadRequest(`could not find next player to act in hand ${hand.handId}`);
+      if (hand.state === 'waiting') {
+        // lineup, startPos, type, state) {
+        pos = this.helper.nextPlayer(hand.lineup, 0, 'active', hand.state);
+      } else {
+        throw new BadRequest(`could not find next player to act in hand ${hand.handId}`);
+      }
     }
 
     const now = Math.floor(Date.now() / 1000);
