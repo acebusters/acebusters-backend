@@ -1,20 +1,22 @@
 
-function ScanManager(sdb, dynamo, contract, sns, sentry) {
-  this.sdb = sdb;
+function ScanManager(factory, table, dynamo, sns, sentry, request, topicArn) {
+  this.factory = factory;
+  this.table = table;
   this.dynamo = dynamo;
-  this.contract = contract;
   this.sns = sns;
   this.sentry = sentry;
+  this.request = request;
+  this.topicArn = topicArn;
 }
 
-ScanManager.prototype.scan = function scan(setId) {
-  const actions = [];
-  return this.sdb.getContractSet(setId).then((set) => {
-    if (!set.addresses || set.addresses.length === 0) {
+ScanManager.prototype.scan = function scan() {
+  return this.factory.getTables().then((set) => {
+    if (!set || set.length === 0) {
       this.log('no contracts to scan');
     }
-    set.addresses.forEach((tableAddr) => {
-      actions.push(this.handleTable(tableAddr, set.topicArn));
+    const actions = [];
+    set.forEach((tableAddr) => {
+      actions.push(this.handleTable(tableAddr));
     });
     return Promise.all(actions);
   });
@@ -43,10 +45,25 @@ ScanManager.prototype.log = function log(message, context) {
   });
 };
 
-ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
-  const lhnProm = this.contract.getLastHandNetted(tableAddr);
-  const lnrProm = this.contract.getLastNettingRequestHandId(tableAddr);
-  const lntProm = this.contract.getLastNettingRequestTime(tableAddr);
+ScanManager.prototype.callTimeout = function callTimeout(tableAddr) {
+  return new Promise((fulfill, reject) => {
+    this.request.post({
+      url: `evm4rumeob.execute-api.eu-west-1.amazonaws.com/v0/table/${tableAddr}/timeout`,
+      json: true,
+    }, (error, response) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      fulfill(response);
+    });
+  });
+};
+
+ScanManager.prototype.handleTable = function handleTable(tableAddr) {
+  const lhnProm = this.table.getLastHandNetted(tableAddr);
+  const lnrProm = this.table.getLastNettingRequestHandId(tableAddr);
+  const lntProm = this.table.getLastNettingRequestTime(tableAddr);
   let lhn;
   let lnr;
   let lnt;
@@ -61,7 +78,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
           // if the dispute period is over
           // send transaction to net up in contract
           const subject = `ProgressNetting::${tableAddr}`;
-          return this.notify({}, subject, topicArn).then(() => this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
+          return this.notify({}, subject).then(() => this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
         }
         return Promise.resolve(null);
         // if dispute period is over since more than 1 hour,
@@ -76,7 +93,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
           tableAddr,
           lastHandNetted: lhn,
           lastNettingRequest: lnr,
-        }, subject, topicArn).then(() => this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
+        }, subject).then(() => this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
       }
     } else {
       // contract is netted up,
@@ -87,7 +104,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
   }).then((rsp) => {
     const results = [];
     if (!rsp || !rsp.handId) {
-      return Promise.resolve(rsp);
+      return this.callTimeout(tableAddr);
     }
     const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
     // check if any of the sitout flags are older than 5 min
@@ -100,7 +117,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
         if (rsp.lineup[i].sitout && typeof rsp.lineup[i].sitout === 'number') {
           if (rsp.lineup[i].sitout < old && rsp.lineup[i].sitout > tooOld) {
             const seat = rsp.lineup[i];
-            results.push(this.notify({ pos: i, tableAddr }, subject, topicArn).then(() => this.log(subject, {
+            results.push(this.notify({ pos: i, tableAddr }, subject).then(() => this.log(subject, {
               tags: { tableAddr },
               user: { id: seat.address },
               extra: { sitout: seat.sitout } })));
@@ -112,18 +129,18 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr, topicArn) {
       // if there are more than 2 hands not netted
       // prepare netting in db
       const subject = `TableNettingRequest::${tableAddr}`;
-      results.push(this.notify({ handId: rsp.handId - 1, tableAddr }, subject, topicArn).then(() => this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: rsp.handId } })));
+      results.push(this.notify({ handId: rsp.handId - 1, tableAddr }, subject).then(() => this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: rsp.handId } })));
     }
     return Promise.all(results);
   });
 };
 
-ScanManager.prototype.notify = function notify(event, subject, topicArn) {
+ScanManager.prototype.notify = function notify(event, subject) {
   return new Promise((fulfill, reject) => {
     this.sns.publish({
       Message: JSON.stringify(event),
       Subject: subject,
-      TopicArn: topicArn,
+      TopicArn: this.topicArn,
     }, (err) => {
       if (err) {
         reject(err);

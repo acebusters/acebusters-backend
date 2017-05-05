@@ -1,21 +1,21 @@
-const expect = require('chai').expect;
-const sinon = require('sinon');
-require('chai').use(require('sinon-chai'));
-const BigNumber = require('bignumber.js');
+import chai, { expect } from 'chai';
+import sinonChai from 'sinon-chai';
+import sinon from 'sinon';
+import { it, describe, afterEach } from 'mocha';
+import BigNumber from 'bignumber.js';
 
-const ScanManager = require('./src/scanner');
-const Sdb = require('./src/sdb.js');
-const Dynamo = require('./src/dynamo.js');
-const Contract = require('./src/tableContract.js');
+import ScanManager from './src/scanner';
+import Dynamo from './src/dynamo';
+import Table from './src/tableContract';
+import Factory from './src/factoryContract';
+
+chai.use(sinonChai);
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P2_ADDR = '0xe10f3d125e5f4c753a6456fc37123cf17c6900f2';
-const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
+const factoryAddr = '0xe10f3d125e5f4c753a6456fc37123cf17c6900f2';
 
-
-const sdb = {
-  getAttributes() {},
-};
+const topicArn = 'arn:aws:sns:eu-west-1:123:ab-events';
 
 const dynamo = {
   query() {},
@@ -29,6 +29,7 @@ const contract = {
   lastHandNetted: { call() {} },
   lastNettingRequestHandId: { call() {} },
   lastNettingRequestTime: { call() {} },
+  getTables: { call() {} },
 };
 
 const web3 = { eth: {
@@ -45,6 +46,10 @@ const sentry = {
   },
 };
 
+const request = {
+  post() {},
+};
+
 const set = {
   id: 'tables',
   addresses: ['0x4C4A59e59172A8369562a3901737d57c84fC9A3C', '0x37a9679c41e99dB270Bda88DE8FF50c0Cd23f326'],
@@ -57,17 +62,15 @@ sinon.stub(web3.eth, 'at').returns(contract);
 describe('Interval Scanner', () => {
   it('should do nothing with fresh netting request', (done) => {
     const now = Math.floor(Date.now() / 1000);
-    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
-      { Name: 'addresses', Value: set.addresses[0] },
-      { Name: 'topicArn', Value: set.topicArn },
-    ] });
+    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(request, 'post').yields(null, {});
 
-    const manager = new ScanManager(new Sdb(sdb), null, new Contract(web3), sns, sentry);
+    const manager = new ScanManager(new Factory(web3, factoryAddr), new Table(web3), null, sns, sentry, request, topicArn);
 
     manager.scan(set.id).then(() => {
       expect(sentry.captureMessage).callCount(0);
@@ -78,17 +81,15 @@ describe('Interval Scanner', () => {
 
   it('should do nothing with netting request older than 1 hour', (done) => {
     const now = Math.floor(Date.now() / 1000);
-    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
-      { Name: 'addresses', Value: set.addresses[0] },
-      { Name: 'topicArn', Value: set.topicArn },
-    ] });
+    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(request, 'post').yields(null, {});
 
-    const manager = new ScanManager(new Sdb(sdb), null, new Contract(web3), sns, sentry);
+    const manager = new ScanManager(new Factory(web3, factoryAddr), new Table(web3), null, sns, sentry, request, topicArn);
 
     manager.scan(set.id).then(() => {
       expect(sentry.captureMessage).callCount(0);
@@ -99,18 +100,15 @@ describe('Interval Scanner', () => {
 
   it('should handle multiple contracts', (done) => {
     const now = Math.floor(Date.now() / 1000) - 3601;
-    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
-      { Name: 'addresses', Value: set.addresses[0] },
-      { Name: 'addresses', Value: set.addresses[1] },
-      { Name: 'topicArn', Value: set.topicArn },
-    ] });
+    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0], set.addresses[1]]);
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(request, 'post').yields(null, {});
 
-    const manager = new ScanManager(new Sdb(sdb), null, new Contract(web3), sns, sentry);
+    const manager = new ScanManager(new Factory(web3, factoryAddr), new Table(web3), null, sns, sentry, request, topicArn);
 
     manager.scan(set.id).then((rsp) => {
       expect(rsp.length).to.eql(2);
@@ -122,19 +120,17 @@ describe('Interval Scanner', () => {
 
   it('should react to mature netting requests', (done) => {
     const now = Math.floor(Date.now() / 1000) - 181;
-    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
-      { Name: 'addresses', Value: set.addresses[0] },
-      { Name: 'topicArn', Value: set.topicArn },
-    ] });
+    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(request, 'post').yields(null, {});
 
-    const manager = new ScanManager(new Sdb(sdb), null, new Contract(web3), sns, sentry);
+    const manager = new ScanManager(new Factory(web3, factoryAddr), new Table(web3), null, sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then((rsp) => {
+    manager.scan(set.id).then(() => {
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(`HandleDispute::${set.addresses[0]}`, {
         level: 'info',
@@ -153,19 +149,17 @@ describe('Interval Scanner', () => {
 
   it('should call net on contract if submission period over', (done) => {
     const now = Math.floor(Date.now() / 1000) - 601;
-    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
-      { Name: 'addresses', Value: set.addresses[0] },
-      { Name: 'topicArn', Value: set.topicArn },
-    ] });
+    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(request, 'post').yields(null, {});
 
-    const manager = new ScanManager(new Sdb(sdb), null, new Contract(web3), sns, sentry);
+    const manager = new ScanManager(new Factory(web3, factoryAddr), new Table(web3), null, sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then((rsp) => {
+    manager.scan(set.id).then(() => {
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(`ProgressNetting::${set.addresses[0]}`, {
         level: 'info',
@@ -184,13 +178,10 @@ describe('Interval Scanner', () => {
 
   it('should initiate new netting requests', (done) => {
     const now = Math.floor(Date.now() / 1000);
-    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
-      { Name: 'addresses', Value: set.addresses[0] },
-      { Name: 'topicArn', Value: set.topicArn },
-    ] });
+    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 8,
-      changed: now
+      changed: now,
     }] });
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
@@ -198,9 +189,9 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(0));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const manager = new ScanManager(new Sdb(sdb), new Dynamo(dynamo), new Contract(web3), sns, sentry);
+    const manager = new ScanManager(new Factory(web3, factoryAddr), new Table(web3), new Dynamo(dynamo), sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then((rsp) => {
+    manager.scan(set.id).then(() => {
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(`TableNettingRequest::${set.addresses[0]}`, {
         level: 'info',
@@ -219,10 +210,7 @@ describe('Interval Scanner', () => {
 
   it('should kick a player', (done) => {
     const now = Math.floor((Date.now() / 1000) - (60 * 10)); // 10 minutes ago
-    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
-      { Name: 'addresses', Value: set.addresses[0] },
-      { Name: 'topicArn', Value: set.topicArn },
-    ] });
+    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 8,
       changed: now,
@@ -239,9 +227,9 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(0));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const manager = new ScanManager(new Sdb(sdb), new Dynamo(dynamo), new Contract(web3), sns, sentry);
+    const manager = new ScanManager(new Factory(web3, factoryAddr), new Table(web3), new Dynamo(dynamo), sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then((rsp) => {
+    manager.scan(set.id).then(() => {
       expect(sentry.captureMessage).callCount(2);
       expect(sentry.captureMessage).calledWith(`TableNettingRequest::${set.addresses[0]}`, {
         level: 'info',
@@ -270,8 +258,9 @@ describe('Interval Scanner', () => {
   });
 
   afterEach(() => {
-    if (sdb.getAttributes.restore) sdb.getAttributes.restore();
     if (sns.publish.restore) sns.publish.restore();
+    if (request.post.restore) request.post.restore();
+    if (contract.getTables.call.restore) contract.getTables.call.restore();
     if (contract.lastHandNetted.call.restore) contract.lastHandNetted.call.restore();
     if (contract.lastNettingRequestHandId.call.restore) contract.lastNettingRequestHandId.call.restore();
     if (contract.lastNettingRequestTime.call.restore) contract.lastNettingRequestTime.call.restore();
