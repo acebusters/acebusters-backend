@@ -1956,7 +1956,7 @@ describe('Oracle timing', () => {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).catch((err) => {
-      expect(err.message).to.contain('second to act');
+      expect(err.message).to.contain('seconds to act');
       done();
     }).catch(done);
   });
@@ -2038,9 +2038,9 @@ describe('Oracle timing', () => {
       dealer: 0,
       state: 'waiting',
       lineup: [{
-        address: P1_ADDR,
-      }, {
         address: EMPTY_ADDR,
+      }, {
+        address: P1_ADDR,
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
@@ -2051,6 +2051,26 @@ describe('Oracle timing', () => {
         address: P1_ADDR,
         sitout: sinon.match.number,
       })));
+      done();
+    }).catch(done);
+  });
+
+  it('should not put empty seat into sitout.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 12,
+      dealer: 0,
+      state: 'waiting',
+      lineup: [{
+        address: EMPTY_ADDR,
+      }, {
+        address: EMPTY_ADDR,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    oracle.timeout(tableAddr).catch((err) => {
+      expect(err.message).to.contain('Bad Request');
       done();
     }).catch(done);
   });
@@ -2071,7 +2091,7 @@ describe('Oracle timing', () => {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).catch((err) => {
-      expect(err.message).to.contain('second to act');
+      expect(err.message).to.contain('seconds to act');
       done();
     }).catch(done);
   });

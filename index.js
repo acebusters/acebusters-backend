@@ -21,20 +21,29 @@ const dynamo = new doc.DynamoDB();
 const rc = new ReceiptCache();
 
 const handleError = function handleError(err, callback) {
-  Raven.captureException(err, { server_name: 'oracle-cashgame' }, (sendErr) => {
-    if (sendErr) {
-      console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
-      callback(sendErr);
-      return;
-    }
-    if (err.errName) {
-      // these are known errors: 4xx
+  if (err.errName) {
+    // these are known errors: 4xx
+    Raven.captureMessage(err, {
+      server_name: 'oracle-cashgame',
+      level: 'warning',
+    }, (sendErr) => {
+      if (sendErr) {
+        console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
+        callback(`Error: ${err.message}`);
+        return;
+      }
       callback(err.message);
-    } else {
-      // this shall map to http 500
+    });
+  } else {
+    Raven.captureException(err, { server_name: 'oracle-cashgame' }, (sendErr) => {
+      if (sendErr) {
+        console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
+        callback(`Error: ${sendErr} - ${err.message}`);
+        return;
+      }
       callback(`Error: ${err.message}`);
-    }
-  });
+    });
+  }
 };
 
 exports.handler = function handler(event, context, callback) {

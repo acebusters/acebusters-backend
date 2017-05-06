@@ -4,6 +4,8 @@ import 'buffer-v6-polyfill';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
+const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
+
 const TableManager = function TableManager(db, contract, receiptCache, oraclePriv, pusher) {
   this.db = db;
   this.rc = receiptCache;
@@ -456,8 +458,9 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     } catch (e) {
       if (hand.state === 'waiting') {
         // lineup, startPos, type, state) {
-        pos = this.helper.nextPlayer(hand.lineup, 0, 'active', hand.state);
-      } else {
+        pos = this.helper.nextPlayer(hand.lineup, 0, 'involved', hand.state);
+      }
+      if (typeof pos === 'undefined' || hand.lineup[pos].address === EMPTY_ADDR) {
         throw new BadRequest(`could not find next player to act in hand ${hand.handId}`);
       }
     }
@@ -465,7 +468,7 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     const now = Math.floor(Date.now() / 1000);
     const leftTime = (hand.changed + 180) - now;
     if (leftTime > 0) {
-      throw new BadRequest(`player ${pos} still got ${leftTime} second to act.`);
+      throw new BadRequest(`player ${pos} still got ${leftTime} seconds to act.`);
     }
     hand.lineup[pos].sitout = now;
     return this.updateState(tableAddr, hand, pos);
