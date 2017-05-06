@@ -24,6 +24,7 @@
   "dependencies": {
     "aws-sdk": "^2.22.0",
     "raven": "^1.2.1",
+    "babel-runtime": "^6.11.6",
     "web3": "^0.18.2"
   },
   "devDependencies": {

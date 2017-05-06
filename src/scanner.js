@@ -12,11 +12,9 @@ ScanManager.prototype.scan = function scan(setId) {
   const tfProm = this.factory.getTables();
   let set;
   let lastBlock;
-  let topicArn;
   let blockNumber;
   return Promise.all([dbProm, tfProm]).then((rsp) => {
     lastBlock = rsp[0].lastBlock;
-    topicArn = rsp[0].topicArn;
     set = rsp[1];
     if (!set || set.length === 0) {
       return Promise.reject('no contracts to scan');
@@ -42,7 +40,7 @@ ScanManager.prototype.scan = function scan(setId) {
     all.forEach((event) => {
       if (event) {
         const subj = `ContractEvent::${event.address}`;
-        dispatches.push(this.notify(event, subj, topicArn));
+        dispatches.push(this.notify(event, subj));
       }
     });
     return Promise.all(dispatches);
@@ -56,12 +54,12 @@ ScanManager.prototype.scan = function scan(setId) {
   });
 };
 
-ScanManager.prototype.notify = function notify(event, subject, topicArn) {
+ScanManager.prototype.notify = function notify(event, subject) {
   return new Promise((fulfill, reject) => {
     this.sns.publish({
       Message: JSON.stringify(event),
       Subject: subject,
-      TopicArn: topicArn,
+      TopicArn: this.topicArn,
     }, (err) => {
       if (err) {
         reject(err);

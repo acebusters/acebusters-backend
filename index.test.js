@@ -152,7 +152,8 @@ describe('Contract Event Scanner', () => {
     sinon.stub(web3.eth, 'getBlockNumber').yields(null, newBlock);
     sinon.stub(filter, 'get').yields(null, []).onFirstCall().yields(null, [event1]);
 
-    const manager = new ScanManager(new Db(sdb), new Table(web3), sns, new Factory(web3, '0x999999'));
+    const manager = new ScanManager(new Db(sdb), new Table(web3),
+      sns, new Factory(web3, '0x999999'), set.topicArn);
 
     manager.scan(set.id).then(() => {
       expect(contract.allEvents).calledWith({
@@ -186,7 +187,8 @@ describe('Contract Event Scanner', () => {
     sinon.stub(web3.eth, 'getBlockNumber').yields(null, newBlock);
     sinon.stub(filter, 'get').yields(null, []).onFirstCall().yields(null, [event1, event2]);
 
-    const manager = new ScanManager(new Db(sdb), new Table(web3), sns, new Factory(web3, '0x999999'));
+    const manager = new ScanManager(new Db(sdb), new Table(web3),
+      sns, new Factory(web3, '0x999999'), set.topicArn);
 
     manager.scan(set.id).then(() => {
       expect(contract.allEvents).calledWith({
@@ -225,7 +227,8 @@ describe('Contract Event Scanner', () => {
     sinon.stub(web3.eth, 'getBlockNumber').yields(null, newBlock);
     sinon.stub(filter, 'get').yields(null, [event3]).onFirstCall().yields(null, [event1, event2]);
 
-    const manager = new ScanManager(new Db(sdb), new Table(web3), sns, new Factory(web3, '0x999999'));
+    const manager = new ScanManager(new Db(sdb), new Table(web3),
+      sns, new Factory(web3, '0x999999'), set.topicArn);
 
     manager.scan(set.id).then(() => {
       expect(contract.allEvents).calledWith({

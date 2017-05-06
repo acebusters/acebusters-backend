@@ -18,23 +18,11 @@ Db.prototype.getContractSet = function getContractSet(setId) {
         return;
       }
       const rv = {
-        addresses: [],
-        topicArn: '',
-        contractAbi: [],
         lastBlock: 0,
       };
       data.Attributes.forEach((aPair) => {
         if (aPair.Name === 'lastBlock') {
           rv.lastBlock = parseInt(aPair.Value, 10);
-        }
-        if (aPair.Name === 'topicArn') {
-          rv.topicArn = aPair.Value;
-        }
-        if (aPair.Name === 'contractAbi') {
-          rv.contractAbi = aPair.Value;
-        }
-        if (aPair.Name === 'addresses') {
-          rv.addresses.push(aPair.Value);
         }
       });
       fulfill(rv);

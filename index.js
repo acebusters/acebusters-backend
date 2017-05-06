@@ -10,6 +10,7 @@ const web3 = new Web3();
 const simpledb = new AWS.SimpleDB();
 
 exports.handler = function handler(event, context, callback) {
+  Raven.config(process.env.SENTRY_URL).install();
   context.callbackWaitsForEmptyEventLoop = false;
   const providerUrl = process.env.PROVIDER_URL;
   const factoryAddr = process.env.FACTORY_ADDR;
@@ -17,7 +18,7 @@ exports.handler = function handler(event, context, callback) {
 
   web3.setProvider(new web3.providers.HttpProvider(providerUrl));
 
-  const manager = new ScanManager(new Db(simpledb, 'ab-accounts'),
+  const manager = new ScanManager(new Db(simpledb, 'ab-event-contracts'),
     new Table(web3), new AWS.SNS(), new Factory(web3, factoryAddr), topicArn);
 
   manager.scan(event.contractSet).then((data) => {
