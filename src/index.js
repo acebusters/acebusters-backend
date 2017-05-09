@@ -535,7 +535,7 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
   if (!hand.deck) {
     return Promise.reject(`hand ${hand} at table ${tableAddr} invalid.`);
   }
-  const boardCards = hand.deck.slice(21, 26);
+  const boardCards = hand.deck.slice(20, 25);
   const rakePerMil = 10;
   const winners = this.helper.calcDistribution(hand.lineup,
     hand.state, boardCards, rakePerMil, this.oracleAddr);
