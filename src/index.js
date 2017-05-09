@@ -237,8 +237,13 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
 TableManager.prototype.updateState = function updateState(tableAddr, handParam, pos) {
   const hand = handParam;
   const changed = Math.floor(Date.now() / 1000);
-  const bettingComplete = this.helper.isBettingDone(hand.lineup,
+  let bettingComplete = false;
+  try {
+    bettingComplete = this.helper.isBettingDone(hand.lineup,
     hand.dealer, hand.state, hand.sb * 2);
+  } catch (err) {
+    // probably someone hit sitout
+  }
   const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
   let streetMaxBet;
   if (bettingComplete && !handComplete) {
