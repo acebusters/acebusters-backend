@@ -52,11 +52,10 @@ const P4_KEY = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2c
 const tableAddr = '0x00112233445566778899aabbccddeeff00112233';
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
-const ORACLE_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
-
 const deck = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
   11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25];
 const bn0 = new BigNumber(0);
+const timeoutPeriod = 120;
 
 const dynamo = {
   getItem() {},
@@ -1419,7 +1418,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, timeoutPeriod);
 
     const fold = new EWT(ABI_FOLD).fold(1, 50).sign(P1_KEY);
 
@@ -1712,7 +1711,7 @@ describe('Oracle show', () => {
     } });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, timeoutPeriod);
 
     const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
@@ -1741,7 +1740,7 @@ describe('Oracle show', () => {
         13, 14, 15, 22, 17, 18, 19, 20, 21, 36, 23, 24, 25],
     } });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, timeoutPeriod);
 
     const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
     oracle.show(tableAddr, show, [12, 11]).then(() => {
@@ -1853,7 +1852,7 @@ describe('Oracle show', () => {
     } });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), null, rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), null, rc, timeoutPeriod);
 
     const show = new EWT(ABI_SHOW).show(1, 100).sign(P1_KEY);
 
@@ -1901,7 +1900,7 @@ describe('Oracle leave', () => {
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, timeoutPeriod);
 
     oracle.leave(tableAddr, leave).then(() => {
       const seat = {
@@ -1925,7 +1924,7 @@ describe('Oracle leave', () => {
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, ORACLE_PRIV);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, timeoutPeriod);
 
     oracle.leave(tableAddr, leave).then(() => {
       const seat = {

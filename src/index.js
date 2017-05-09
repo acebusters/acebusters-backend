@@ -6,17 +6,15 @@ import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './error
 
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
-const TableManager = function TableManager(db, contract, receiptCache, oraclePriv, pusher) {
+const TableManager = function TableManager(db, contract, receiptCache,
+  timeoutPeriod, pusher, providerUrl) {
   this.db = db;
   this.rc = receiptCache;
   this.helper = new PokerHelper(this.rc);
   this.contract = contract;
-  if (oraclePriv) {
-    this.oraclePriv = oraclePriv;
-    const priv = new Buffer(oraclePriv.replace('0x', ''), 'hex');
-    this.oracleAddr = `0x${ethUtil.privateToAddress(priv).toString('hex')}`;
-  }
   this.pusher = pusher;
+  this.providerUrl = providerUrl;
+  this.timeoutPeriod = (timeoutPeriod) || 60;
 };
 
 TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
@@ -30,10 +28,10 @@ TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
   });
 };
 
-TableManager.prototype.getConfig = function getConfig(stageVars) {
+TableManager.prototype.getConfig = function getConfig() {
   return Promise.resolve({
-    tableContracts: stageVars.tableContracts.split(','),
-    providerUrl: stageVars.providerUrl,
+    providerUrl: this.providerUrl,
+    timeout: this.timeoutPeriod,
   });
 };
 
@@ -471,7 +469,7 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const leftTime = (hand.changed + 180) - now;
+    const leftTime = (hand.changed + this.timeoutPeriod) - now;
     if (leftTime > 0) {
       throw new BadRequest(`player ${pos} still got ${leftTime} seconds to act.`);
     }

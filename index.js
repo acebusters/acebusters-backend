@@ -47,15 +47,20 @@ const handleError = function handleError(err, callback) {
 };
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL).install();
+  const providerUrl = event['stage-variables'].providerUrl;
+  const sentryUrl = process.env.SENTRY_URL;
+  const timeout = process.env.TIMEOUT;
+
+  Raven.config(sentryUrl).install();
 
   if (typeof web3 === 'undefined') {
-    web3 = new Web3(new Web3.providers.HttpProvider(event['stage-variables'].providerUrl));
+    web3 = new Web3(new Web3.providers.HttpProvider(providerUrl));
   }
 
+
   let handleRequest;
-  const manager = new TableManager(new Db(dynamo),
-    new TableContract(web3), rc, process.env.ORACLE_PRIV, pusher);
+  const manager = new TableManager(new Db(dynamo), new TableContract(web3), rc,
+    timeout, pusher, providerUrl);
   const path = event.context['resource-path'];
   const tableAddr = event.params.path.tableAddr;
   const handId = event.params.path.handId;
@@ -63,7 +68,7 @@ exports.handler = function handler(event, context, callback) {
     if (path.indexOf('pay') > -1) {
       handleRequest = manager.pay(tableAddr, event.params.header.Authorization);
     } else if (path.indexOf('info') > -1) {
-      handleRequest = manager.info(tableAddr, event['stage-variables'].tableContracts);
+      handleRequest = manager.info(tableAddr);
     } else if (path.indexOf('netting') > -1) {
       handleRequest = manager.netting(tableAddr, handId, event.nettingSig);
     } else if (path.indexOf('hand') > -1) {
@@ -71,7 +76,7 @@ exports.handler = function handler(event, context, callback) {
     } else if (path.indexOf('message') > -1) {
       handleRequest = manager.handleMessage(event.msgReceipt);
     } else if (path.indexOf('config') > -1) {
-      handleRequest = manager.getConfig(event['stage-variables']);
+      handleRequest = manager.getConfig();
     } else if (path.indexOf('show') > -1) {
       handleRequest = manager.show(tableAddr, event.params.header.Authorization, event.cards);
     } else if (path.indexOf('leave') > -1) {
