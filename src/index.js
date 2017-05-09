@@ -29,11 +29,11 @@ const shuffle = function shuffle() {
   return array;
 };
 
-const EventWorker = function EventWorker(table,
-  factory, db, oraclePriv, sentry, controller, recoveryPriv) {
+function EventWorker(table, factory, db, oraclePriv, sentry, controller, nutz, recoveryPriv) {
   this.table = table;
   this.factory = factory;
   this.controller = controller;
+  this.nutz = nutz;
   this.db = db;
   if (oraclePriv) {
     this.oraclePriv = oraclePriv;
@@ -47,7 +47,7 @@ const EventWorker = function EventWorker(table,
   }
   this.helper = new PokerHelper();
   this.sentry = sentry;
-};
+}
 
 EventWorker.prototype.process = function process(msg) {
   const tasks = [];
@@ -102,13 +102,7 @@ EventWorker.prototype.process = function process(msg) {
 
   // react to new wallet. deploy proxy and controller on the chain.
   if (msgType === 'WalletCreated') {
-    tasks.push(this.factory.createAccount(msgBody.signerAddr, this.recoveryAddr));
-    tasks.push(this.log(`WalletCreated: ${msgBody.signerAddr}`, {
-      user: {
-        id: msgBody.signerAddr,
-      },
-      extra: msgBody,
-    }));
+    tasks.push(this.walletCreated(msgBody.signerAddr));
   }
 
   // react to wallet reset. send recovery transaction to controller.
@@ -146,7 +140,7 @@ EventWorker.prototype.process = function process(msg) {
 };
 
 EventWorker.prototype.err = function err(e) {
-  this.sentry.captureException(e, (sendErr) => {
+  this.sentry.captureException(e, { server_name: 'event-worker' }, (sendErr) => {
     if (sendErr) {
       console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line  no-console
     }
@@ -157,8 +151,10 @@ EventWorker.prototype.err = function err(e) {
 EventWorker.prototype.log = function log(message, context) {
   const cntxt = (context) || {};
   cntxt.level = (cntxt.level) ? cntxt.level : 'info';
+  cntxt.server_name = 'event-worker';
   return new Promise((fulfill, reject) => {
-    this.sentry.captureMessage(message, cntxt, (error, eventId) => {
+    const now = Math.floor(Date.now() / 1000);
+    this.sentry.captureMessage(`${now} - ${message}`, cntxt, (error, eventId) => {
       if (error) {
         reject(error);
         return;
@@ -166,6 +162,19 @@ EventWorker.prototype.log = function log(message, context) {
       fulfill(eventId);
     });
   });
+};
+
+EventWorker.prototype.walletCreated = function walletCreated(signerAddr) {
+  const nextAddrProm = this.factory.getNextAddr();
+  const createProm = this.factory.createAccount(signerAddr, this.recoveryAddr);
+  return Promise.all([nextAddrProm, createProm]).then((rsps) => {
+    const nextAddr = rsps[0];
+    return this.nutz.transfer(nextAddr, 10000);
+  }).then(() => this.log(`WalletCreated: ${signerAddr}`, {
+    user: {
+      id: signerAddr,
+    },
+  }));
 };
 
 EventWorker.prototype.walletReset = function walletReset(oldAddr, newAddr) {

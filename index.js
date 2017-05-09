@@ -5,6 +5,7 @@ import Raven from 'raven';
 import Db from './src/db';
 import EventWorker from './src/index';
 import Table from './src/tableContract';
+import Nutz from './src/nutzContract';
 import Controller from './src/controllerContract';
 import Factory from './src/factoryContract';
 
@@ -12,9 +13,7 @@ let web3Provider;
 let dynamo;
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL, {
-    server_name: 'event-worker',
-  }).install();
+  Raven.config(process.env.SENTRY_URL).install();
 
   if (event.Records && event.Records instanceof Array) {
     let web3;
@@ -26,6 +25,7 @@ exports.handler = function handler(event, context, callback) {
     const table = new Table(web3, process.env.SENDER_ADDR);
     const controller = new Controller(web3, process.env.SENDER_ADDR);
     const factory = new Factory(web3, process.env.SENDER_ADDR, process.env.FACTORY_ADDR);
+    const nutz = new Nutz(web3, process.env.SENDER_ADDR, process.env.NUTZ_ADDR);
 
     if (!dynamo) {
       dynamo = new doc.DynamoDB();
@@ -33,14 +33,14 @@ exports.handler = function handler(event, context, callback) {
 
     let requests = [];
     const worker = new EventWorker(table, factory, new Db(dynamo),
-      process.env.ORACLE_PRIV, Raven, controller, process.env.RECOVERY_PRIV);
+      process.env.ORACLE_PRIV, Raven, controller, nutz, process.env.RECOVERY_PRIV);
     for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }
     Promise.all(requests).then((data) => {
       callback(null, data);
     }).catch((err) => {
-      Raven.captureException(err, (sendErr) => {
+      Raven.captureException(err, { server_name: 'event-worker' }, (sendErr) => {
         if (sendErr) {
           console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
           callback(sendErr);
