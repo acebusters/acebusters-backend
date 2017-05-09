@@ -1,8 +1,6 @@
 import { AttributeValue } from 'dynamodb-data-types';
 import { PokerHelper } from 'poker-helper';
 
-const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
-
 const leaveReceived = function leaveReceived(oldHand, newHand) {
   for (let i = 0; i < newHand.lineup.length; i += 1) {
     if (newHand.lineup[i].exitHand !== undefined &&
@@ -26,16 +24,6 @@ const findActingPlayer = function findActingPlayer(oldHand, newHand) {
     }
   }
   return null;
-};
-
-const countTakenSeats = function countTakenSeats(lineup) {
-  let taken = 0;
-  for (let i = 0; i < lineup.length; i += 1) {
-    if (lineup[i].address && lineup[i].address !== EMPTY_ADDR) {
-      taken += 1;
-    }
-  }
-  return taken;
 };
 
 const lineupHasLeave = function lineupHasLeave(newHand) {
@@ -143,9 +131,9 @@ StreamScanner.prototype.process = function process(record) {
   // check netting complete
   if (newHand.lineup !== undefined && oldHand.netting !== undefined &&
     newHand.netting !== undefined) {
-    const taken = countTakenSeats(newHand.lineup);
-    if (Object.keys(newHand.netting).length > Object.keys(oldHand.netting).length &&
-    Object.keys(newHand.netting).length - 2 >= taken) {
+    const taken = ph.countActivePlayers(newHand.lineup, newHand.state);
+    const sigCount = Object.keys(newHand.netting).length;
+    if (sigCount > Object.keys(oldHand.netting).length && sigCount - 2 >= taken) {
       // send settle tx with complete netting to table
       tasks.push(this.notify(`TableNettingComplete::${keys.tableAddr}`, {
         tableAddr: keys.tableAddr,

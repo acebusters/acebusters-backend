@@ -318,7 +318,7 @@ describe('Stream scanner', () => {
           handId: { N: '2' },
           lineup: { L: [
             { M: { address: { S: P1_ADDR }, last: { S: bet1 } } },
-            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, exitHand: { N: '2' }, leaveReceipt: { S: '0x99' } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, exitHand: { N: '2' } } },
           ] },
         },
         NewImage: {
@@ -326,7 +326,7 @@ describe('Stream scanner', () => {
           handId: { N: '2' },
           lineup: { L: [
             { M: { address: { S: P1_ADDR }, last: { S: fold } } },
-            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, exitHand: { N: '2' }, leaveReceipt: { S: '0x99' } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 }, exitHand: { N: '2' } } },
           ] },
         },
       },
@@ -359,6 +359,8 @@ describe('Stream scanner', () => {
   });
 
   it('should submit when netting complete.', (done) => {
+    const bet1 = new EWT(ABI_BET).bet(2, 1000).sign(P1_PRIV);
+    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
     const event = {
       eventName: 'MODIFY',
       dynamodb: {
@@ -370,11 +372,11 @@ describe('Stream scanner', () => {
         OldImage: {
           dealer: { N: '0' },
           handId: { N: '2' },
-          state: { S: 'waiting' },
+          state: { S: 'preflop' },
           lineup: { L: [
             { M: { address: { S: EMPTY_ADDR } } },
-            { M: { address: { S: P1_ADDR }, sitout: { N: 1 } } },
-            { M: { address: { S: P2_ADDR } } },
+            { M: { address: { S: P1_ADDR }, last: { S: bet1 }, sitout: { S: 'allin' } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 } } },
             { M: { address: { S: EMPTY_ADDR } } },
           ] },
           netting: { M: {
@@ -386,11 +388,12 @@ describe('Stream scanner', () => {
         NewImage: {
           dealer: { N: '0' },
           handId: { N: '2' },
-          state: { S: 'waiting' },
+          state: { S: 'showdown' },
+          deck: { L: [{ N: 0 }, { N: 1 }, { N: 2 }, { N: 3 }] },
           lineup: { L: [
             { M: { address: { S: EMPTY_ADDR } } },
-            { M: { address: { S: P1_ADDR }, sitout: { N: 1 } } },
-            { M: { address: { S: P2_ADDR } } },
+            { M: { address: { S: P1_ADDR }, last: { S: bet1 }, sitout: { S: 'allin' } } },
+            { M: { address: { S: P2_ADDR }, last: { S: bet2 } } },
             { M: { address: { S: EMPTY_ADDR } } },
           ] },
           netting: { M: {
