@@ -2069,6 +2069,29 @@ describe('Oracle timing', () => {
     }).catch(done);
   });
 
+  it('should not sitout sitouted player.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 12,
+      dealer: 0,
+      changed: 1234,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR,
+        sitout: 1,
+      }, {
+        address: P2_ADDR,
+        sitout: 2,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    oracle.timeout(tableAddr).catch((err) => {
+      expect(err.message).to.contain('Bad Request');
+      done();
+    }).catch(done);
+  });
+
   it('should kick last player in lineup.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 12,

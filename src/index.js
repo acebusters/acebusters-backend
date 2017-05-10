@@ -463,7 +463,8 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
         // lineup, startPos, type, state) {
         pos = this.helper.nextPlayer(hand.lineup, 0, 'involved', hand.state);
       }
-      if (typeof pos === 'undefined' || hand.lineup[pos].address === EMPTY_ADDR) {
+      if (typeof pos === 'undefined' || hand.lineup[pos].address === EMPTY_ADDR ||
+        typeof hand.lineup[pos].sitout === 'number') {
         throw new BadRequest(`could not find next player to act in hand ${hand.handId}`);
       }
     }
