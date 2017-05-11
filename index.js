@@ -14,15 +14,13 @@ let web3Provider;
 let dynamo;
 
 exports.handler = function handler(event, context, callback) {
-  context.callbackWaitsForEmptyEventLoop = false;
+  context.callbackWaitsForEmptyEventLoop = false; // eslint-disable-line no-param-reassign
 
-  Raven.config(process.env.SENTRY_URL, {
-    captureUnhandledRejections: true,
-  }).install(() => {
-    callback(null, 'This is thy sheath; there rust, and let me die.');
-  });
+  Raven.config(process.env.SENTRY_URL).install();
 
-  if (!event.providerUrl || !event.contractSet) { callback('Bad Request: provider or set name not provided'); }
+  if (!event.providerUrl || !event.contractSet) {
+    callback('Bad Request: provider or set name not provided');
+  }
 
   let web3;
   if (!web3Provider) {
@@ -43,10 +41,10 @@ exports.handler = function handler(event, context, callback) {
   manager.scan(event.contractSet).then((data) => {
     callback(null, data);
   }).catch((err) => {
-    Raven.captureException(err, (sendErr) => {
+    Raven.captureException(err, { server_name: 'interval-scanner' }, (sendErr) => {
       if (sendErr) {
-        console.log('Failed to send captured exception to Sentry');
-        console.log(JSON.stringify(sendErr));
+        console.log('Failed to send captured exception to Sentry'); // eslint-disable-line no-console
+        console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
         callback(sendErr);
         return;
       }

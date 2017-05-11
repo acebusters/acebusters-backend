@@ -16,7 +16,8 @@ TableContract.prototype.getLastHandNetted = function getLastHandNetted(tableAddr
   });
 };
 
-TableContract.prototype.getLastNettingRequestHandId = function getLastNettingRequestHandId(tableAddr) {
+// get last netting request hand id
+TableContract.prototype.getLNRHandId = function getLNRHandId(tableAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.lastNettingRequestHandId.call((err, val) => {
@@ -28,7 +29,8 @@ TableContract.prototype.getLastNettingRequestHandId = function getLastNettingReq
   });
 };
 
-TableContract.prototype.getLastNettingRequestTime = function getLastNettingRequestTime(tableAddr) {
+// get last netting request time
+TableContract.prototype.getLNRTime = function getLNRTime(tableAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.lastNettingRequestTime.call((err, val) => {
