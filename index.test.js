@@ -801,6 +801,47 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
+  it('should allow to call-in and proceed to showdown.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'turn',
+      dealer: 3,
+      lineup: [{
+        address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(3, 1400).sign(P1_KEY),
+      }, {
+        address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(3, 800).sign(P2_KEY),
+      }, {
+        address: EMPTY_ADDR,
+      }, {
+        address: P3_ADDR,
+        last: new EWT(ABI_FOLD).fold(3, 800).sign(P3_KEY),
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(2),
+      [P1_ADDR, P2_ADDR, EMPTY_ADDR, P3_ADDR],
+      [new BigNumber(2000), new BigNumber(1000), new BigNumber(0), new BigNumber(2000)],
+      [bn0, bn0, bn0, bn0],
+    ]);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const callIn = new EWT(ABI_BET).bet(3, 1000).sign(P2_KEY);
+    oracle.pay(tableAddr, callIn).then((rsp) => {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P2_ADDR,
+        last: callIn,
+        sitout: 'allin',
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'showdown')));
+      done();
+    }).catch(done);
+  });
+
   it('should allow to sitout in state waiting.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
