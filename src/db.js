@@ -71,6 +71,26 @@ Db.prototype.updateSeat = function updateSeat(tableAddr, handId, seat, pos, time
   });
 };
 
+Db.prototype.emptySeat = function emptySeat(tableAddr, handId, pos) {
+  return new Promise((fulfill, reject) => {
+    const params = {
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: `set lineup[${pos}] = :s`,
+      ExpressionAttributeValues: {
+        ':s': { address: '0x0000000000000000000000000000000000000000' },
+      },
+    };
+    this.dynamo.updateItem(params, (err, rsp) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      fulfill(rsp.Item);
+    });
+  });
+};
+
 Db.prototype.updateNetting = function updateNetting(tableAddr, handId, netting) {
   return new Promise((fulfill, reject) => {
     const params = {

@@ -1210,11 +1210,18 @@ describe('Stream worker other events', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
       const seat = { address: EMPTY_ADDR };
+      expect(dynamo.updateItem).callCount(1);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(sentry.captureMessage).calledWith(sinon.match('removed players [1] from db'), {
+        level: 'info',
+        server_name: 'event-worker',
+        tags: { handId: 3, tableAddr: '0x77aabb11ee00' },
+      });
       done();
     }).catch(done);
   });

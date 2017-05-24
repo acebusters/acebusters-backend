@@ -475,6 +475,7 @@ EventWorker.prototype.removePlayer = function removePlayer(tableAddr) {
   let hand;
   const lup = this.table.getLineup(tableAddr);
   const ddp = this.db.getLastHand(tableAddr);
+  const leavePos = [];
   return Promise.all([lup, ddp]).then((responses) => {
     hand = responses[1];
     const params = responses[0];
@@ -484,7 +485,6 @@ EventWorker.prototype.removePlayer = function removePlayer(tableAddr) {
     if (!hand.lineup || hand.lineup.length !== params.lineup.length) {
       return Promise.reject(`table lineup length ${hand.lineup.length} does not match contract.`);
     }
-    let leavePos = -1;
     for (let i = 0; i < hand.lineup.length; i += 1) {
       // if seat is taken in table
       if (hand.lineup[i].address &&
@@ -493,20 +493,22 @@ EventWorker.prototype.removePlayer = function removePlayer(tableAddr) {
         if (!params.lineup[i].address ||
           params.lineup[i].address === EMPTY_ADDR) {
           // remember that seat to work on it
-          leavePos = i;
-          break;
+          leavePos.push(i);
         }
       }
     }
-    if (leavePos === -1) {
-      return Promise.reject('no left player found in lineup after Leave event.');
+    if (leavePos.length === 0) {
+      return Promise.resolve('no left player found in lineup after Leave event.');
     }
-    // handle that seat that we eyed before.
-    hand.lineup[leavePos] = { address: params.lineup[leavePos].address };
-    // update db
-    const changed = Math.floor(Date.now() / 1000);
-    return this.db.updateSeat(tableAddr, hand.handId,
-      hand.lineup[leavePos], leavePos, changed, hand.dealer);
+    const emptyProms = [];
+    for (let i = 0; i < leavePos.length; i += 1) {
+      emptyProms.push(this.db.emptySeat(tableAddr, hand.handId, leavePos[i]));
+    }
+    return Promise.all(emptyProms);
+  }).then(() => {
+    this.log(`removed players ${JSON.stringify(leavePos)} from db`, {
+      tags: { tableAddr, handId: hand.handId },
+    });
   });
 };
 
