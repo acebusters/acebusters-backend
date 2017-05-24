@@ -1097,6 +1097,7 @@ describe('Stream worker other events', () => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'waiting',
+      dealer: 0,
       lineup: [{
         address: EMPTY_ADDR,
       }, {
@@ -1127,18 +1128,22 @@ describe('Stream worker other events', () => {
       }),
     };
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
-      [P1_ADDR, P2_ADDR],
-      [new BigNumber(50000), new BigNumber(50000)],
-      [new BigNumber(0), new BigNumber(0)],
+      [EMPTY_ADDR, P2_ADDR, P1_ADDR],
+      [new BigNumber(0), new BigNumber(50000), new BigNumber(50000)],
+      [new BigNumber(0), new BigNumber(0), new BigNumber(0)],
     ]);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'waiting',
+      dealer: 2,
       lineup: [{
-        address: P1_ADDR,
+        address: EMPTY_ADDR,
       }, {
-        // empty
+        address: EMPTY_ADDR,
+      }, {
+        address: P1_ADDR,
+        sitout: 1,
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
@@ -1147,6 +1152,7 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then(() => {
       const seat = { address: P2_ADDR };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
       done();
     }).catch(done);
   });
@@ -1168,11 +1174,15 @@ describe('Stream worker other events', () => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'flop',
+      dealer: 1,
       lineup: [{
         address: P1_ADDR,
+        last: new EWT(ABI_BET).bet(3, 100).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
+        last: new EWT(ABI_BET).bet(3, 200).sign(P2_PRIV),
       }, {
+        address: EMPTY_ADDR,
         // empty
       }],
     }] });

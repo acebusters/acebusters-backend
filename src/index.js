@@ -437,12 +437,10 @@ EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
       return Promise.reject(`table lineup length ${hand.lineup.length} does not match contract.`);
     }
     let joinPos = -1;
-    let emptyCount = 0;
     for (let i = 0; i < hand.lineup.length; i += 1) {
       // if seat empty in table
       if (!hand.lineup[i].address ||
         hand.lineup[i].address === EMPTY_ADDR) {
-        emptyCount += 1;
         // but filled in contract
         if (params.lineup[i].address &&
           params.lineup[i].address !== EMPTY_ADDR) {
@@ -452,7 +450,7 @@ EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
       }
     }
     if (joinPos === -1) {
-      return Promise.reject('no new player found in lineup after join event.');
+      return Promise.fulfill('no new player found in lineup after join event.');
     }
     // now
     const changed = Math.floor(Date.now() / 1000);
@@ -461,8 +459,9 @@ EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
     if (hand.state !== 'waiting' && hand.state !== 'dealing') {
       hand.lineup[joinPos].sitout = changed;
     }
+    const isDealerActive = this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state);
     // if joining player first player, make him dealer
-    if (emptyCount >= (hand.lineup.length - 1)) {
+    if (!isDealerActive) {
       hand.dealer = joinPos;
     }
     // update db
