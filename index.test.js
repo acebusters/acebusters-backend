@@ -824,6 +824,36 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
+  it('should allow to sitout in state waiting as last active player.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 1,
+      dealer: 0,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR,
+        sitout: 1,
+      }, {
+        address: EMPTY_ADDR,
+      }, {
+        address: P3_ADDR,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)], [0, 0]]);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const sitout = new EWT(ABI_SIT_OUT).sitOut(1, 0).sign(P3_KEY);
+    oracle.pay(tableAddr, sitout).then((rsp) => {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P3_ADDR,
+        sitout: sinon.match.any,
+        last: sitout };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      done();
+    }).catch(done);
+  });
+
   it('should allow to sitout in state preflop heads up.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
@@ -1992,8 +2022,8 @@ describe('Oracle timing', () => {
     }] });
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
-    oracle.timeout(tableAddr).catch((err) => {
-      expect(err.message).to.contain('seconds to act');
+    oracle.timeout(tableAddr).then((rsp) => {
+      expect(rsp).to.contain('seconds to act');
       done();
     }).catch(done);
   });
@@ -2040,8 +2070,8 @@ describe('Oracle timing', () => {
     }] });
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
-    oracle.timeout(tableAddr).catch((err) => {
-      expect(err.message).to.contain('Bad Request');
+    oracle.timeout(tableAddr).then((rsp) => {
+      expect(rsp).to.contain('could not find next player');
       done();
     }).catch(done);
   });
@@ -2086,8 +2116,8 @@ describe('Oracle timing', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
-    oracle.timeout(tableAddr).catch((err) => {
-      expect(err.message).to.contain('Bad Request');
+    oracle.timeout(tableAddr).then((rsp) => {
+      expect(rsp).to.contain('could not find next player');
       done();
     }).catch(done);
   });
@@ -2129,8 +2159,8 @@ describe('Oracle timing', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
-    oracle.timeout(tableAddr).catch((err) => {
-      expect(err.message).to.contain('Bad Request');
+    oracle.timeout(tableAddr).then((rsp) => {
+      expect(rsp).to.contain('could not find next player');
       done();
     }).catch(done);
   });
@@ -2150,8 +2180,8 @@ describe('Oracle timing', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
-    oracle.timeout(tableAddr).catch((err) => {
-      expect(err.message).to.contain('seconds to act');
+    oracle.timeout(tableAddr).then((rsp) => {
+      expect(rsp).to.contain('seconds to act');
       done();
     }).catch(done);
   });

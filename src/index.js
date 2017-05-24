@@ -124,7 +124,7 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
     // are we ready to start dealing?
     const activeCount = this.helper.countActivePlayers(hand.lineup, hand.state);
     if (hand.state === 'waiting' && activeCount < 2) {
-      if (activeCount === 0 || !hand.lineup[pos].sitout) {
+      if ((activeCount === 0 || !hand.lineup[pos].sitout) && receipt.abi[0].name !== 'sitOut') {
         throw new BadRequest('not enough players to start game.');
       }
     }
@@ -465,14 +465,14 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
       }
       if (typeof pos === 'undefined' || hand.lineup[pos].address === EMPTY_ADDR ||
         typeof hand.lineup[pos].sitout === 'number') {
-        throw new BadRequest(`could not find next player to act in hand ${hand.handId}`);
+        return Promise.resolve(`could not find next player to act in hand ${hand.handId}`);
       }
     }
 
     const now = Math.floor(Date.now() / 1000);
     const leftTime = (hand.changed + this.timeoutPeriod) - now;
     if (leftTime > 0) {
-      throw new BadRequest(`player ${pos} still got ${leftTime} seconds to act.`);
+      return Promise.resolve(`player ${pos} still got ${leftTime} seconds to act.`);
     }
     hand.lineup[pos].sitout = now;
     return this.updateState(tableAddr, hand, pos);
