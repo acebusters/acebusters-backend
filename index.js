@@ -15,7 +15,7 @@ const pusher = new Pusher({
 const rc = new ReceiptCache();
 
 const handleError = function handleError(err, callback) {
-  Raven.captureException(err, (sendErr) => {
+  Raven.captureException(err, { server_name: 'stream-scanner' }, (sendErr) => {
     if (sendErr) {
       console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
       callback(sendErr);
@@ -26,9 +26,7 @@ const handleError = function handleError(err, callback) {
 };
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL, {
-    server_name: 'stream-scanner',
-  }).install();
+  Raven.config(process.env.SENTRY_URL).install();
 
   if (event.Records && event.Records instanceof Array) {
     const requests = [];

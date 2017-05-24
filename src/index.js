@@ -28,7 +28,7 @@ const findActingPlayer = function findActingPlayer(oldHand, newHand) {
 
 const lineupHasLeave = function lineupHasLeave(newHand) {
   for (let i = 0; i < newHand.lineup.length; i += 1) {
-    if (newHand.lineup[i].exitHand === newHand.handId) {
+    if (newHand.lineup[i].exitHand <= newHand.handId) {
       return i;
     }
   }
@@ -112,21 +112,6 @@ StreamScanner.prototype.process = function process(record) {
       }, this.topicArn));
     }
   }
-  // send event to sentry
-  const actingPlayer = findActingPlayer(oldHand, newHand);
-  if (actingPlayer) {
-    tasks.push(this.log(`action: ${actingPlayer.signerAddr}`, {
-      user: {
-        id: actingPlayer.signerAddr,
-      },
-      level: 'info',
-      tags: {
-        tableAddr: keys.tableAddr,
-        handId: newHand.handId,
-      },
-    }));
-  }
-
 
   // check netting complete
   if (newHand.lineup !== undefined && oldHand.netting !== undefined &&
@@ -159,6 +144,7 @@ StreamScanner.prototype.publishUpdate = function publishUpdate(topic, msg) {
 StreamScanner.prototype.log = function log(message, context) {
   const cntxt = (context) || {};
   cntxt.level = (cntxt.level) ? cntxt.level : 'info';
+  cntxt.server_name = 'stream-scanner';
   return new Promise((fulfill, reject) => {
     this.sentry.captureMessage(message, cntxt, (error, eventId) => {
       if (error) {
