@@ -8,15 +8,8 @@ import Db from './src/db';
 import TableContract from './src/tableContract';
 import TableManager from './src/index';
 
-const pusher = new Pusher({
-  appId: '314687',
-  key: 'd4832b88a2a81f296f53',
-  secret: 'f8e280d370f8870fcfaa',
-  cluster: 'eu',
-  encrypted: true,
-});
-
 let web3;
+let pusher;
 const dynamo = new doc.DynamoDB();
 const rc = new ReceiptCache();
 
@@ -47,11 +40,22 @@ const handleError = function handleError(err, callback) {
 };
 
 exports.handler = function handler(event, context, callback) {
-  const providerUrl = event['stage-variables'].providerUrl;
+  const providerUrl = process.env.PROVIDER_URL;
   const sentryUrl = process.env.SENTRY_URL;
+  const tableName = process.env.TABLE_NAME;
   const timeout = process.env.TIMEOUT;
 
   Raven.config(sentryUrl).install();
+
+  if (typeof pusher === 'undefined') {
+    pusher = new Pusher({
+      appId: process.env.PUSHER_APP_ID,
+      key: process.env.PUSHER_KEY,
+      secret: process.env.PUSHER_SECRET,
+      cluster: 'eu',
+      encrypted: true,
+    });
+  }
 
   if (typeof web3 === 'undefined') {
     web3 = new Web3(new Web3.providers.HttpProvider(providerUrl));
@@ -59,7 +63,7 @@ exports.handler = function handler(event, context, callback) {
 
 
   let handleRequest;
-  const manager = new TableManager(new Db(dynamo), new TableContract(web3), rc,
+  const manager = new TableManager(new Db(dynamo, tableName), new TableContract(web3), rc,
     timeout, pusher, providerUrl);
   const path = event.context['resource-path'];
   const tableAddr = event.params.path.tableAddr;

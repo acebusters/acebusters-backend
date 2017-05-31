@@ -1,8 +1,8 @@
 import { NotFound } from './errors';
 
-function Db(dynamo) {
+function Db(dynamo, tableName) {
   this.dynamo = dynamo;
-  this.tableName = 'poker';
+  this.tableName = (typeof tableName === 'undefined') ? 'sb_cashgame' : tableName;
 }
 
 Db.prototype.getLastHand = function getLastHand(tableAddr) {
