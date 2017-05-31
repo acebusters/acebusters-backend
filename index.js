@@ -4,14 +4,7 @@ import { ReceiptCache } from 'poker-helper';
 import Raven from 'raven';
 import StreamWorker from './src/index';
 
-const pusher = new Pusher({
-  appId: '314687',
-  key: 'd4832b88a2a81f296f53',
-  secret: 'f8e280d370f8870fcfaa',
-  cluster: 'eu',
-  encrypted: true,
-});
-
+let pusher;
 const rc = new ReceiptCache();
 
 const handleError = function handleError(err, callback) {
@@ -27,6 +20,16 @@ const handleError = function handleError(err, callback) {
 
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL).install();
+
+  if (typeof pusher === 'undefined') {
+    pusher = new Pusher({
+      appId: process.env.PUSHER_APP_ID,
+      key: process.env.PUSHER_KEY,
+      secret: process.env.PUSHER_SECRET,
+      cluster: 'eu',
+      encrypted: true,
+    });
+  }
 
   if (event.Records && event.Records instanceof Array) {
     const requests = [];

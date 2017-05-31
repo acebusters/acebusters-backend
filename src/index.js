@@ -13,19 +13,6 @@ const leaveReceived = function leaveReceived(oldHand, newHand) {
   return -1;
 };
 
-const findActingPlayer = function findActingPlayer(oldHand, newHand) {
-  if (newHand.lineup && oldHand.lineup) {
-    for (let i = 0; i < newHand.lineup.length; i += 1) {
-      if (oldHand.lineup[i] && newHand.lineup[i] &&
-        newHand.lineup[i].last &&
-        oldHand.lineup[i].last !== newHand.lineup[i].last) {
-        return { signerAddr: newHand.lineup[i].address, pos: i };
-      }
-    }
-  }
-  return null;
-};
-
 const lineupHasLeave = function lineupHasLeave(newHand) {
   for (let i = 0; i < newHand.lineup.length; i += 1) {
     if (newHand.lineup[i].exitHand <= newHand.handId) {
