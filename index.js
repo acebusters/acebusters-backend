@@ -34,9 +34,10 @@ exports.handler = function handler(event, context, callback) {
   }
   const factoryAddr = process.env.FACTORY_ADDR;
   const topicArn = process.env.TOPIC_ARN;
+  const tableName = process.env.TABLE_NAME;
 
   const manager = new ScanManager(new Factory(web3, factoryAddr),
-    new Table(web3), new Dynamo(dynamo), new AWS.SNS(), Raven, request, topicArn);
+    new Table(web3), new Dynamo(dynamo, tableName), new AWS.SNS(), Raven, request, topicArn);
 
   manager.scan(event.contractSet).then((data) => {
     callback(null, data);

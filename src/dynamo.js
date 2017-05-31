@@ -1,6 +1,6 @@
-function Dynamo(dynamo) {
+function Dynamo(dynamo, tableName) {
   this.dynamo = dynamo;
-  this.tableName = 'poker';
+  this.tableName = (typeof tableName === 'undefined') ? 'sb_cashgame' : tableName;
 }
 
 
