@@ -113,17 +113,17 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
     if (!rsp || !rsp.handId) {
       return this.callTimeout(tableAddr);
     }
+    // 1 hour
     const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
-    // check if any of the sitout flags are older than 5 min
     if (rsp.lineup) {
       // 5 minutes
       const old = Math.floor(Date.now() / 1000) - (5 * 60);
-      // if the receipt is older than 1 hour, ignore it
       const subject = `Kick::${tableAddr}`;
       let hasPlayer = false;
       for (let i = 0; i < rsp.lineup.length; i += 1) {
         if (rsp.lineup[i].sitout && typeof rsp.lineup[i].sitout === 'number') {
-          if (rsp.lineup[i].sitout < old && rsp.lineup[i].sitout > tooOld) {
+          // check if any of the sitout flags are older than 5 min
+          if (rsp.lineup[i].sitout < old) {
             const seat = rsp.lineup[i];
             results.push(this.notify({ pos: i, tableAddr }, subject).then(() =>
               this.log(subject, {
