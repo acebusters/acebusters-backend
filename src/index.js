@@ -240,7 +240,7 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
     bettingComplete = this.helper.isBettingDone(hand.lineup,
     hand.dealer, hand.state, hand.sb * 2);
   } catch (err) {
-    // probably someone hit sitout
+    console.log(err); // eslint-disable-line no-console
   }
   const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
   let streetMaxBet;
