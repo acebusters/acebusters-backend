@@ -13,6 +13,8 @@ let web3Provider;
 let dynamo;
 
 exports.handler = function handler(event, context, callback) {
+  const tableName = process.env.TABLE_NAME;
+
   Raven.config(process.env.SENTRY_URL).install();
 
   if (event.Records && event.Records instanceof Array) {
@@ -32,7 +34,7 @@ exports.handler = function handler(event, context, callback) {
     }
 
     let requests = [];
-    const worker = new EventWorker(table, factory, new Db(dynamo),
+    const worker = new EventWorker(table, factory, new Db(dynamo, tableName),
       process.env.ORACLE_PRIV, Raven, controller, nutz, process.env.RECOVERY_PRIV);
     for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));

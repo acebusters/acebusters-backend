@@ -153,7 +153,7 @@ describe('Stream worker HandComplete event', () => {
         lineup: [{ address: EMPTY_ADDR }, { address: P1_ADDR }, { address: P2_ADDR }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
         EWT.concat(P2_ADDR, 1485).toString('hex'),
         EWT.concat(ORACLE_ADDR, 15).toString('hex'),
@@ -230,7 +230,7 @@ describe('Stream worker HandComplete event', () => {
         }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       const distHand2 = new EWT(ABI_DIST).distribution(2, 0, [
         EWT.concat(P3_ADDR, 2376).toString('hex'),
         EWT.concat(ORACLE_ADDR, 24).toString('hex'),
@@ -294,7 +294,7 @@ describe('Stream worker HandComplete event', () => {
         }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
@@ -356,7 +356,7 @@ describe('Stream worker HandComplete event', () => {
         }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
@@ -415,7 +415,7 @@ describe('Stream worker HandComplete event', () => {
         }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
@@ -475,7 +475,7 @@ describe('Stream worker HandComplete event', () => {
         }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
@@ -579,7 +579,7 @@ describe('Stream worker HandComplete event', () => {
         }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
@@ -817,7 +817,7 @@ describe('Stream worker other events', () => {
         lineup: [{ address: EMPTY_ADDR }, { address: EMPTY_ADDR }],
         changed: sinon.match.any,
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
@@ -1032,12 +1032,12 @@ describe('Stream worker other events', () => {
         handId: 2,
         tableAddr: '0x77aabb11ee00',
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       expect(dynamo.deleteItem).calledWith({ Key: {
         handId: 3,
         tableAddr: '0x77aabb11ee00',
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
@@ -1075,7 +1075,7 @@ describe('Stream worker other events', () => {
         handId: 2,
         tableAddr: '0x77aabb11ee00',
       },
-        TableName: 'poker' });
+        TableName: 'sb_cashgame' });
       done();
     }).catch(done);
   });
