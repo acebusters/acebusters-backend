@@ -18,10 +18,6 @@ exports.handler = function handler(event, context, callback) {
 
   Raven.config(process.env.SENTRY_URL).install();
 
-  if (!event.providerUrl || !event.contractSet) {
-    callback('Bad Request: provider or set name not provided');
-  }
-
   let web3;
   if (!web3Provider) {
     web3 = new Web3();
@@ -39,7 +35,7 @@ exports.handler = function handler(event, context, callback) {
   const manager = new ScanManager(new Factory(web3, factoryAddr),
     new Table(web3), new Dynamo(dynamo, tableName), new AWS.SNS(), Raven, request, topicArn);
 
-  manager.scan(event.contractSet).then((data) => {
+  manager.scan().then((data) => {
     callback(null, data);
   }).catch((err) => {
     Raven.captureException(err, { server_name: 'interval-scanner' }, (sendErr) => {

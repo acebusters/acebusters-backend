@@ -69,7 +69,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), null, sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then(() => {
+    manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(0);
       expect(sns.publish).callCount(0);
       done();
@@ -89,7 +89,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), null, sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then(() => {
+    manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(0);
       expect(sns.publish).callCount(0);
       done();
@@ -109,7 +109,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), null, sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then((rsp) => {
+    manager.scan().then((rsp) => {
       expect(rsp.length).to.eql(2);
       expect(sentry.captureMessage).callCount(0);
       expect(sns.publish).callCount(0);
@@ -130,7 +130,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), null, sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then(() => {
+    manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(sinon.match(`HandleDispute::${set.addresses[0]}`), {
         level: 'info',
@@ -161,7 +161,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), null, sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then(() => {
+    manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(sinon.match(`ProgressNetting::${set.addresses[0]}`), {
         level: 'info',
@@ -195,7 +195,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), new Dynamo(dynamo), sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then(() => {
+    manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(sinon.match(`TableNettingRequest::${set.addresses[0]}`), {
         level: 'info',
@@ -236,7 +236,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), new Dynamo(dynamo), sns, sentry, request, topicArn);
 
-    manager.scan(set.id).then(() => {
+    manager.scan().then(() => {
       expect(request.post).calledWith(sinon.match.has('url', sinon.match(set.addresses[0])));
       expect(sentry.captureMessage).callCount(2);
       expect(sentry.captureMessage).calledWith(sinon.match(`TableNettingRequest::${set.addresses[0]}`), {
