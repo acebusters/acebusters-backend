@@ -20,7 +20,10 @@ const TableManager = function TableManager(db, contract, receiptCache,
 TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
   return new Promise((fulfill, reject) => {
     try {
-      const rsp = this.pusher.trigger(topic, 'update', msg);
+      const rsp = this.pusher.trigger(topic, 'update', {
+        type: 'chatMessage',
+        payload: msg
+      });
       fulfill(rsp);
     } catch (err) {
       reject(err);
