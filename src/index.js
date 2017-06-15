@@ -120,7 +120,10 @@ StreamScanner.prototype.process = function process(record) {
 StreamScanner.prototype.publishUpdate = function publishUpdate(topic, msg) {
   return new Promise((fulfill, reject) => {
     try {
-      const rsp = this.pusher.trigger(topic, 'update', msg);
+      const rsp = this.pusher.trigger(topic, 'update', {
+        type: 'handUpdate',
+        payload: msg
+      });
       fulfill(rsp);
     } catch (err) {
       reject(err);
