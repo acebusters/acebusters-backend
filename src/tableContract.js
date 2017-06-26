@@ -20,6 +20,21 @@ TableContract.prototype.leave = function leave(tableAddr, leaveReceipt) {
   });
 };
 
+TableContract.prototype.toggleTable = function toggleTable(tableAddr, activeReceipt) {
+  const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
+  return new Promise((fulfill, reject) => {
+    contract.toggleActive.sendTransaction(activeReceipt,
+      { from: this.senderAddr, gas: 200000 },
+      (err, val) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        fulfill(val);
+      });
+  });
+};
+
 TableContract.prototype.settle = function settle(tableAddr, newBalances, sigs) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
@@ -98,6 +113,19 @@ TableContract.prototype.getSmallBlind = function getSmallBlind(tableAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
     contract.smallBlind.call((err, val) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      fulfill(val.toNumber());
+    });
+  });
+};
+
+TableContract.prototype.getLastHandNetted = function getLastHandNetted(tableAddr) {
+  const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
+  return new Promise((fulfill, reject) => {
+    contract.lastHandNetted.call((err, val) => {
       if (err) {
         reject(err);
         return;

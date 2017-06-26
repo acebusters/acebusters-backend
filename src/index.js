@@ -110,6 +110,11 @@ EventWorker.prototype.process = function process(msg) {
     tasks.push(this.walletReset(msgBody.oldSignerAddr, msgBody.newSignerAddr));
   }
 
+  // toggle table active
+  if (msgType === 'ToggleTable') {
+    tasks.push(this.toggleTable(msg.Subject.split('::')[1]));
+  }
+
   // kick a player from a table.
   if (msgType === 'Kick') {
     tasks.push(this.kickPlayer(msgBody.tableAddr, msgBody.pos));
@@ -169,7 +174,7 @@ EventWorker.prototype.walletCreated = function walletCreated(signerAddr) {
   const createProm = this.factory.createAccount(signerAddr, this.recoveryAddr);
   return Promise.all([nextAddrProm, createProm]).then((rsps) => {
     const nextAddr = rsps[0];
-    return this.nutz.transfer(nextAddr, 10000);
+    return this.nutz.transfer(nextAddr, 1500000000000000);
   }).then(() => this.log(`WalletCreated: ${signerAddr}`, {
     user: {
       id: signerAddr,
@@ -467,6 +472,31 @@ EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
     // update db
     return this.db.updateSeat(tableAddr, hand.handId,
       hand.lineup[joinPos], joinPos, hand.changed, hand.dealer);
+  });
+};
+
+EventWorker.prototype.toggleTable = function toggleTable(tableAddr) {
+  const lhnProm = this.table.getLastHandNetted(tableAddr);
+  return Promise.all([lhnProm]).then((responses) => {
+    const lhn = responses[0];
+    const priv = new Buffer(this.oraclePriv.replace('0x', ''), 'hex');
+    const callDest = new Buffer(tableAddr.replace('0x', ''), 'hex');
+    const hand = Buffer.alloc(4);
+    hand.writeUInt32BE(lhn, 0);
+    const hash = ethUtil.sha3( Buffer.concat([hand, callDest]));
+    const sig = ethUtil.ecsign(hash, priv);
+    const activeReceipt = Buffer.alloc(89);
+    hand.copy(activeReceipt, 0);
+    callDest.copy(activeReceipt, 4);
+    sig.r.copy(activeReceipt, 24);
+    sig.s.copy(activeReceipt, 56);
+    activeReceipt.writeInt8(sig.v, 88);
+    return this.table.toggleTable(tableAddr, `0x${activeReceipt.toString('hex')}`);
+  }).then((txHash) => {
+    this.log(`toggled table active state: ${tableAddr}`, {
+      tags: { tableAddr },
+      extra: { txHash },
+    });
   });
 };
 

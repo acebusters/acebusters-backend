@@ -72,6 +72,9 @@ const contract = {
   transfer: {
     sendTransaction() {},
   },
+  toggleActive: {
+    sendTransaction() {},
+  },
   getLineup: {
     call() {},
   },
@@ -84,6 +87,9 @@ const contract = {
   smallBlind: {
     call() {},
   },
+  lastHandNetted: {
+    call() {},
+  }
 };
 
 const sentry = {
@@ -957,7 +963,30 @@ describe('Stream worker other events', () => {
       expect(contract.create.sendTransaction).calledWith(P1_ADDR,
         ORACLE_ADDR, 259200, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(contract.transfer.sendTransaction).calledWith(nextAddr,
-        10000, { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
+        1500000000000000, { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
+      expect(sentry.captureMessage).calledWith(sinon.match.any, {
+        level: 'info',
+        server_name: 'event-worker',
+        user: { id: P1_ADDR },
+      });
+      done();
+    }).catch(done);
+  });
+
+  it('should handle ToggleTable event.', (done) => {
+    const senderAddr = '0x3322';
+    const event = {
+      Subject: `ToggleTable::${P1_ADDR}`,
+      Message: '{}',
+    };
+    sinon.stub(contract.toggleActive, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(12));
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, senderAddr), null, null, ORACLE_PRIV);
+    Promise.all(worker.process(event)).then(() => {
+      const toggleReceipt = '0x0000000cf3beac30c498d9e26865f34fcaa57dbb935b0d74b8203ec9bb03700770ee3664c4819186de8ab490117381159ecc53ef4e5499ea7c14b136cddbd848ff496a0f275bd9e9092d9ed0885e6e95704a9673e2458cc21b';
+      expect(contract.toggleActive.sendTransaction).calledWith(toggleReceipt, { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match.any, {
         level: 'info',
         server_name: 'event-worker',
