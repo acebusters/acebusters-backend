@@ -11,14 +11,15 @@ const simpledb = new AWS.SimpleDB();
 
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL).install();
-  context.callbackWaitsForEmptyEventLoop = false;
+  context.callbackWaitsForEmptyEventLoop = false; // eslint-disable-line no-param-reassign
   const providerUrl = process.env.PROVIDER_URL;
   const factoryAddr = process.env.FACTORY_ADDR;
   const topicArn = process.env.TOPIC_ARN;
+  const tableName = process.env.SDB_DOMAIN;
 
   web3.setProvider(new web3.providers.HttpProvider(providerUrl));
 
-  const manager = new ScanManager(new Db(simpledb, 'ab-event-contracts'),
+  const manager = new ScanManager(new Db(simpledb, tableName),
     new Table(web3), new AWS.SNS(), new Factory(web3, factoryAddr), topicArn);
 
   manager.scan(event.contractSet).then((data) => {
@@ -26,8 +27,8 @@ exports.handler = function handler(event, context, callback) {
   }).catch((err) => {
     Raven.captureException(err, { server_name: 'contract-scanner' }, (sendErr) => {
       if (sendErr) {
-        console.log('Failed to send captured exception to Sentry');
-        console.log(JSON.stringify(sendErr));
+        console.log('Failed to send captured exception to Sentry'); // eslint-disable-line no-console
+        console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
         callback(sendErr);
         return;
       }
