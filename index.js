@@ -1,6 +1,7 @@
 import doc from 'dynamodb-doc';
 import Web3 from 'web3';
 import Raven from 'raven';
+import request from 'request';
 
 import Db from './src/db';
 import EventWorker from './src/index';
@@ -8,6 +9,7 @@ import Table from './src/tableContract';
 import Nutz from './src/nutzContract';
 import Controller from './src/controllerContract';
 import Factory from './src/factoryContract';
+import MailerLite from './src/mailerLite';
 
 let web3Provider;
 let dynamo;
@@ -28,6 +30,7 @@ exports.handler = function handler(event, context, callback) {
     const controller = new Controller(web3, process.env.SENDER_ADDR);
     const factory = new Factory(web3, process.env.SENDER_ADDR, process.env.FACTORY_ADDR);
     const nutz = new Nutz(web3, process.env.SENDER_ADDR, process.env.NUTZ_ADDR);
+    const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
 
     if (!dynamo) {
       dynamo = new doc.DynamoDB();
@@ -35,7 +38,7 @@ exports.handler = function handler(event, context, callback) {
 
     let requests = [];
     const worker = new EventWorker(table, factory, new Db(dynamo, tableName),
-      process.env.ORACLE_PRIV, Raven, controller, nutz, process.env.RECOVERY_PRIV);
+      process.env.ORACLE_PRIV, Raven, controller, nutz, process.env.RECOVERY_PRIV, mailer);
     for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }

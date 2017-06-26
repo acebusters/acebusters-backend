@@ -29,7 +29,8 @@ const shuffle = function shuffle() {
   return array;
 };
 
-function EventWorker(table, factory, db, oraclePriv, sentry, controller, nutz, recoveryPriv) {
+function EventWorker(table, factory, db,
+  oraclePriv, sentry, controller, nutz, recoveryPriv, mailer) {
   this.table = table;
   this.factory = factory;
   this.controller = controller;
@@ -47,6 +48,7 @@ function EventWorker(table, factory, db, oraclePriv, sentry, controller, nutz, r
   }
   this.helper = new PokerHelper();
   this.sentry = sentry;
+  this.mailer = mailer;
 }
 
 EventWorker.prototype.process = function process(msg) {
@@ -102,7 +104,7 @@ EventWorker.prototype.process = function process(msg) {
 
   // react to new wallet. deploy proxy and controller on the chain.
   if (msgType === 'WalletCreated') {
-    tasks.push(this.walletCreated(msgBody.signerAddr));
+    tasks.push(this.walletCreated(msgBody.signerAddr, msgBody.email));
   }
 
   // react to wallet reset. send recovery transaction to controller.
@@ -169,12 +171,14 @@ EventWorker.prototype.log = function log(message, context) {
   });
 };
 
-EventWorker.prototype.walletCreated = function walletCreated(signerAddr) {
+EventWorker.prototype.walletCreated = function walletCreated(signerAddr, email) {
   const nextAddrProm = this.factory.getNextAddr();
   const createProm = this.factory.createAccount(signerAddr, this.recoveryAddr);
   return Promise.all([nextAddrProm, createProm]).then((rsps) => {
     const nextAddr = rsps[0];
-    return this.nutz.transfer(nextAddr, 1500000000000000);
+    const faucetProm = this.nutz.transfer(nextAddr, 1500000000000000);
+    const mailerProm = this.mailer.add(email);
+    return Promise.all([faucetProm, mailerProm]);
   }).then(() => this.log(`WalletCreated: ${signerAddr}`, {
     user: {
       id: signerAddr,
@@ -483,7 +487,7 @@ EventWorker.prototype.toggleTable = function toggleTable(tableAddr) {
     const callDest = new Buffer(tableAddr.replace('0x', ''), 'hex');
     const hand = Buffer.alloc(4);
     hand.writeUInt32BE(lhn, 0);
-    const hash = ethUtil.sha3( Buffer.concat([hand, callDest]));
+    const hash = ethUtil.sha3(Buffer.concat([hand, callDest]));
     const sig = ethUtil.ecsign(hash, priv);
     const activeReceipt = Buffer.alloc(89);
     hand.copy(activeReceipt, 0);
@@ -492,11 +496,6 @@ EventWorker.prototype.toggleTable = function toggleTable(tableAddr) {
     sig.s.copy(activeReceipt, 56);
     activeReceipt.writeInt8(sig.v, 88);
     return this.table.toggleTable(tableAddr, `0x${activeReceipt.toString('hex')}`);
-  }).then((txHash) => {
-    this.log(`toggled table active state: ${tableAddr}`, {
-      tags: { tableAddr },
-      extra: { txHash },
-    });
   });
 };
 

@@ -12,6 +12,7 @@ import Nutz from './src/nutzContract';
 import Controller from './src/controllerContract';
 import Factory from './src/factoryContract';
 import Db from './src/db';
+import MailerLite from './src/mailerLite';
 
 chai.use(sinonChai);
 
@@ -89,7 +90,7 @@ const contract = {
   },
   lastHandNetted: {
     call() {},
-  }
+  },
 };
 
 const sentry = {
@@ -112,6 +113,10 @@ const dynamo = {
   updateItem() {},
   deleteItem() {},
 };
+
+const http = {
+  request() {},
+}
 
 sinon.stub(web3.eth, 'contract').returns(web3.eth);
 sinon.stub(web3.eth, 'at').returns(contract);
@@ -948,6 +953,7 @@ describe('Stream worker other events', () => {
       Subject: 'WalletCreated::0x1234',
       Message: JSON.stringify({
         signerAddr: P1_ADDR,
+        email: 'test@mail.com',
         accountId: 'someuuid',
       }),
     };
@@ -955,9 +961,12 @@ describe('Stream worker other events', () => {
     sinon.stub(web3.eth, 'getTransactionCount').yields(null, 12);
     sinon.stub(contract.transfer, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(http, 'request').yields(null, { statusCode: 200 }, {});
 
-    const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR),
-      null, null, sentry, null, new Nutz(web3, senderAddr, '0x9988'), ORACLE_PRIV);
+    const mailer = new MailerLite(http.request, '1234', '4567');
+
+    const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR), null, null,
+      sentry, null, new Nutz(web3, senderAddr, '0x9988'), ORACLE_PRIV, mailer);
     Promise.all(worker.process(event)).then(() => {
       const nextAddr = '0x312dd66d24da42a564afb553824fb9737f2860a1';
       expect(contract.create.sendTransaction).calledWith(P1_ADDR,
@@ -968,6 +977,12 @@ describe('Stream worker other events', () => {
         level: 'info',
         server_name: 'event-worker',
         user: { id: P1_ADDR },
+      });
+      expect(http.request).calledWith({
+        body: '{"email":"test@mail.com"}',
+        headers: { 'Content-Type': 'application/json', 'X-MailerLite-ApiKey': '1234' },
+        method: 'POST',
+        url: 'https://api.mailerlite.com/api/v2/groups/4567/subscribers',
       });
       done();
     }).catch(done);
@@ -986,12 +1001,8 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, senderAddr), null, null, ORACLE_PRIV);
     Promise.all(worker.process(event)).then(() => {
       const toggleReceipt = '0x0000000cf3beac30c498d9e26865f34fcaa57dbb935b0d74b8203ec9bb03700770ee3664c4819186de8ab490117381159ecc53ef4e5499ea7c14b136cddbd848ff496a0f275bd9e9092d9ed0885e6e95704a9673e2458cc21b';
-      expect(contract.toggleActive.sendTransaction).calledWith(toggleReceipt, { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
-      expect(sentry.captureMessage).calledWith(sinon.match.any, {
-        level: 'info',
-        server_name: 'event-worker',
-        user: { id: P1_ADDR },
-      });
+      expect(contract.toggleActive.sendTransaction).calledWith(toggleReceipt,
+        { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
       done();
     }).catch(done);
   });
@@ -1280,5 +1291,6 @@ describe('Stream worker other events', () => {
     if (dynamo.deleteItem.restore) dynamo.deleteItem.restore();
     if (sentry.captureMessage.restore) sentry.captureMessage.restore();
     if (sentry.captureException.restore) sentry.captureException.restore();
+    if (http.request.restore) http.request.restore();
   });
 });
