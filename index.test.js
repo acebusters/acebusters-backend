@@ -2291,7 +2291,10 @@ describe('Oracle messaging', () => {
     const oracle = new Oracle(new Db(dynamo), null, null, null, pusher);
     oracle.handleMessage(msgReceipt).then(() => {
       expect(pusher.trigger).callCount(1);
-      expect(pusher.trigger).calledWith(tableAddr, 'update', msgReceipt);
+      expect(pusher.trigger).calledWith(tableAddr, 'update', {
+        type: 'chatMessage',
+        payload: msgReceipt,
+      });
       done();
     }).catch(done);
   });
