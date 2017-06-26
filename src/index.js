@@ -122,7 +122,7 @@ StreamScanner.prototype.publishUpdate = function publishUpdate(topic, msg) {
     try {
       const rsp = this.pusher.trigger(topic, 'update', {
         type: 'handUpdate',
-        payload: msg
+        payload: msg,
       });
       fulfill(rsp);
     } catch (err) {

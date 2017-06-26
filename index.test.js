@@ -464,13 +464,16 @@ describe('Stream scanner', () => {
     worker.process(event).then(() => {
       expect(pusher.trigger).callCount(1);
       expect(pusher.trigger).calledWith('0x77aabb11ee', 'update', {
-        cards: [],
-        changed: 123,
-        dealer: 0,
-        handId: 3,
-        sb: 50,
-        lineup: [{ address: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' }, { address: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' }],
-        state: 'waiting',
+        type: 'handUpdate',
+        payload: {
+          cards: [],
+          changed: 123,
+          dealer: 0,
+          handId: 3,
+          sb: 50,
+          lineup: [{ address: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' }, { address: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' }],
+          state: 'waiting',
+        },
       });
       done();
     }).catch(done);
@@ -510,13 +513,16 @@ describe('Stream scanner', () => {
     worker.process(event).then(() => {
       expect(pusher.trigger).callCount(1);
       expect(pusher.trigger).calledWith('0x77aabb11ee', 'update', {
-        cards: [],
-        changed: 123,
-        dealer: 0,
-        sb: 50,
-        handId: 3,
-        lineup: [{ address: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' }, { address: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' }],
-        state: 'waiting',
+        type: 'handUpdate',
+        payload: {
+          cards: [],
+          changed: 123,
+          dealer: 0,
+          sb: 50,
+          handId: 3,
+          lineup: [{ address: '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f' }, { address: '0xc3ccb3902a164b83663947aff0284c6624f3fbf2' }],
+          state: 'waiting',
+        },
       });
       done();
     }).catch(done);
