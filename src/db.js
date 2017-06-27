@@ -131,4 +131,48 @@ Db.prototype.updateNetting = function updateNetting(tableAddr, handId, signer, n
   });
 };
 
+Db.prototype.setSeat = function setSeat(tableAddr, handId, pos, addr, sitout) {
+  const address = addr || '0x0000000000000000000000000000000000000000';
+  return new Promise((fulfill, reject) => {
+    const params = {
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: `set lineup[${pos}] = :s`,
+      ExpressionAttributeValues: {
+        ':s': { address },
+      },
+    };
+    if (sitout) {
+      params.ExpressionAttributeValues[':s'].sitout = sitout;
+    }
+    this.dynamo.updateItem(params, (err, rsp) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      fulfill(rsp.Item);
+    });
+  });
+};
+
+Db.prototype.setDealer = function setDealer(tableAddr, handId, changed, dealer) {
+  return new Promise((fulfill, reject) => {
+    const params = {
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: 'set dealer = :d, changed = :c',
+      ExpressionAttributeValues: {
+        ':d': dealer,
+        ':c': changed,
+      },
+    };
+    this.dynamo.updateItem(params, (err, rsp) => {
+      if (err) {
+        return reject(err);
+      }
+      return fulfill(rsp.Item);
+    });
+  });
+};
+
 module.exports = Db;

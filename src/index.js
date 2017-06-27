@@ -7,7 +7,7 @@ import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './error
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 const TableManager = function TableManager(db, contract, receiptCache,
-  timeoutPeriod, pusher, providerUrl) {
+  timeoutPeriod, pusher, providerUrl, sentry) {
   this.db = db;
   this.rc = receiptCache;
   this.helper = new PokerHelper(this.rc);
@@ -15,6 +15,23 @@ const TableManager = function TableManager(db, contract, receiptCache,
   this.pusher = pusher;
   this.providerUrl = providerUrl;
   this.timeoutPeriod = (timeoutPeriod) || 60;
+  this.sentry = sentry;
+};
+
+TableManager.prototype.log = function log(message, context) {
+  const cntxt = (context) || {};
+  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
+  cntxt.server_name = 'oracle-cashgame';
+  return new Promise((fulfill, reject) => {
+    const now = Math.floor(Date.now() / 1000);
+    this.sentry.captureMessage(`${now} - ${message}`, cntxt, (error, eventId) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      fulfill(eventId);
+    });
+  });
 };
 
 TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
@@ -479,6 +496,80 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     }
     hand.lineup[pos].sitout = now;
     return this.updateState(tableAddr, hand, pos);
+  });
+};
+
+TableManager.prototype.lineup = function lineup(tableAddr) {
+  let hand;
+  const lup = this.contract.getLineup(tableAddr);
+  const ddp = this.db.getLastHand(tableAddr);
+  const leavePos = [];
+  const joinPos = [];
+  return Promise.all([lup, ddp]).then((responses) => {
+    hand = responses[1];
+    const params = responses[0];
+    if (params.lastHandNetted > hand.handId) {
+      return Promise.reject(`contract handId ${params.lastHandNetted} ahead of table handId ${hand.handId}`);
+    }
+    if (!hand.lineup || hand.lineup.length !== params.lineup.length) {
+      return Promise.reject(`table lineup length ${hand.lineup.length} does not match contract.`);
+    }
+    for (let i = 0; i < hand.lineup.length; i += 1) {
+      // if seat is taken in table
+      if (hand.lineup[i].address &&
+        hand.lineup[i].address !== EMPTY_ADDR) {
+        // but empty in contract
+        if (!params.lineup[i].address ||
+          params.lineup[i].address === EMPTY_ADDR) {
+          // remember that seat to work on it
+          leavePos.push(i);
+        }
+      }
+      // if seat empty in table
+      if (!hand.lineup[i].address ||
+        hand.lineup[i].address === EMPTY_ADDR) {
+        // but filled in contract
+        if (params.lineup[i].address &&
+          params.lineup[i].address !== EMPTY_ADDR) {
+          // remember that seat to work on it
+          joinPos.push({ pos: i, addr: params.lineup[i].address });
+        }
+      }
+    }
+    if (leavePos.length === 0 && joinPos.length === 0) {
+      return Promise.resolve('no changes for lineup detected.');
+    }
+    const jobProms = [];
+    for (let i = 0; i < leavePos.length; i += 1) {
+      // we only update the seat, as not to affect the game
+      jobProms.push(this.db.setSeat(tableAddr, hand.handId, leavePos[i]));
+    }
+    // now
+    const now = Math.floor(Date.now() / 1000);
+    const sitout = (hand.state !== 'waiting' && hand.state !== 'dealing') ? now : null;
+    for (let i = 0; i < joinPos.length; i += 1) {
+      // we only update the seat, as not to affect the game
+      jobProms.push(this.db.setSeat(tableAddr,
+        hand.handId, joinPos[i].pos, joinPos[i].addr, sitout));
+    }
+    if (hand.state === 'waiting' && !this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state)) {
+      // TODO: optimize this, when handstate waiting, we can update everything at once
+      let nextDealer = 0;
+      try {
+        nextDealer = this.helper.nextPlayer(hand.lineup, hand.dealer, 'active');
+      } catch (err) {
+        // do nothing
+      }
+      if (joinPos.length > 0) {
+        nextDealer = joinPos[0].pos;
+      }
+      jobProms.push(this.db.setDealer(tableAddr, hand.handId, now, nextDealer));
+    }
+    return Promise.all(jobProms);
+  }).then(() => {
+    this.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
+      tags: { tableAddr, handId: hand.handId },
+    });
   });
 };
 

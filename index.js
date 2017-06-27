@@ -87,6 +87,8 @@ exports.handler = function handler(event, context, callback) {
       handleRequest = manager.leave(tableAddr, event.params.header.Authorization);
     } else if (path.indexOf('timeout') > -1) {
       handleRequest = manager.timeout(tableAddr);
+    } else if (path.indexOf('lineup') > -1) {
+      handleRequest = manager.lineup(tableAddr);
     } else {
       handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
     }
