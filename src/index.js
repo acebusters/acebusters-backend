@@ -30,7 +30,7 @@ const shuffle = function shuffle() {
 };
 
 function EventWorker(table, factory, db,
-  oraclePriv, sentry, controller, nutz, recoveryPriv, mailer) {
+  oraclePriv, sentry, controller, nutz, recoveryPriv, mailer, oracle) {
   this.table = table;
   this.factory = factory;
   this.controller = controller;
@@ -49,6 +49,7 @@ function EventWorker(table, factory, db,
   this.helper = new PokerHelper();
   this.sentry = sentry;
   this.mailer = mailer;
+  this.oracle = oracle;
 }
 
 EventWorker.prototype.process = function process(msg) {
@@ -87,6 +88,11 @@ EventWorker.prototype.process = function process(msg) {
   // handle HandComplete event:
   if (msgType === 'HandComplete') {
     tasks.push(this.putNextHand(msg.Subject.split('::')[1]));
+  }
+
+  // handle Timeout event:
+  if (msgType === 'Timeout') {
+    tasks.push(this.timeout(msg.Subject.split('::')[1]));
   }
 
   // handle TableNettingRequest:
@@ -432,53 +438,6 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
   });
 };
 
-EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
-  let hand;
-  const lup = this.table.getLineup(tableAddr);
-  const ddp = this.db.getLastHand(tableAddr);
-  return Promise.all([lup, ddp]).then((responses) => {
-    hand = responses[1];
-    const params = responses[0];
-    if (params.lastHandNetted > hand.handId) {
-      return Promise.reject(`contract handId ${params.lastHandNetted} ahead of table handId ${hand.handId}`);
-    }
-    if (!hand.lineup || hand.lineup.length !== params.lineup.length) {
-      return Promise.reject(`table lineup length ${hand.lineup.length} does not match contract.`);
-    }
-    let joinPos = -1;
-    for (let i = 0; i < hand.lineup.length; i += 1) {
-      // if seat empty in table
-      if (!hand.lineup[i].address ||
-        hand.lineup[i].address === EMPTY_ADDR) {
-        // but filled in contract
-        if (params.lineup[i].address &&
-          params.lineup[i].address !== EMPTY_ADDR) {
-          // remember that seat to work on it
-          joinPos = i;
-        }
-      }
-    }
-    if (joinPos === -1) {
-      return Promise.fulfill('no new player found in lineup after join event.');
-    }
-    // now
-    const changed = Math.floor(Date.now() / 1000);
-    // handle that seat that we eyed before.
-    hand.lineup[joinPos].address = params.lineup[joinPos].address;
-    if (hand.state !== 'waiting' && hand.state !== 'dealing') {
-      hand.lineup[joinPos].sitout = changed;
-    }
-    const isDealerActive = this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state);
-    // if joining player first player, make him dealer
-    if (!isDealerActive) {
-      hand.dealer = joinPos;
-    }
-    // update db
-    return this.db.updateSeat(tableAddr, hand.handId,
-      hand.lineup[joinPos], joinPos, hand.changed, hand.dealer);
-  });
-};
-
 EventWorker.prototype.toggleTable = function toggleTable(tableAddr) {
   const lhnProm = this.table.getLastHandNetted(tableAddr);
   return Promise.all([lhnProm]).then((responses) => {
@@ -499,45 +458,20 @@ EventWorker.prototype.toggleTable = function toggleTable(tableAddr) {
   });
 };
 
+
+EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
+  // call lineup on oracle
+  return this.oracle.lineup(tableAddr);
+};
+
 EventWorker.prototype.removePlayer = function removePlayer(tableAddr) {
-  let hand;
-  const lup = this.table.getLineup(tableAddr);
-  const ddp = this.db.getLastHand(tableAddr);
-  const leavePos = [];
-  return Promise.all([lup, ddp]).then((responses) => {
-    hand = responses[1];
-    const params = responses[0];
-    if (params.lastHandNetted > hand.handId) {
-      return Promise.reject(`contract handId ${params.lastHandNetted} ahead of table handId ${hand.handId}`);
-    }
-    if (!hand.lineup || hand.lineup.length !== params.lineup.length) {
-      return Promise.reject(`table lineup length ${hand.lineup.length} does not match contract.`);
-    }
-    for (let i = 0; i < hand.lineup.length; i += 1) {
-      // if seat is taken in table
-      if (hand.lineup[i].address &&
-        hand.lineup[i].address !== EMPTY_ADDR) {
-        // but empty in contract
-        if (!params.lineup[i].address ||
-          params.lineup[i].address === EMPTY_ADDR) {
-          // remember that seat to work on it
-          leavePos.push(i);
-        }
-      }
-    }
-    if (leavePos.length === 0) {
-      return Promise.resolve('no left player found in lineup after Leave event.');
-    }
-    const emptyProms = [];
-    for (let i = 0; i < leavePos.length; i += 1) {
-      emptyProms.push(this.db.emptySeat(tableAddr, hand.handId, leavePos[i]));
-    }
-    return Promise.all(emptyProms);
-  }).then(() => {
-    this.log(`removed players ${JSON.stringify(leavePos)} from db`, {
-      tags: { tableAddr, handId: hand.handId },
-    });
-  });
+  // call lineup on oracle
+  return this.oracle.lineup(tableAddr);
+};
+
+EventWorker.prototype.timeout = function timeout(tableAddr) {
+  // call timeout on oracle
+  return this.oracle.timeout(tableAddr);
 };
 
 EventWorker.prototype.getBalances = function getBalances(tableAddr, lineup, lhn, handId) {

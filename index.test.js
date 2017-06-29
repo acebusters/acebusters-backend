@@ -13,6 +13,7 @@ import Controller from './src/controllerContract';
 import Factory from './src/factoryContract';
 import Db from './src/db';
 import MailerLite from './src/mailerLite';
+import Lambda from './src/lambda';
 
 chai.use(sinonChai);
 
@@ -116,7 +117,11 @@ const dynamo = {
 
 const http = {
   request() {},
-}
+};
+
+const lambda = {
+  invoke() {},
+};
 
 sinon.stub(web3.eth, 'contract').returns(web3.eth);
 sinon.stub(web3.eth, 'at').returns(contract);
@@ -1120,44 +1125,6 @@ describe('Stream worker other events', () => {
     }).catch(done);
   });
 
-  it('should handle Table join as first player.', (done) => {
-    const event = {
-      Subject: 'ContractEvent::0x77aabb11ee00',
-      Message: JSON.stringify({
-        address: '0x77aabb11ee00',
-        event: 'Join',
-        args: {},
-      }),
-    };
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
-      [EMPTY_ADDR, P2_ADDR],
-      [new BigNumber(0), new BigNumber(50000)],
-      [new BigNumber(0), new BigNumber(0)],
-    ]);
-    sinon.stub(dynamo, 'query').yields(null, { Items: [{
-      handId: 3,
-      state: 'waiting',
-      dealer: 0,
-      lineup: [{
-        address: EMPTY_ADDR,
-      }, {
-        address: EMPTY_ADDR,
-      }],
-    }] });
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
-
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
-    const trueIsh = sinon.match((value) => {
-      const hasSeat = value.ExpressionAttributeValues[':s'].address === P2_ADDR;
-      const hasDealer = value.ExpressionAttributeValues[':d'] === 1;
-      return hasSeat && hasDealer;
-    }, 'trueIsh');
-    Promise.all(worker.process(event)).then(() => {
-      expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
-      done();
-    }).catch(done);
-  });
-
   it('should handle Table join.', (done) => {
     const event = {
       Subject: 'ContractEvent::0x77aabb11ee00',
@@ -1167,71 +1134,17 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
-      [EMPTY_ADDR, P2_ADDR, P1_ADDR],
-      [new BigNumber(0), new BigNumber(50000), new BigNumber(50000)],
-      [new BigNumber(0), new BigNumber(0), new BigNumber(0)],
-    ]);
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(dynamo, 'query').yields(null, { Items: [{
-      handId: 3,
-      state: 'waiting',
-      dealer: 2,
-      lineup: [{
-        address: EMPTY_ADDR,
-      }, {
-        address: EMPTY_ADDR,
-      }, {
-        address: P1_ADDR,
-        sitout: 1,
-      }],
-    }] });
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(lambda, 'invoke').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(null, null,
+      null, null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
-      const seat = { address: P2_ADDR };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
-      done();
-    }).catch(done);
-  });
-
-  it('should handle Table join after game started.', (done) => {
-    const event = {
-      Subject: 'ContractEvent::0x77aabb11ee00',
-      Message: JSON.stringify({
-        address: '0x77aabb11ee00',
-        event: 'Join',
-        args: {},
-      }),
-    };
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
-      [P1_ADDR, P2_ADDR, P3_ADDR],
-      [new BigNumber(50000), new BigNumber(50000), new BigNumber(50000)],
-      [new BigNumber(0), new BigNumber(0), new BigNumber(0)],
-    ]);
-    sinon.stub(dynamo, 'query').yields(null, { Items: [{
-      handId: 3,
-      state: 'flop',
-      dealer: 1,
-      lineup: [{
-        address: P1_ADDR,
-        last: new EWT(ABI_BET).bet(3, 100).sign(P1_PRIV),
-      }, {
-        address: P2_ADDR,
-        last: new EWT(ABI_BET).bet(3, 200).sign(P2_PRIV),
-      }, {
-        address: EMPTY_ADDR,
-        // empty
-      }],
-    }] });
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
-
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
-    Promise.all(worker.process(event)).then(() => {
-      const seat = { address: P3_ADDR, sitout: sinon.match.number };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(lambda.invoke).callCount(1);
+      expect(lambda.invoke).calledWith({
+        FunctionName: 'test',
+        InvocationType: 'Event',
+        Payload: '{"params":{"path":{"tableAddr":"0x77aabb11ee00"}},"context":{"resource-path":"lineup"}}',
+      }, sinon.match.any);
       done();
     }).catch(done);
   });
@@ -1245,33 +1158,34 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
-      [P1_ADDR, EMPTY_ADDR],
-      [new BigNumber(50000), new BigNumber(0)],
-      [new BigNumber(0), new BigNumber(0)],
-    ]);
-    sinon.stub(dynamo, 'query').yields(null, { Items: [{
-      handId: 3,
-      lineup: [{
-        address: P1_ADDR,
-      }, {
-        address: P2_ADDR,
-        last: '0x11',
-      }],
-    }] });
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(lambda, 'invoke').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(null, null,
+      null, null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
-      const seat = { address: EMPTY_ADDR };
-      expect(dynamo.updateItem).callCount(1);
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
-      expect(sentry.captureMessage).calledWith(sinon.match('removed players [1] from db'), {
-        level: 'info',
-        server_name: 'event-worker',
-        tags: { handId: 3, tableAddr: '0x77aabb11ee00' },
-      });
+      expect(lambda.invoke).callCount(1);
+      expect(lambda.invoke).calledWith({
+        FunctionName: 'test',
+        InvocationType: 'Event',
+        Payload: '{"params":{"path":{"tableAddr":"0x77aabb11ee00"}},"context":{"resource-path":"lineup"}}',
+      }, sinon.match.any);
+      done();
+    }).catch(done);
+  });
+
+  it('should handle timeout.', (done) => {
+    const event = { Subject: 'Timeout::0x77aabb11ee00' };
+    sinon.stub(lambda, 'invoke').yields(null, {});
+
+    const worker = new EventWorker(null, null,
+      null, null, null, null, null, null, null, new Lambda(lambda, 'test'));
+    Promise.all(worker.process(event)).then(() => {
+      expect(lambda.invoke).callCount(1);
+      expect(lambda.invoke).calledWith({
+        FunctionName: 'test',
+        InvocationType: 'Event',
+        Payload: '{"params":{"path":{"tableAddr":"0x77aabb11ee00"}},"context":{"resource-path":"timeout"}}',
+      }, sinon.match.any);
       done();
     }).catch(done);
   });
@@ -1292,5 +1206,6 @@ describe('Stream worker other events', () => {
     if (sentry.captureMessage.restore) sentry.captureMessage.restore();
     if (sentry.captureException.restore) sentry.captureException.restore();
     if (http.request.restore) http.request.restore();
+    if (lambda.invoke.restore) lambda.invoke.restore();
   });
 });
