@@ -1,12 +1,11 @@
 const P_EMPTY = '0x0000000000000000000000000000000000000000';
 
-function ScanManager(factory, table, dynamo, sns, sentry, request, topicArn) {
+function ScanManager(factory, table, dynamo, sns, sentry, topicArn) {
   this.factory = factory;
   this.table = table;
   this.dynamo = dynamo;
   this.sns = sns;
   this.sentry = sentry;
-  this.request = request;
   this.topicArn = topicArn;
 }
 
@@ -44,21 +43,6 @@ ScanManager.prototype.log = function log(message, context) {
         return;
       }
       fulfill(eventId);
-    });
-  });
-};
-
-ScanManager.prototype.callTimeout = function callTimeout(tableAddr) {
-  return new Promise((fulfill, reject) => {
-    this.request.post({
-      url: `https://evm4rumeob.execute-api.eu-west-1.amazonaws.com/v0/table/${tableAddr}/timeout`,
-      json: true,
-    }, (error, response) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      fulfill(response);
     });
   });
 };
@@ -111,7 +95,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
   }).then((rsp) => {
     const results = [];
     if (!rsp || !rsp.handId) {
-      return this.callTimeout(tableAddr);
+      return Promise.resolve(null);
     }
     // 1 hour
     const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
@@ -139,7 +123,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
         }
       }
       if (rsp.changed > tooOld && hasPlayer) {
-        results.push(this.callTimeout(tableAddr));
+        results.push(this.notify({ tableAddr }, `Timeout::${tableAddr}`));
       }
     }
     if (rsp.handId >= lhn + 2 && rsp.changed > (tooOld)) {

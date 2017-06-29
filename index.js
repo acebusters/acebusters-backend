@@ -2,7 +2,6 @@ import AWS from 'aws-sdk';
 import doc from 'dynamodb-doc';
 import Web3 from 'web3';
 import Raven from 'raven';
-import request from 'request';
 
 import Dynamo from './src/dynamo';
 import ScanManager from './src/scanner';
@@ -33,7 +32,7 @@ exports.handler = function handler(event, context, callback) {
   const tableName = process.env.TABLE_NAME;
 
   const manager = new ScanManager(new Factory(web3, factoryAddr),
-    new Table(web3), new Dynamo(dynamo, tableName), new AWS.SNS(), Raven, request, topicArn);
+    new Table(web3), new Dynamo(dynamo, tableName), new AWS.SNS(), Raven, topicArn);
 
   manager.scan().then((data) => {
     callback(null, data);

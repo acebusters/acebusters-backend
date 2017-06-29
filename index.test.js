@@ -42,10 +42,6 @@ const sentry = {
   captureException() {},
 };
 
-const request = {
-  post() {},
-};
-
 const set = {
   id: 'tables',
   addresses: ['0x4C4A59e59172A8369562a3901737d57c84fC9A3C', '0x37a9679c41e99dB270Bda88DE8FF50c0Cd23f326'],
@@ -64,10 +60,9 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(request, 'post').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, request, topicArn);
+      new Table(web3), null, sns, sentry, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(0);
@@ -84,10 +79,9 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(request, 'post').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, request, topicArn);
+      new Table(web3), null, sns, sentry, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(0);
@@ -104,10 +98,9 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(request, 'post').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, request, topicArn);
+      new Table(web3), null, sns, sentry, topicArn);
 
     manager.scan().then((rsp) => {
       expect(rsp.length).to.eql(2);
@@ -125,10 +118,9 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(request, 'post').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, request, topicArn);
+      new Table(web3), null, sns, sentry, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
@@ -156,10 +148,9 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(request, 'post').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, request, topicArn);
+      new Table(web3), null, sns, sentry, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
@@ -193,7 +184,7 @@ describe('Interval Scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), new Dynamo(dynamo), sns, sentry, request, topicArn);
+      new Table(web3), new Dynamo(dynamo), sns, sentry, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
@@ -231,13 +222,11 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(0));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(request, 'post').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), new Dynamo(dynamo), sns, sentry, request, topicArn);
+      new Table(web3), new Dynamo(dynamo), sns, sentry, topicArn);
 
     manager.scan().then(() => {
-      expect(request.post).calledWith(sinon.match.has('url', sinon.match(set.addresses[0])));
       expect(sentry.captureMessage).callCount(2);
       expect(sentry.captureMessage).calledWith(sinon.match(`TableNettingRequest::${set.addresses[0]}`), {
         level: 'info',
@@ -252,7 +241,7 @@ describe('Interval Scanner', () => {
         tags: { tableAddr: set.addresses[0] },
         extra: sinon.match.any,
       });
-      expect(sns.publish).callCount(2);
+      expect(sns.publish).callCount(3);
       expect(sns.publish).calledWith({
         Subject: `TableNettingRequest::${set.addresses[0]}`,
         Message: `{"handId":7,"tableAddr":"${set.addresses[0]}"}`,
@@ -263,13 +252,17 @@ describe('Interval Scanner', () => {
         Message: `{"pos":1,"tableAddr":"${set.addresses[0]}"}`,
         TopicArn: set.topicArn,
       });
+      expect(sns.publish).calledWith({
+        Subject: `Timeout::${set.addresses[0]}`,
+        Message: `{"tableAddr":"${set.addresses[0]}"}`,
+        TopicArn: set.topicArn,
+      });
       done();
     }).catch(done);
   });
 
   afterEach(() => {
     if (sns.publish.restore) sns.publish.restore();
-    if (request.post.restore) request.post.restore();
     if (contract.getTables.call.restore) contract.getTables.call.restore();
     if (contract.lastHandNetted.call.restore) { contract.lastHandNetted.call.restore(); }
     if (contract.lastNettingRequestHandId.call.restore) {
