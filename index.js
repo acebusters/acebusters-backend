@@ -43,7 +43,14 @@ exports.handler = function handler(event, context, callback) {
   const providerUrl = process.env.PROVIDER_URL;
   const sentryUrl = process.env.SENTRY_URL;
   const tableName = process.env.TABLE_NAME;
-  const timeout = process.env.TIMEOUT;
+
+  const getTimeout = (handState) => {
+    if (handState === 'waiting' || handState === 'dealing') {
+      return 10;
+    }
+
+    return 40;
+  };
 
   Raven.config(sentryUrl).install();
 
@@ -63,8 +70,14 @@ exports.handler = function handler(event, context, callback) {
 
 
   let handleRequest;
-  const manager = new TableManager(new Db(dynamo, tableName), new TableContract(web3), rc,
-    timeout, pusher, providerUrl);
+  const manager = new TableManager(
+    new Db(dynamo, tableName),
+    new TableContract(web3),
+    rc,
+    getTimeout,
+    pusher,
+    providerUrl,
+  );
   const path = event.context['resource-path'];
   const tableAddr = event.params.path.tableAddr;
   const handId = event.params.path.handId;
