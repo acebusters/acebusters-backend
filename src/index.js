@@ -6,15 +6,28 @@ import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './error
 
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
-const TableManager = function TableManager(db, contract, receiptCache,
-  timeoutPeriod, pusher, providerUrl, sentry) {
+const TableManager = function TableManager(
+  db,
+  contract,
+  receiptCache,
+  timeout,
+  pusher,
+  providerUrl,
+  sentry,
+) {
   this.db = db;
   this.rc = receiptCache;
   this.helper = new PokerHelper(this.rc);
   this.contract = contract;
   this.pusher = pusher;
   this.providerUrl = providerUrl;
-  this.timeoutPeriod = (timeoutPeriod) || 60;
+
+  if (typeof timeout !== 'function') {
+    this.getTimeout = () => timeout || 60;
+  } else {
+    this.getTimeout = timeout;
+  }
+
   this.sentry = sentry;
 };
 
@@ -51,7 +64,6 @@ TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
 TableManager.prototype.getConfig = function getConfig() {
   return Promise.resolve({
     providerUrl: this.providerUrl,
-    timeout: this.timeoutPeriod,
   });
 };
 
@@ -475,6 +487,7 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
   // get the latest hand to check on
   return this.db.getLastHand(tableAddr).then((_hand) => {
     hand = _hand;
+
     let pos;
     try {
       pos = this.helper.getWhosTurn(hand.lineup, hand.dealer, hand.state, hand.sb * 2);
@@ -490,7 +503,7 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const leftTime = (hand.changed + this.timeoutPeriod) - now;
+    const leftTime = (hand.changed + this.getTimeout(hand.state)) - now;
     if (leftTime > 0) {
       return Promise.resolve(`player ${pos} still got ${leftTime} seconds to act.`);
     }
