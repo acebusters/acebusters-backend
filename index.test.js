@@ -2278,6 +2278,30 @@ describe('Oracle timing', () => {
     }).catch(done);
   });
 
+  it('should use timeout function', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 12,
+      dealer: 0,
+      changed: Math.floor(Date.now() / 1000) - 20,
+      state: 'waiting',
+      lineup: [{
+        address: P1_ADDR,
+      }, {
+        address: EMPTY_ADDR,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    Promise.all([
+      new Oracle(new Db(dynamo), null, rc, () => 25).timeout(tableAddr),
+      new Oracle(new Db(dynamo), null, rc, () => 5).timeout(tableAddr),
+    ]).then(([rsp1, rsp2]) => {
+      expect(rsp1).to.contain('seconds to act');
+      expect(rsp2).to.eql(undefined);
+      done();
+    }).catch(done);
+  });
+
   afterEach(() => {
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
