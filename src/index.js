@@ -642,7 +642,12 @@ TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
 
   return Promise.all([contractData, dbData]).then(result => ({
     contract: result[0],
-    db: result[1],
+    db: result[1].map(hand => ({
+      handId: hand.handId,
+      netting: hand.netting,
+      distribution: hand.distribution,
+      lineup: hand.lineup,
+    })),
   }));
 };
 
