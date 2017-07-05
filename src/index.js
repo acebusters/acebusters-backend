@@ -607,7 +607,7 @@ function getOuts(contract, tableAddr, handId, lineup) {
 }
 
 TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
-  return Promise.all(
+  const contractData = Promise.all(
     this.contract.getLineup(tableAddr),
     this.contract.lastNettingRequestHandId(tableAddr),
     this.contract.lastNettingRequestTime(tableAddr),
@@ -637,6 +637,13 @@ TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
         lastNettingRequestTime,
       }));
   });
+
+  const dbData = this.db.getTableHands(tableAddr);
+
+  return Promise.all([contractData, dbData]).then(result => ({
+    contract: result[0],
+    db: result[1],
+  }));
 };
 
 module.exports = TableManager;
