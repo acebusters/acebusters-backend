@@ -35,26 +35,26 @@ TableManager.prototype.log = function log(message, context) {
   const cntxt = (context) || {};
   cntxt.level = (cntxt.level) ? cntxt.level : 'info';
   cntxt.server_name = 'oracle-cashgame';
-  return new Promise((fulfill, reject) => {
+  return new Promise((resolve, reject) => {
     const now = Math.floor(Date.now() / 1000);
     this.sentry.captureMessage(`${now} - ${message}`, cntxt, (error, eventId) => {
       if (error) {
         reject(error);
         return;
       }
-      fulfill(eventId);
+      resolve(eventId);
     });
   });
 };
 
 TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
-  return new Promise((fulfill, reject) => {
+  return new Promise((resolve, reject) => {
     try {
       const rsp = this.pusher.trigger(topic, 'update', {
         type: 'chatMessage',
         payload: msg,
       });
-      fulfill(rsp);
+      resolve(rsp);
     } catch (err) {
       reject(err);
     }
@@ -583,6 +583,59 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
     this.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
       tags: { tableAddr, handId: hand.handId },
     });
+  });
+};
+
+function getIns(contract, tableAddr, handId, lineup) {
+  return Promise.all(lineup.map(({ address }) => {
+    if (address === EMPTY_ADDR) {
+      return Promise.resolve(null);
+    }
+
+    return contract.getIn(tableAddr, handId, address);
+  }));
+}
+
+function getOuts(contract, tableAddr, handId, lineup) {
+  return Promise.all(lineup.map(({ address }) => {
+    if (address === EMPTY_ADDR) {
+      return Promise.resolve(null);
+    }
+
+    return contract.getOut(tableAddr, handId, address);
+  }));
+}
+
+TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
+  return Promise.all(
+    this.contract.getLineup(tableAddr),
+    this.contract.lastNettingRequestHandId(tableAddr),
+    this.contract.lastNettingRequestTime(tableAddr),
+  ).then(([
+    { lineup, lastHandNetted },
+    lastNettingRequestHandId,
+    lastNettingRequestTime,
+  ]) => {
+    const promises = [
+      getIns(this.contract, tableAddr, handId, lineup),
+      getOuts(this.contract, tableAddr, handId, lineup),
+      getIns(this.contract, tableAddr, lastHandNetted, lineup),
+      getOuts(this.contract, tableAddr, lastHandNetted, lineup),
+      getIns(this.contract, tableAddr, lastNettingRequestHandId, lineup),
+      getOuts(this.contract, tableAddr, lastNettingRequestHandId, lineup),
+    ];
+
+    return Promise.all(promises)
+      .then(([i1, o1, i2, o2, i3, o3]) => ({
+        hands: {
+          [handId]: { ins: i1, outs: o1 },
+          [lastHandNetted]: { ins: i2, outs: o2 },
+          [lastNettingRequestHandId]: { ins: i3, outs: o3 },
+        },
+        lastHandNetted,
+        lastNettingRequestHandId,
+        lastNettingRequestTime,
+      }));
   });
 };
 
