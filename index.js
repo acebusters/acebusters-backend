@@ -88,6 +88,8 @@ exports.handler = function handler(event, context, callback) {
       handleRequest = manager.info(tableAddr);
     } else if (path.indexOf('netting') > -1) {
       handleRequest = manager.netting(tableAddr, handId, event.nettingSig);
+    } else if (path.indexOf('debug') > -1) {
+      handleRequest = manager.debugInfo(tableAddr, handId);
     } else if (path.indexOf('hand') > -1) {
       handleRequest = manager.getHand(tableAddr, handId);
     } else if (path.indexOf('message') > -1) {
@@ -102,8 +104,6 @@ exports.handler = function handler(event, context, callback) {
       handleRequest = manager.timeout(tableAddr);
     } else if (path.indexOf('lineup') > -1) {
       handleRequest = manager.lineup(tableAddr);
-    } else if (path.indexOf('debug') > -1) {
-      handleRequest = manager.debugInfo(tableAddr, handId);
     } else {
       handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
     }

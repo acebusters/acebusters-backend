@@ -607,11 +607,11 @@ function getOuts(contract, tableAddr, handId, lineup) {
 }
 
 TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
-  const contractData = Promise.all(
+  const contractData = Promise.all([
     this.contract.getLineup(tableAddr),
     this.contract.lastNettingRequestHandId(tableAddr),
     this.contract.lastNettingRequestTime(tableAddr),
-  ).then(([
+  ]).then(([
     { lineup, lastHandNetted },
     lastNettingRequestHandId,
     lastNettingRequestTime,
