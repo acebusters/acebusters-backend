@@ -5,6 +5,25 @@ function Db(dynamo, tableName) {
   this.tableName = (typeof tableName === 'undefined') ? 'sb_cashgame' : tableName;
 }
 
+Db.prototype.getTableHands = function getTableHands(tableAddr) {
+  return new Promise((fulfill, reject) => {
+    this.dynamo.query({
+      TableName: this.tableName,
+      KeyConditionExpression: 'tableAddr = :a',
+      ExpressionAttributeValues: { ':a': tableAddr },
+      ScanIndexForward: false,
+    }, (err, rsp) => {
+      if (err) {
+        return reject(err);
+      }
+      if (!rsp.Items || rsp.Items.length < 1) {
+        return reject(new NotFound(`table with address ${tableAddr} unknown.`));
+      }
+      return fulfill(rsp.Items);
+    });
+  });
+};
+
 Db.prototype.getLastHand = function getLastHand(tableAddr) {
   return new Promise((fulfill, reject) => {
     this.dynamo.query({
