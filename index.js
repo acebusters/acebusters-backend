@@ -89,7 +89,7 @@ exports.handler = function handler(event, context, callback) {
     } else if (path.indexOf('netting') > -1) {
       handleRequest = manager.netting(tableAddr, handId, event.nettingSig);
     } else if (path.indexOf('debug') > -1) {
-      handleRequest = manager.debugInfo(tableAddr, handId);
+      handleRequest = manager.debugInfo(tableAddr);
     } else if (path.indexOf('hand') > -1) {
       handleRequest = manager.getHand(tableAddr, handId);
     } else if (path.indexOf('message') > -1) {

@@ -4,7 +4,7 @@ import 'buffer-v6-polyfill';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
-const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
+import { EMPTY_ADDR, getIns, getOuts } from './utils';
 
 const TableManager = function TableManager(
   db,
@@ -586,27 +586,7 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
   });
 };
 
-function getIns(contract, tableAddr, handId, lineup) {
-  return Promise.all(lineup.map(({ address }) => {
-    if (address === EMPTY_ADDR) {
-      return Promise.resolve(null);
-    }
-
-    return contract.getIn(tableAddr, handId, address);
-  }));
-}
-
-function getOuts(contract, tableAddr, handId, lineup) {
-  return Promise.all(lineup.map(({ address }) => {
-    if (address === EMPTY_ADDR) {
-      return Promise.resolve(null);
-    }
-
-    return contract.getOut(tableAddr, handId, address);
-  }));
-}
-
-TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
+TableManager.prototype.debugInfo = function debugInfo(tableAddr) {
   const contractData = Promise.all([
     this.contract.getLineup(tableAddr),
     this.contract.lastNettingRequestHandId(tableAddr),
@@ -617,8 +597,6 @@ TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
     lastNettingRequestTime,
   ]) => {
     const promises = [
-      getIns(this.contract, tableAddr, handId, lineup),
-      getOuts(this.contract, tableAddr, handId, lineup),
       getIns(this.contract, tableAddr, lastHandNetted, lineup),
       getOuts(this.contract, tableAddr, lastHandNetted, lineup),
       getIns(this.contract, tableAddr, lastNettingRequestHandId, lineup),
@@ -626,11 +604,11 @@ TableManager.prototype.debugInfo = function debugInfo(tableAddr, handId) {
     ];
 
     return Promise.all(promises)
-      .then(([i1, o1, i2, o2, i3, o3]) => ({
+      .then(([i1, o1, i2, o2]) => ({
+        lineup,
         hands: {
-          [handId]: { ins: i1, outs: o1 },
-          [lastHandNetted]: { ins: i2, outs: o2 },
-          [lastNettingRequestHandId]: { ins: i3, outs: o3 },
+          [lastHandNetted]: { ins: i1, outs: o1 },
+          [lastNettingRequestHandId]: { ins: i2, outs: o2 },
         },
         lastHandNetted,
         lastNettingRequestHandId,
