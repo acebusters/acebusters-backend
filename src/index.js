@@ -118,8 +118,8 @@ TableManager.prototype.handleMessage = function handleMessage(msgReceipt) {
   });
 };
 
-TableManager.prototype.pay = function pay(tableAddr, ewt) {
-  const receipt = this.rc.get(ewt);
+TableManager.prototype.pay = function pay(tableAddr, receiptHash) {
+  const receipt = this.rc.get(receiptHash);
   const now = Math.floor(Date.now() / 1000);
   const { handId } = receipt;
   let hand;
@@ -147,8 +147,8 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
     if (hand.lineup[pos].exitHand && hand.lineup[pos].exitHand < hand.handId) {
       throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} exceeded.`);
     }
-    // check ewt not reused
-    if (hand.lineup[pos].last === ewt) {
+    // check receiptHash not reused
+    if (hand.lineup[pos].last === receiptHash) {
       throw new Unauthorized('you can not reuse receipts.');
     }
 
@@ -211,7 +211,7 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
     }
     if (receipt.type === Type.SIT_OUT) {
       if (hand.lineup[pos].sitout) {
-        if (hand.state === 'waiting' || receipt.amount > 0) {
+        if (hand.state === 'waiting' || receipt.amount.gt(0)) {
           delete hand.lineup[pos].sitout;
         } else {
           throw new BadRequest('have to pay to return after waiting.');
@@ -248,7 +248,7 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
     if ((prevReceipt && prevReceipt.amount < recAmount) || (!prevReceipt && recAmount > 0)) {
       // calc bal
       return this.calcBalance(tableAddr, pos, receipt).then((balLeft) => {
-        hand.lineup[pos].last = ewt;
+        hand.lineup[pos].last = receiptHash;
         if (balLeft === 0) {
           hand.lineup[pos].sitout = 'allin';
         } else if (hand.state !== 'waiting' && hand.state !== 'dealing' &&
@@ -262,7 +262,7 @@ TableManager.prototype.pay = function pay(tableAddr, ewt) {
         return this.updateState(tableAddr, hand, pos);
       });
     }
-    hand.lineup[pos].last = ewt;
+    hand.lineup[pos].last = receiptHash;
     return this.updateState(tableAddr, hand, pos);
   }).then(() => {
     let rsp = (deck) ? { cards: [deck[pos * 2], deck[(pos * 2) + 1]] } : {};
@@ -505,6 +505,7 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
         return Promise.resolve(`could not find next player to act in hand ${hand.handId}`);
       }
     }
+
 
     const now = Math.floor(Date.now() / 1000);
     const leftTime = (hand.changed + this.getTimeout(hand.state)) - now;

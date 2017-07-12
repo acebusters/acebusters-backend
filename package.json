@@ -51,7 +51,6 @@
     "bignumber.js": "^4.0.1",
     "buffer-v6-polyfill": "^1.0.3",
     "dynamodb-doc": "^1.0.0",
-    "ethereum-web-token": "^0.1.12",
     "ethereumjs-util": "^4.5.0",
     "poker-helper": "^0.3.19",
     "pusher": "^1.5.1",
