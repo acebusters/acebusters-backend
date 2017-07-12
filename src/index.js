@@ -184,7 +184,7 @@ TableManager.prototype.pay = function pay(tableAddr, receiptHash) {
         Type.CHECK_TURN,
       ];
 
-      if (checks.indexOf(receipt.type) > -1 && receipt.amount !== prevReceipt.amount) {
+      if (checks.indexOf(receipt.type) > -1 && !receipt.amount.eq(prevReceipt.amount)) {
         throw new BadRequest('check should not raise.');
       }
     }
@@ -239,13 +239,13 @@ TableManager.prototype.pay = function pay(tableAddr, receiptHash) {
         const nextToAct = this.helper.getWhosTurn(hand.lineup,
           hand.dealer, hand.state, hand.sb * 2);
         if (nextToAct === bigBlindPos) {
-          if (recAmount !== hand.sb * 2) {
+          if (!recAmount.eq(hand.sb * 2)) {
             throw new BadRequest('big blind not valid.');
           }
         }
       }
     }
-    if ((prevReceipt && prevReceipt.amount < recAmount) || (!prevReceipt && recAmount > 0)) {
+    if ((prevReceipt && prevReceipt.amount.lt(recAmount)) || (!prevReceipt && recAmount.gt(0))) {
       // calc bal
       return this.calcBalance(tableAddr, pos, receipt).then((balLeft) => {
         hand.lineup[pos].last = receiptHash;
@@ -302,7 +302,7 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
     if (hand.state === 'waiting') {
       hand.state = 'dealing';
     }
-    streetMaxBet = this.helper.getMaxBet(hand.lineup, hand.state).amount;
+    streetMaxBet = this.helper.getMaxBet(hand.lineup, hand.state).amount.toString();
   }
 
   // take care of all-in
@@ -318,7 +318,7 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
 
 TableManager.prototype.calcBalance = function calcBalance(tableAddr, pos, receipt) {
   let amount;
-  if (receipt.amount > 0) {
+  if (receipt.amount.gt(0)) {
     // check if balance sufficient
     // 1. get balance at last netted
     // 2. go hand by hand till current hand - 1
@@ -336,14 +336,14 @@ TableManager.prototype.calcBalance = function calcBalance(tableAddr, pos, receip
     }).then((hands) => {
       for (let i = 0; i < hands.length; i += 1) {
         if (hands[i].lineup[pos].last) {
-          amount -= this.rc.get(hands[i].lineup[pos].last).amount;
+          amount -= this.rc.get(hands[i].lineup[pos].last).amount.toNumber();
         }
         const outs = this.rc.get(hands[i].distribution).outs;
         if (outs[pos] && hands[i].lineup[pos].address === receipt.signer) {
-          amount += outs[pos];
+          amount += outs[pos].toNumber();
         }
       }
-      const balLeft = amount - receipt.amount;
+      const balLeft = amount - receipt.amount.toNumber();
       if (balLeft >= 0) {
         return Promise.resolve(balLeft);
       }
