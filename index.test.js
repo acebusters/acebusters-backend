@@ -82,6 +82,7 @@ const sentry = {
   },
 };
 
+// ToDo: drop it with poker-helper update
 ReceiptCache.prototype.get = function get(receipt) {
   if (!receipt) { return null; }
   if (this.cache[receipt]) { return this.cache[receipt]; }
