@@ -3,6 +3,7 @@ import Web3 from 'web3';
 import Raven from 'raven';
 import Aws from 'aws-sdk';
 import request from 'request';
+import Pusher from 'pusher';
 
 import Db from './src/db';
 import EventWorker from './src/index';
@@ -14,12 +15,23 @@ import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
 
 let web3Provider;
+let pusher;
 let dynamo;
 
 exports.handler = function handler(event, context, callback) {
   const tableName = process.env.TABLE_NAME;
 
   Raven.config(process.env.SENTRY_URL).install();
+
+  if (typeof pusher === 'undefined') {
+    pusher = new Pusher({
+      appId: process.env.PUSHER_APP_ID,
+      key: process.env.PUSHER_KEY,
+      secret: process.env.PUSHER_SECRET,
+      cluster: 'eu',
+      encrypted: true,
+    });
+  }
 
   if (event.Records && event.Records instanceof Array) {
     let web3;
@@ -40,8 +52,8 @@ exports.handler = function handler(event, context, callback) {
     }
 
     let requests = [];
-    const worker = new EventWorker(table, factory, new Db(dynamo, tableName),
-      process.env.ORACLE_PRIV, Raven, controller, nutz, process.env.RECOVERY_PRIV, mailer, lambda);
+    const worker = new EventWorker(table, factory, new Db(dynamo, tableName), process.env.ORACLE_PRIV,
+      Raven, controller, nutz, process.env.RECOVERY_PRIV, mailer, lambda, pusher);
     for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
     }

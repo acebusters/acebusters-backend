@@ -115,6 +115,10 @@ const dynamo = {
   deleteItem() {},
 };
 
+const pusher = {
+  trigger() {},
+};
+
 const http = {
   request() {},
 };
@@ -964,14 +968,15 @@ describe('Stream worker other events', () => {
     };
     sinon.stub(contract.create, 'sendTransaction').yields(null, '0x123456');
     sinon.stub(web3.eth, 'getTransactionCount').yields(null, 12);
-    sinon.stub(contract.transfer, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.transfer, 'sendTransaction').yields(null, '0x789abc');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(http, 'request').yields(null, { statusCode: 200 }, {});
+    sinon.stub(pusher, 'trigger').returns(null);
 
     const mailer = new MailerLite(http.request, '1234', '4567');
 
     const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR), null, null,
-      sentry, null, new Nutz(web3, senderAddr, '0x9988'), ORACLE_PRIV, mailer);
+      sentry, null, new Nutz(web3, senderAddr, '0x9988'), ORACLE_PRIV, mailer, null, pusher);
     Promise.all(worker.process(event)).then(() => {
       const nextAddr = '0x312dd66d24da42a564afb553824fb9737f2860a1';
       expect(contract.create.sendTransaction).calledWith(P1_ADDR,
@@ -988,6 +993,11 @@ describe('Stream worker other events', () => {
         headers: { 'Content-Type': 'application/json', 'X-MailerLite-ApiKey': '1234' },
         method: 'POST',
         url: 'https://api.mailerlite.com/api/v2/groups/4567/subscribers',
+      });
+      expect(pusher.trigger).callCount(1);
+      expect(pusher.trigger).calledWith(P1_ADDR, 'update', {
+        type: 'txHash',
+        payload: '0x123456',
       });
       done();
     }).catch(done);

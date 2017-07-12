@@ -29,8 +29,8 @@ const shuffle = function shuffle() {
   return array;
 };
 
-function EventWorker(table, factory, db,
-  oraclePriv, sentry, controller, nutz, recoveryPriv, mailer, oracle) {
+function EventWorker(table, factory, db, oraclePriv, sentry, controller, nutz,
+  recoveryPriv, mailer, oracle, pusher) {
   this.table = table;
   this.factory = factory;
   this.controller = controller;
@@ -50,6 +50,7 @@ function EventWorker(table, factory, db,
   this.sentry = sentry;
   this.mailer = mailer;
   this.oracle = oracle;
+  this.pusher = pusher;
 }
 
 EventWorker.prototype.process = function process(msg) {
@@ -152,6 +153,20 @@ EventWorker.prototype.process = function process(msg) {
   return tasks;
 };
 
+EventWorker.prototype.publishUpdate = function publishUpdate(topic, msg) {
+  return new Promise((fulfill, reject) => {
+    try {
+      const rsp = this.pusher.trigger(topic, 'update', {
+        type: 'txHash',
+        payload: msg,
+      });
+      fulfill(rsp);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
 EventWorker.prototype.err = function err(e) {
   this.sentry.captureException(e, { server_name: 'event-worker' }, (sendErr) => {
     if (sendErr) {
@@ -182,9 +197,11 @@ EventWorker.prototype.walletCreated = function walletCreated(signerAddr, email) 
   const createProm = this.factory.createAccount(signerAddr, this.recoveryAddr);
   return Promise.all([nextAddrProm, createProm]).then((rsps) => {
     const nextAddr = rsps[0];
+    const txHash = rsps[1];
     const faucetProm = this.nutz.transfer(nextAddr, 1500000000000000);
     const mailerProm = this.mailer.add(email);
-    return Promise.all([faucetProm, mailerProm]);
+    const pusherProm = this.publishUpdate(signerAddr, txHash);
+    return Promise.all([faucetProm, mailerProm, pusherProm]);
   }).then(() => this.log(`WalletCreated: ${signerAddr}`, {
     user: {
       id: signerAddr,
