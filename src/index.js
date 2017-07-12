@@ -1,4 +1,3 @@
-import EWT from 'ethereum-web-token';
 import ethUtil from 'ethereumjs-util';
 import 'buffer-v6-polyfill';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
@@ -339,12 +338,9 @@ TableManager.prototype.calcBalance = function calcBalance(tableAddr, pos, receip
         if (hands[i].lineup[pos].last) {
           amount -= this.rc.get(hands[i].lineup[pos].last).amount;
         }
-        const dists = this.rc.get(hands[i].distribution).values[2];
-        for (let j = 0; j < dists.length; j += 1) {
-          const dist = EWT.separate(dists[j]);
-          if (dist.address === receipt.signer) {
-            amount += dist.amount;
-          }
+        const outs = this.rc.get(hands[i].distribution).outs;
+        if (outs[pos] && hands[i].lineup[pos].address === receipt.signer) {
+          amount += outs[pos];
         }
       }
       const balLeft = amount - receipt.amount;

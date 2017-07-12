@@ -1,7 +1,6 @@
 import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
-import EWT from 'ethereum-web-token';
 import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
 import { Receipt, ReceiptCache } from 'poker-helper';
@@ -16,8 +15,6 @@ function babz(ntz) {
   return new BigNumber(ntz).mul(NTZ_DECIMAL);
 }
 const BALANCE = babz(50000);
-const SMALL_BLIND = babz(50);
-const BIG_BLIND = babz(100);
 
 // BET can replace lower bet
 // BET can replace SIT_OUT during dealing state
@@ -27,8 +24,6 @@ const BIG_BLIND = babz(100);
 // CHECK_FLOP can replace BET or CHECK with same amount in flop
 // CHECK_TURN can replace BET or CHECK_FLOP with same amount in turn
 // SHOW can replace BET, ALL_IN or CHECK_SHOW with same amount in showdown
-
-const ABI_DIST = [{ name: 'distribution', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }, { type: 'bytes32[]' }] }];
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P1_PRIV = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
@@ -103,7 +98,7 @@ describe('Oracle pay', () => {
     sinon.stub(dynamo, 'getItem').yields(null, {});
     sinon.stub(dynamo, 'query').yields(null, { Items: [{ handId: 1 }] });
     const oracle = new Oracle(new Db(dynamo), null, rc);
-    const blind = new Receipt(tableAddr).bet(2, SMALL_BLIND).sign(P1_PRIV);
+    const blind = new Receipt(tableAddr).bet(2, babz(50)).sign(P1_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
       expect(err.message).to.contain('currently playing 1');
       done();
@@ -111,7 +106,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent small blind from player not in lineup.', (done) => {
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [0, [P2_ADDR, P3_ADDR], [50000, 50000], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       state: 'waiting',
@@ -126,7 +121,7 @@ describe('Oracle pay', () => {
     }] });
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const blind = new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P1_PRIV);
+    const blind = new Receipt(tableAddr).bet(1, babz(50)).sign(P1_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
       expect(err.message).to.contain('Forbidden');
       done();
@@ -134,7 +129,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent SB from leaving player.', (done) => {
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
       [P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)],
       [bn0, bn0],
@@ -155,7 +150,7 @@ describe('Oracle pay', () => {
     }] });
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const blind = new Receipt(tableAddr).bet(3, SMALL_BLIND).sign(P2_PRIV);
+    const blind = new Receipt(tableAddr).bet(3, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
       expect(err.message).to.contain('Forbidden: exitHand 2 exceeded.');
       done();
@@ -163,7 +158,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent BB from leaving player.', (done) => {
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1),
       [P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)],
       [bn0, bn0],
@@ -180,7 +175,7 @@ describe('Oracle pay', () => {
         exitHand: 2,
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(3, SMALL_BLIND).sign(P3_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(50)).sign(P3_PRIV),
       }],
     }] });
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
@@ -193,7 +188,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent game with less than 2 players.', (done) => {
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
       bn0,
       [P1_ADDR, EMPTY_ADDR],
@@ -219,7 +214,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent blind with wrong value.', (done) => {
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
       bn0,
       [P1_ADDR, P2_ADDR],
@@ -263,7 +258,7 @@ describe('Oracle pay', () => {
 
     const smallBlind = new Receipt(tableAddr).bet(
       1,
-      SMALL_BLIND,
+      babz(50),
     ).sign(P1_PRIV);
     oracle.pay(tableAddr, smallBlind).catch((err) => {
       expect(err.message).to.contain('not your turn');
@@ -289,7 +284,7 @@ describe('Oracle pay', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const smallBlind = new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV);
+    const smallBlind = new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, smallBlind).then(() => {
       done();
     }).catch(done);
@@ -314,7 +309,7 @@ describe('Oracle pay', () => {
     }] });
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const smallBlind = new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV);
+    const smallBlind = new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, smallBlind).then((rsp) => {
       expect(rsp.cards.length).to.eql(2);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
@@ -334,7 +329,7 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
       }],
@@ -342,7 +337,7 @@ describe('Oracle pay', () => {
     }] });
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const bet3 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P3_PRIV);
+    const bet3 = new Receipt(tableAddr).bet(1, babz(100)).sign(P3_PRIV);
     oracle.pay(tableAddr, bet3).then((rsp) => {
       expect(rsp.cards.length).to.eql(2);
       done();
@@ -360,10 +355,10 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P3_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P3_PRIV),
       }, {
         address: P4_ADDR,
       }],
@@ -386,7 +381,7 @@ describe('Oracle pay', () => {
       state: 'dealing',
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P1_PRIV),
       }, {
         address: EMPTY_ADDR,
       }, {
@@ -416,7 +411,7 @@ describe('Oracle pay', () => {
     }] });
     const oracle = new Oracle(new Db(dynamo), null, rc);
 
-    const blind = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const blind = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
       expect(err.message).to.contain('Forbidden');
       done();
@@ -430,7 +425,7 @@ describe('Oracle pay', () => {
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
       }],
@@ -459,13 +454,13 @@ describe('Oracle pay', () => {
       sb: '50000000000000',
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P3_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P3_PRIV),
       }],
       state: 'preflop',
       dealer: 0,
@@ -473,7 +468,7 @@ describe('Oracle pay', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const bet = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const bet = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, bet).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
       done();
@@ -487,16 +482,16 @@ describe('Oracle pay', () => {
       [new BigNumber(BALANCE), new BigNumber(BALANCE)],
       [0, 0],
     ]);
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
       sb: '50000000000000',
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV),
       }],
       state: 'preflop',
       dealer: 0,
@@ -506,7 +501,7 @@ describe('Oracle pay', () => {
 
     const pfCheck = new Receipt(tableAddr).checkPre(
       1,
-      BIG_BLIND,
+      babz(100),
     ).sign(P2_PRIV);
     oracle.pay(tableAddr, pfCheck).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
@@ -525,14 +520,14 @@ describe('Oracle pay', () => {
         address: P2_ADDR,
         last: new Receipt(tableAddr).bet(2, babz(10000)).sign(P2_PRIV),
       }],
-      distribution: new EWT(ABI_DIST).distribution(2, 0, [EWT.concat(P2_ADDR, 2000).toString('hex')]).sign(P1_PRIV),
+      distribution: new Receipt(tableAddr).dist(2, 0, [babz(2000)]).sign(P1_PRIV),
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       sb: '50000000000000',
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(3, SMALL_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(50)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
       }],
@@ -546,7 +541,7 @@ describe('Oracle pay', () => {
 
     const bigBlind = new Receipt(tableAddr).bet(
       3,
-      BIG_BLIND,
+      babz(100),
     ).sign(P2_PRIV);
     oracle.pay(tableAddr, bigBlind).then((rsp) => {
       expect(rsp).to.eql({
@@ -565,8 +560,8 @@ describe('Oracle pay', () => {
         address: P2_ADDR,
         last: new Receipt(tableAddr).bet(2, babz(10000)).sign(P2_PRIV),
       }],
-      distribution: new EWT(ABI_DIST).distribution(1, 0, [
-        EWT.concat(P1_ADDR, 20000).toString('hex'),
+      distribution: new Receipt(tableAddr).dist(1, 0, [
+        babz(20000),
       ]).sign(P1_PRIV),
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
@@ -601,10 +596,10 @@ describe('Oracle pay', () => {
       handId: 1,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV),
       }],
       state: 'flop',
       dealer: 0,
@@ -618,10 +613,7 @@ describe('Oracle pay', () => {
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const tooMuchBet = new Receipt(tableAddr).bet(
-      1,
-      babz(200),
-    ).sign(P2_PRIV);
+    const tooMuchBet = new Receipt(tableAddr).bet(1, babz(200)).sign(P2_PRIV);
     oracle.pay(tableAddr, tooMuchBet).catch((err) => {
       expect(err.message).to.contain('can not bet more than balance');
       done();
@@ -629,7 +621,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent reusing receipts.', (done) => {
-    const blind = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const blind = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 1,
       lineup: [{ address: P1_ADDR }, { address: P2_ADDR, last: blind }],
@@ -649,20 +641,20 @@ describe('Oracle pay', () => {
       state: 'dealing',
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P3_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P3_PRIV),
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const fold = new Receipt(tableAddr).fold(1, SMALL_BLIND).sign(P2_PRIV);
+    const fold = new Receipt(tableAddr).fold(1, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, fold).then((rsp) => {
       expect(rsp).to.eql({});
       const seat = {
@@ -681,20 +673,20 @@ describe('Oracle pay', () => {
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P3_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P3_PRIV),
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P2_ADDR], [new BigNumber(1000), new BigNumber(100), new BigNumber(1000)], [bn0, bn0, bn0]]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const allin = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const allin = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, allin).then((rsp) => {
       expect(rsp).to.eql({});
       const seat = {
@@ -715,12 +707,12 @@ describe('Oracle pay', () => {
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
       }, {
         address: EMPTY_ADDR,
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
         sitout: 1,
@@ -735,7 +727,7 @@ describe('Oracle pay', () => {
     ]);
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const allin = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const allin = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, allin).then(() => {
       const seat = {
         address: P2_ADDR,
@@ -757,7 +749,7 @@ describe('Oracle pay', () => {
         address: EMPTY_ADDR,
       }, {
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
       }, {
         address: P4_ADDR,
         sitout: 1,
@@ -983,7 +975,7 @@ describe('Oracle pay', () => {
         address: EMPTY_ADDR,
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
       }, {
         address: EMPTY_ADDR,
       }],
@@ -1021,7 +1013,7 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
       }],
@@ -1050,7 +1042,7 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
       }],
@@ -1086,7 +1078,7 @@ describe('Oracle pay', () => {
         last: new Receipt(tableAddr).bet(13, babz(50)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(13, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(13, babz(100)).sign(P2_PRIV),
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
@@ -1114,18 +1106,18 @@ describe('Oracle pay', () => {
         last: new Receipt(tableAddr).bet(1, babz(150)).sign(P2_PRIV),
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P3_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P3_PRIV),
       }, {
         address: P4_ADDR,
         last: new Receipt(tableAddr).fold(1, new BigNumber(0)).sign(P4_PRIV),
       }],
     }] });
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
-    const fold3 = new Receipt(tableAddr).fold(1, BIG_BLIND).sign(P3_PRIV);
+    const fold3 = new Receipt(tableAddr).fold(1, babz(100)).sign(P3_PRIV);
     oracle.pay(tableAddr, fold3).then((rsp) => {
       expect(rsp).to.eql({});
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
@@ -1145,7 +1137,7 @@ describe('Oracle pay', () => {
         last: new Receipt(tableAddr).bet(1, babz(200)).sign(P3_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).fold(1, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).fold(1, babz(100)).sign(P2_PRIV),
       }],
     }] });
     const oracle = new Oracle(new Db(dynamo), null, rc);
@@ -1189,10 +1181,10 @@ describe('Oracle pay', () => {
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P2_PRIV),
       }],
     }] });
 
@@ -1331,7 +1323,7 @@ describe('Oracle pay', () => {
         sitout: 1,
       }, {
         address: P3_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
       }],
     }] });
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
@@ -1350,10 +1342,10 @@ describe('Oracle pay', () => {
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P2_PRIV),
       }],
     }] });
 
@@ -1368,10 +1360,10 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to deal.', (done) => {
-    const smallBlind = new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P2_PRIV);
+    const smallBlind = new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV);
     const bigBlind = new Receipt(tableAddr).bet(
       1,
-      BIG_BLIND,
+      babz(100),
     ).sign(P3_PRIV);
 
     const lineup = [
@@ -1408,7 +1400,7 @@ describe('Oracle pay', () => {
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(50)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
       }, {
@@ -1423,7 +1415,7 @@ describe('Oracle pay', () => {
 
     const bigBlind = new Receipt(tableAddr).bet(
       1,
-      BIG_BLIND,
+      babz(100),
     ).sign(P2_PRIV);
     oracle.pay(tableAddr, bigBlind).then((rsp) => {
       expect(rsp).to.eql({
@@ -1515,7 +1507,7 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to flop with sitout', (done) => {
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 13,
@@ -1549,7 +1541,7 @@ describe('Oracle pay', () => {
   });
 
   it('should prevent playing lower bet.', (done) => {
-    sinon.stub(contract.smallBlind, 'call').yields(null, SMALL_BLIND);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [
       new BigNumber(1),
       [P1_ADDR, P2_ADDR, P3_ADDR],
@@ -1563,7 +1555,7 @@ describe('Oracle pay', () => {
         last: new Receipt(tableAddr).bet(2, babz(50)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(2, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(2, babz(100)).sign(P2_PRIV),
       }],
       state: 'turn',
       deck,
@@ -1581,8 +1573,8 @@ describe('Oracle pay', () => {
   });
 
   it('should keep hand state if game ends.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P1_PRIV);
-    const bet2 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(50)).sign(P1_PRIV);
+    const bet2 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
 
     const lineup = [
       { address: P1_ADDR, last: bet1 },
@@ -1600,7 +1592,7 @@ describe('Oracle pay', () => {
 
     const oracle = new Oracle(new Db(dynamo), null, rc, timeoutPeriod);
 
-    const fold = new Receipt(tableAddr).fold(1, SMALL_BLIND).sign(P1_PRIV);
+    const fold = new Receipt(tableAddr).fold(1, babz(50)).sign(P1_PRIV);
 
     oracle.pay(tableAddr, fold).then(() => {
       const seat = { address: P1_ADDR, last: fold };
@@ -1757,8 +1749,8 @@ describe('Oracle info', () => {
   });
 
   it('should allow to get showdown info.', (done) => {
-    const show1 = new Receipt(tableAddr).show(0, SMALL_BLIND).sign(P1_PRIV);
-    const muck2 = new Receipt(tableAddr).fold(0, SMALL_BLIND).sign(P2_PRIV);
+    const show1 = new Receipt(tableAddr).show(0, babz(50)).sign(P1_PRIV);
+    const muck2 = new Receipt(tableAddr).fold(0, babz(50)).sign(P2_PRIV);
     const lineup = [
       { address: P1_ADDR, last: show1 },
       { address: P2_ADDR, last: muck2 },
@@ -1854,8 +1846,8 @@ describe('Oracle show', () => {
   });
 
   it('should prevent bet in showdown', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV);
-    const bet2 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
+    const bet2 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     const lineup = [
       { address: P1_ADDR, last: bet1 },
       { address: P2_ADDR, last: bet2 },
@@ -1879,8 +1871,8 @@ describe('Oracle show', () => {
   });
 
   it('should allow to showdown with 1 winner.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV);
-    const bet2 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
+    const bet2 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     const lineup = [
       { address: P1_ADDR, last: bet1 },
       { address: P2_ADDR, last: bet2 },
@@ -1915,11 +1907,11 @@ describe('Oracle show', () => {
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
         sitout: 'allin',
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV),
       }],
       state: 'showdown',
       deck: [12, 11, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 0,
@@ -1943,9 +1935,9 @@ describe('Oracle show', () => {
   });
 
   it('should prevent show by timedout player.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV);
-    const bet2 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
-    const bet3 = new Receipt(tableAddr).bet(1, SMALL_BLIND).sign(P3_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
+    const bet2 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
+    const bet3 = new Receipt(tableAddr).bet(1, babz(50)).sign(P3_PRIV);
 
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
@@ -1976,8 +1968,8 @@ describe('Oracle show', () => {
   });
 
   it('should prevent show with smaller amount.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV);
-    const bet2 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
+    const bet2 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
 
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
@@ -2004,9 +1996,9 @@ describe('Oracle show', () => {
   });
 
   it('should prevent show by folded player.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV);
-    const bet2 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
-    const fold = new Receipt(tableAddr).fold(1, SMALL_BLIND).sign(P3_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
+    const bet2 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
+    const fold = new Receipt(tableAddr).fold(1, babz(50)).sign(P3_PRIV);
 
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
@@ -2036,8 +2028,8 @@ describe('Oracle show', () => {
   });
 
   it('should allow to showdown with 2 winners.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV);
-    const bet2 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
+    const bet2 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     const lineup = [
       { address: P1_ADDR, last: bet1 },
       { address: P2_ADDR, last: bet2 },
@@ -2177,7 +2169,7 @@ describe('Oracle netting', () => {
 
 describe('Oracle timing', () => {
   it('should not timeout if time not up.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
@@ -2188,7 +2180,7 @@ describe('Oracle timing', () => {
         last: bet1,
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV),
       }],
     }] });
 
@@ -2200,7 +2192,7 @@ describe('Oracle timing', () => {
   });
 
   it('should allow to put player into sitout.', (done) => {
-    const bet1 = new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P2_PRIV);
+    const bet1 = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
 
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 1,
@@ -2233,10 +2225,10 @@ describe('Oracle timing', () => {
       dealer: 0,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: new Receipt(tableAddr).fold(1, SMALL_BLIND).sign(P2_PRIV),
+        last: new Receipt(tableAddr).fold(1, babz(50)).sign(P2_PRIV),
       }],
     }] });
 
@@ -2562,7 +2554,7 @@ describe('Oracle lineup', () => {
       dealer: 1,
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(3, BIG_BLIND).sign(P1_PRIV),
+        last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
         last: new Receipt(tableAddr).bet(3, babz(200)).sign(P2_PRIV),
