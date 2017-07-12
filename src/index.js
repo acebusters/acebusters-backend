@@ -1,19 +1,15 @@
 import ethUtil from 'ethereumjs-util';
-import EWT from 'ethereum-web-token';
 import 'buffer-v6-polyfill';
 import crypto from 'crypto';
+import BigNumber from 'bignumber.js';
 import { PokerHelper, Receipt } from 'poker-helper';
-
-const ABI_DIST = [{ name: 'distribution', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }, { type: 'bytes32[]' }] }];
 
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
-const sign = function sign(payload, privStr) {
-  const priv = new Buffer(privStr.replace('0x', ''), 'hex');
-  const hash = ethUtil.sha3(payload);
-  const sig = ethUtil.ecsign(hash, priv);
-  return sig.r.toString('hex') + sig.s.toString('hex') + sig.v.toString(16);
-};
+const NTZ_DECIMAL = new BigNumber(10).pow(12);
+function babz(ntz) {
+  return new BigNumber(ntz).mul(NTZ_DECIMAL);
+}
 
 const shuffle = function shuffle() {
   const array = [];
@@ -133,7 +129,6 @@ EventWorker.prototype.process = function process(msg) {
   // find all players that have lastHand == lastHandNetted
   // pay out those players
   if (msgType === 'ContractEvent' && msgBody.event === 'Netted') {
-    tasks.push(this.payoutPlayers(msgBody.address));
     tasks.push(this.deleteHands(msgBody.address));
   }
 
@@ -232,24 +227,11 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, 
   }
   return this.table.leave(tableAddr, leaveHex).then((_txHash) => {
     txHash = _txHash;
-    const logProm = this.log('tx: table.leave()', {
+    return this.log('tx: table.leave()', {
       tags: { tableAddr, handId: exitHand },
       extra: { txHash, leaveReceipt },
     });
-    const lineupProm = this.table.getLineup(tableAddr);
-    return Promise.all([lineupProm, logProm]);
-  }).then((rsp) => {
-    if (rsp[0].lastHandNetted >= exitHand) {
-      return this.table.payout(tableAddr, leaverAddr).then(_txHash => this.log('tx: table.payout()', {
-        tags: { tableAddr },
-        extra: {
-          txHash: _txHash,
-          leaverAddr,
-        },
-      }));
-    }
-    return Promise.resolve('');
-  }).then(payoutHash => Promise.resolve([txHash, payoutHash]));
+  }).then(() => Promise.resolve([txHash]));
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
@@ -294,15 +276,11 @@ EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
 
 EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
   lastHandNetted, lastNettingRequest) {
-  const receipts = [];
+  const bets = [];
   const dists = [];
   const handProms = [];
   let txHash;
-  let txHash1;
-  let betsHex = '0x';
-  let betSigs = '0x';
-  let distsHex = '0x';
-  let distSigs = '0x';
+  let receipts = [];
   for (let i = lastHandNetted + 1; i <= lastNettingRequest; i += 1) {
     handProms.push(this.db.getHand(tableAddr, i));
   }
@@ -313,44 +291,29 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
     for (i = 0; i < hands.length; i += 1) {
       for (pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
-          receipts.push(hands[i].lineup[pos].last);
+          bets.push(hands[i].lineup[pos].last);
         }
       }
       if (hands[i].distribution) {
         dists.push(hands[i].distribution);
       }
     }
-
-    for (i = 0; i < receipts.length; i += 1) {
-      const parsed = EWT.parseToHex(receipts[i]);
-      betsHex += parsed.rec;
-      betSigs += parsed.sig;
+    for (i = 0; i < bets.length; i += 1) {
+      receipts = receipts.concat(Receipt.parseToParams(bets[i]));
     }
-
     for (i = 0; i < dists.length; i += 1) {
-      const parsed = EWT.parseToHex(dists[i]);
-      distsHex += parsed.rec;
-      distSigs += parsed.sig;
+      receipts = receipts.concat(Receipt.parseToParams(dists[i]));
     }
 
-
-    return this.table.submitDists(tableAddr, distsHex, distSigs);
+    return this.table.submit(tableAddr, receipts);
   }).then((_txHash) => {
-    txHash1 = _txHash;
-    const logProm = this.log('tx: table.submitDists()', {
+    txHash = _txHash;
+    return this.log('tx: table.submit()', {
       tags: { tableAddr },
-      extra: { txHash: txHash1, distsHex, distSigs },
-    });
-    const betsProm = this.table.submitBets(tableAddr, betsHex, betSigs);
-    return Promise.all([betsProm, logProm]);
-  }).then((rsp) => {
-    txHash = rsp[0];
-    return this.log('tx: table.submitBets()', {
-      tags: { tableAddr },
-      extra: { txHash, betsHex, betSigs },
+      extra: { txHash, receipts },
     });
   })
-  .then(() => Promise.resolve([txHash1, txHash]));
+  .then(() => Promise.resolve([txHash]));
 };
 
 EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
@@ -368,21 +331,6 @@ EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
     }
     return Promise.all(deletes);
   });
-};
-
-EventWorker.prototype.payoutPlayers = function payoutPlayers(tableAddr) {
-  return this.table.getLineup(tableAddr).then((rsp) => {
-    const requests = [];
-    for (let pos = 0; pos < rsp.lineup.length; pos += 1) {
-      if (rsp.lineup[pos].exitHand > 0 &&
-        rsp.lineup[pos].exitHand <= rsp.lastHandNetted) {
-        requests.push(this.table.payout(tableAddr, rsp.lineup[pos].address));
-      }
-    }
-    return Promise.all(requests);
-  }).then(txns =>
-    // do anything more?
-     Promise.resolve(txns));
 };
 
 EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) {
@@ -403,7 +351,8 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
 };
 
 EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) {
-  const balances = { [this.oracleAddr]: 0 };
+  const balances = {};
+  let lhn;
   return this.table.getLineup(tableAddr).then((rsp) => {
     for (let pos = 0; pos < rsp.lineup.length; pos += 1) {
       if (rsp.lineup[pos].address && rsp.lineup[pos].address !== EMPTY_ADDR) {
@@ -412,6 +361,7 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     }
     // return get all old hands
     const hands = [];
+    lhn = rsp.lastHandNetted;
     for (let i = rsp.lastHandNetted + 1; i <= handId; i += 1) {
       hands.push(this.db.getHand(tableAddr, i));
     }
@@ -421,36 +371,35 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
       return Promise.resolve('netting not needed');
     }
     // prevent overwriting netting
-    if (hands[hands.length - 1].netting) {
+    const lastHand = hands[hands.length - 1];
+    if (lastHand.netting) {
       return Promise.resolve('netting already found');
     }
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
-          balances[hands[i].lineup[pos].address] -= EWT.parse(hands[i].lineup[pos].last).values[1];
+          const value = Receipt.parse(hands[i].lineup[pos].last).amount;
+          balances[hands[i].lineup[pos].address] = balances[hands[i].lineup[pos].address].sub(value);
         }
       }
-      const dists = EWT.parse(hands[i].distribution).values[2];
-      for (let j = 0; j < dists.length; j += 1) {
-        const dist = EWT.separate(dists[j]);
-        balances[dist.address] += dist.amount;
+      const outs = Receipt.parse(hands[i].distribution).outs;
+      for (let j = 0; j < outs.length; j += 1) {
+        balances[hands[i].lineup[j].address] = balances[hands[i].lineup[j].address].add(outs[j]);
       }
     }
     // build receipt
-    const balLength = Object.keys(balances).length;
-    const recLength = 28;
-    const balBuf = Buffer.alloc((balLength * recLength) + 20);
-    balBuf.write(tableAddr.replace('0x', ''), 0, 20, 'hex');
-    balBuf.writeUInt32BE(handId, 0);
-    Object.keys(balances).forEach((key, i) => {
-      ethUtil.setLength(balances[key], 8).copy(balBuf, (i * recLength) + 20);
-      balBuf.write(key.replace('0x', ''), (i * recLength) + 28, 20, 'hex');
-    });
+    const outs = [];
+    for (let i = 0; i < lastHand.lineup.length; i += 1) {
+      outs.push(balances[lastHand.lineup[i].address] ? new BigNumber(balances[lastHand.lineup[i].address]) : babz(0));
+    }
+    const settleReceipt = new Receipt(tableAddr).settle(lhn, handId - 1, outs).sign(this.oraclePriv);
+
+    const bytes = Receipt.parseToParams(settleReceipt);
     // write netting
     return this.db.updateNetting(tableAddr, handId, {
-      newBalances: `0x${balBuf.toString('hex')}`,
-      [this.oracleAddr]: `0x${sign(balBuf, this.oraclePriv)}`,
+      newBalances: `0x${bytes[1].replace('0x', '')}${bytes[2].replace('0x', '')}`,
+      [this.oracleAddr]: bytes[0],
     });
   });
 };
@@ -492,9 +441,11 @@ EventWorker.prototype.timeout = function timeout(tableAddr) {
 };
 
 EventWorker.prototype.getBalances = function getBalances(tableAddr, lineup, lhn, handId) {
-  const balances = { [this.oracleAddr]: 0 };
+  const balances = { };
   for (let pos = 0; pos < lineup.length; pos += 1) {
-    balances[lineup[pos].address] = lineup[pos].amount;
+    if (lineup[pos].address !== EMPTY_ADDR) {
+      balances[lineup[pos].address] = lineup[pos].amount;
+    }
   }
   if (lhn >= handId - 1) {
     return Promise.resolve(balances);
@@ -504,17 +455,17 @@ EventWorker.prototype.getBalances = function getBalances(tableAddr, lineup, lhn,
     handProms.push(this.db.getHand(tableAddr, i));
   }
   return Promise.all(handProms).then((hands) => {
-      // sum up previous hands
+    // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
-          balances[hands[i].lineup[pos].address] -= EWT.parse(hands[i].lineup[pos].last).values[1];
+          const value = Receipt.parse(hands[i].lineup[pos].last).amount;
+          balances[hands[i].lineup[pos].address] = balances[hands[i].lineup[pos].address].sub(value);
         }
       }
-      const dists = EWT.parse(hands[i].distribution).values[2];
-      for (let j = 0; j < dists.length; j += 1) {
-        const dist = EWT.separate(dists[j]);
-        balances[dist.address] += dist.amount;
+      const outs = Receipt.parse(hands[i].distribution).outs;
+      for (let j = 0; j < outs.length; j += 1) {
+        balances[hands[i].lineup[j].address] = balances[hands[i].lineup[j].address].add(outs[j]);
       }
     }
     return Promise.resolve(balances);
@@ -530,15 +481,15 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
   const winners = this.helper.calcDistribution(hand.lineup,
     hand.state, boardCards, rakePerMil, this.oracleAddr);
   // distribute pots
-  const dists = [];
-  Object.keys(winners).forEach((winnerAddr) => {
-    dists.push(EWT.concat(winnerAddr, winners[winnerAddr]).toString('hex'));
-  });
+  const outs = [];
+  for (let i = 0; i < hand.lineup.length; i += 1) {
+    outs.push(winners[hand.lineup[i].address] ? new BigNumber(winners[hand.lineup[i].address]) : babz(0));
+  }
   let claimId = 0;
   if (hand.distribution) {
-    claimId = this.rc.get(hand.distribution).values[1] + 1;
+    claimId = this.rc.get(hand.distribution).claimId + 1;
   }
-  const dist = new EWT(ABI_DIST).distribution(hand.handId, claimId, dists).sign(this.oraclePriv);
+  const dist = new Receipt(tableAddr).dist(hand.handId, claimId, outs).sign(this.oraclePriv);
   return this.db.updateDistribution(tableAddr, hand.handId, dist).then(() => {
     this.log(`HandComplete: ${tableAddr}`, {
       level: 'info',
@@ -580,14 +531,17 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
     // sum up previous hands
     for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
       if (prevHand.lineup[pos].last) {
-        balances[prevHand.lineup[pos].address] -= EWT.parse(prevHand.lineup[pos].last).values[1];
+        const value = Receipt.parse(prevHand.lineup[pos].last).amount;
+        balances[prevHand.lineup[pos].address] = balances[prevHand.lineup[pos].address].sub(value);
       }
     }
-    const dists = EWT.parse(prevHand.distribution).values[2];
-    for (let j = 0; j < dists.length; j += 1) {
-      const dist = EWT.separate(dists[j]);
-      balances[dist.address] += dist.amount;
+    const outs = Receipt.parse(prevHand.distribution).outs;
+    for (let j = 0; j < outs.length; j += 1) {
+      if (outs[j] > 0) {
+        balances[prevHand.lineup[j].address] = balances[prevHand.lineup[j].address].add(outs[j]);
+      }
     }
+
     // create new lineup
     for (let i = 0; i < lineup.length; i += 1) {
       delete lineup[i].amount;
