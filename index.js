@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import Pusher from 'pusher';
-import { ReceiptCache } from 'poker-helper';
+import { Receipt, ReceiptCache } from 'poker-helper';
 import Raven from 'raven';
 import StreamWorker from './src/index';
 

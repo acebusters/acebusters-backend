@@ -1,15 +1,17 @@
 import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
-import EWT from 'ethereum-web-token';
-import { ReceiptCache } from 'poker-helper';
+import BigNumber from 'bignumber.js';
+import { Receipt, ReceiptCache } from 'poker-helper';
 import { it, describe, afterEach } from 'mocha';
 import StreamWorker from './src/index';
 
 chai.use(sinonChai);
 
-const ABI_BET = [{ name: 'bet', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }] }];
-const ABI_FOLD = [{ name: 'fold', type: 'function', inputs: [{ type: 'uint' }, { type: 'uint' }] }];
+const NTZ_DECIMAL = new BigNumber(10).pow(12);
+function babz(ntz) {
+  return new BigNumber(ntz).mul(NTZ_DECIMAL);
+}
 
 const P1_ADDR = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74';
 const P1_PRIV = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d25383f';
@@ -165,9 +167,9 @@ describe('Stream scanner', () => {
   });
 
   it('should send event when hand turns complete.', (done) => {
-    const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
-    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
-    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+    const bet1 = new Receipt(EMPTY_ADDR).bet(2, babz(500)).sign(P1_PRIV);
+    const bet2 = new Receipt(EMPTY_ADDR).bet(2, babz(1000)).sign(P2_PRIV);
+    const fold = new Receipt(EMPTY_ADDR).fold(2, babz(500)).sign(P1_PRIV);
 
     const event = {
       eventName: 'MODIFY',
@@ -215,8 +217,8 @@ describe('Stream scanner', () => {
   });
 
   it('should send event when hand turns complete with incomplete old Hand.', (done) => {
-    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
-    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+    const bet2 = new Receipt(EMPTY_ADDR).bet(2, babz(1000)).sign(P2_PRIV);
+    const fold = new Receipt(EMPTY_ADDR).fold(2, babz(500)).sign(P1_PRIV);
 
     const event = {
       eventName: 'MODIFY',
@@ -260,8 +262,8 @@ describe('Stream scanner', () => {
   });
 
   it('should not send event when hand was complete already.', (done) => {
-    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
-    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+    const bet2 = new Receipt(EMPTY_ADDR).bet(2, babz(1000)).sign(P2_PRIV);
+    const fold = new Receipt(EMPTY_ADDR).fold(2, babz(500)).sign(P1_PRIV);
 
     const event = {
       eventName: 'MODIFY',
@@ -301,9 +303,9 @@ describe('Stream scanner', () => {
   });
 
   it('should create netting when hand with leaving player turns complete.', (done) => {
-    const bet1 = new EWT(ABI_BET).bet(2, 500).sign(P1_PRIV);
-    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
-    const fold = new EWT(ABI_FOLD).fold(2, 500).sign(P1_PRIV);
+    const bet1 = new Receipt(EMPTY_ADDR).bet(2, babz(500)).sign(P1_PRIV);
+    const bet2 = new Receipt(EMPTY_ADDR).bet(2, babz(1000)).sign(P2_PRIV);
+    const fold = new Receipt(EMPTY_ADDR).fold(2, babz(500)).sign(P1_PRIV);
 
     const event = {
       eventName: 'MODIFY',
@@ -359,8 +361,8 @@ describe('Stream scanner', () => {
   });
 
   it('should submit when netting complete.', (done) => {
-    const bet1 = new EWT(ABI_BET).bet(2, 1000).sign(P1_PRIV);
-    const bet2 = new EWT(ABI_BET).bet(2, 1000).sign(P2_PRIV);
+    const bet1 = new Receipt(EMPTY_ADDR).bet(2, babz(1000)).sign(P1_PRIV);
+    const bet2 = new Receipt(EMPTY_ADDR).bet(2, babz(1000)).sign(P2_PRIV);
     const event = {
       eventName: 'MODIFY',
       dynamodb: {
