@@ -418,7 +418,7 @@ TableManager.prototype.leave = function leave(tableAddr, ewt) {
   let hand;
   let pos = -1;
   const receipt = this.rc.get(ewt);
-  const { handId } = receipt;
+  const { handId, leaverAddr } = receipt;
   // check if this hand exists
   return this.db.getLastHand(tableAddr).then((_hand) => {
     hand = _hand;
@@ -430,13 +430,13 @@ TableManager.prototype.leave = function leave(tableAddr, ewt) {
     return this.contract.getLineup(tableAddr);
   }).then((rsp) => {
     for (let i = 0; i < rsp.lineup.length; i += 1) {
-      if (receipt.signer === rsp.lineup[i].address) {
+      if (leaverAddr === rsp.lineup[i].address) {
         pos = i;
         break;
       }
     }
     if (pos < 0 || !hand.lineup[pos]) {
-      throw new Forbidden(`address ${receipt.signer} not in lineup.`);
+      throw new Forbidden(`address ${leaverAddr} not in lineup.`);
     }
     // check signer not submitting another leave receipt
     if (hand.lineup[pos].exitHand) {
