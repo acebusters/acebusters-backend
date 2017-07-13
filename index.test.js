@@ -100,7 +100,7 @@ describe('Oracle pay', () => {
 
   it('should prevent small blind from player not in lineup.', (done) => {
     sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
-    sinon.stub(contract.getLineup, 'call').yields(null, [0, [P2_ADDR, P3_ADDR], [50000, 50000], [0, 0]]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [P2_ADDR, P3_ADDR], [babz(50000), babz(50000)], [0, 0]]);
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       state: 'waiting',
       handId: 1,
