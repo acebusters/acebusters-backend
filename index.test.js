@@ -851,8 +851,8 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const netting = {
-        '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x1b8a5e7966a103b5ea9bb49220ef91b8460d0fc78c884e4019bc4bf3b32ea6fdc0018cca6f4ece69f766e523b448fb9ec6b693e415bb839dca67897cc4b4fca779',
-        newBalances: '0x00a701000000038be5e000000269fb20000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x1c9d1c14a033754a7e7a43371e79517a76afc321f2820109733ab9feeeb47ea9124bd6f8c97bfc0837fc7a1213be91fbe782edc4778944f0f9d9883a9921d80f0e',
+        newBalances: '0x00a7010000000090f560ffffff6f0aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':n', netting)));
       done();
@@ -895,9 +895,10 @@ describe('Stream worker other events', () => {
         handId: 2,
       }),
     };
+    const bals = '0x11223311223311223311223311223311223311223311223311223311223311228899aabbccddeeff8899aabbccddeeff8899aabbccddeeff8899aabbccddeeff';
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       netting: {
-        newBalances: '0x112233',
+        newBalances: bals,
         [ORACLE_ADDR]: '0x223344',
         [P1_ADDR]: '0x334455',
         [P2_ADDR]: '0x445566',
@@ -908,12 +909,12 @@ describe('Stream worker other events', () => {
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
-      expect(contract.settle.sendTransaction).calledWith('0x112233', '0x223344334455445566', { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(contract.settle.sendTransaction).calledWith('0x223344334455445566', '0x1122331122331122331122331122331122331122331122331122331122331122', '0x8899aabbccddeeff8899aabbccddeeff8899aabbccddeeff8899aabbccddeeff', { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.settle()'), {
         level: 'info',
         server_name: 'event-worker',
         tags: { tableAddr: '0x77aabb11ee00' },
-        extra: { txHash: '0x123456', bals: '0x112233', sigs: '0x223344334455445566' },
+        extra: { txHash: '0x123456', bals, sigs: '0x223344334455445566' },
       });
       done();
     }).catch(done);
@@ -943,7 +944,7 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then(() => {
       const nextAddr = '0x312dd66d24da42a564afb553824fb9737f2860a1';
       expect(contract.create.sendTransaction).calledWith(P1_ADDR,
-        ORACLE_ADDR, 259200, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+        ORACLE_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(contract.transfer.sendTransaction).calledWith(nextAddr,
         1500000000000000, { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match.any, {

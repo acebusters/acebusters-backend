@@ -35,11 +35,11 @@ TableContract.prototype.toggleTable = function toggleTable(tableAddr, activeRece
   });
 };
 
-TableContract.prototype.settle = function settle(tableAddr, newBalances, sigs) {
+TableContract.prototype.settle = function settle(tableAddr, sigs, newBalances) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
   return new Promise((fulfill, reject) => {
-    contract.settle.sendTransaction(newBalances, sigs,
-      { from: this.senderAddr, gas: 200000 },
+    contract.settle.sendTransaction(sigs, `0x${newBalances.substring(2, 66)}`, `0x${newBalances.substring(66, 130)}`,
+      { from: this.senderAddr, gas: 500000 },
       (err, val) => {
         if (err) {
           reject(err);

@@ -2,7 +2,7 @@ import ethUtil from 'ethereumjs-util';
 import 'buffer-v6-polyfill';
 import crypto from 'crypto';
 import BigNumber from 'bignumber.js';
-import { PokerHelper, Receipt } from 'poker-helper';
+import { PokerHelper, Receipt, ReceiptCache } from 'poker-helper';
 
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
@@ -47,6 +47,7 @@ function EventWorker(table, factory, db, oraclePriv, sentry, controller, nutz,
   this.mailer = mailer;
   this.oracle = oracle;
   this.pusher = pusher;
+  this.rc = new ReceiptCache();
 }
 
 EventWorker.prototype.process = function process(msg) {
@@ -343,7 +344,7 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
         sigs += hand.netting[addr].replace('0x', '');
       }
     });
-    return this.table.settle(tableAddr, hand.netting.newBalances, sigs);
+    return this.table.settle(tableAddr, sigs, hand.netting.newBalances);
   }).then(txHash => this.log('tx: table.settle()', {
     tags: { tableAddr },
     extra: { bals: hand.netting.newBalances, sigs, txHash },
@@ -351,12 +352,17 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
 };
 
 EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) {
-  const balances = {};
+  const old = [];
+  const bal = [];
   let lhn;
   return this.table.getLineup(tableAddr).then((rsp) => {
     for (let pos = 0; pos < rsp.lineup.length; pos += 1) {
       if (rsp.lineup[pos].address && rsp.lineup[pos].address !== EMPTY_ADDR) {
-        balances[rsp.lineup[pos].address] = rsp.lineup[pos].amount;
+        bal[pos] = rsp.lineup[pos].amount;
+        old[pos] = rsp.lineup[pos].amount;
+      } else {
+        bal[pos] = new BigNumber(0);
+        old[pos] = new BigNumber(0);
       }
     }
     // return get all old hands
@@ -377,24 +383,21 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     }
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
-      const outs = Receipt.parse(hands[i].distribution).outs;
+      const outs = (this.rc.get(hands[i].distribution)) ? this.rc.get(hands[i].distribution).outs : [];
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
           if (typeof outs[pos] === 'undefined') {
             outs[pos] = new BigNumber(0);
           }
-          const value = Receipt.parse(hands[i].lineup[pos].last).amount;
-          const bal = balances[hands[i].lineup[pos].address] || new BigNumber(0);
-          balances[hands[i].lineup[pos].address] = bal.add(outs[pos]).sub(value);
+          bal[pos] = bal[pos].add(outs[pos]).sub(this.rc.get(hands[i].lineup[pos].last).amount);
         }
       }
     }
     // build receipt
-    const outs = [];
-    for (let i = 0; i < lastHand.lineup.length; i += 1) {
-      outs.push(balances[lastHand.lineup[i].address] ? new BigNumber(balances[lastHand.lineup[i].address]) : babz(0));
+    for (let i = 0; i < bal.length; i += 1) {
+      bal[i] = bal[i].sub(old[i]);
     }
-    const settleReceipt = new Receipt(tableAddr).settle(lhn, handId - 1, outs).sign(this.oraclePriv);
+    const settleReceipt = new Receipt(tableAddr).settle(lhn, handId - 1, bal).sign(this.oraclePriv);
 
     const bytes = Receipt.parseToParams(settleReceipt);
     // write netting
@@ -458,14 +461,14 @@ EventWorker.prototype.getBalances = function getBalances(tableAddr, lineup, lhn,
   return Promise.all(handProms).then((hands) => {
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
-      const outs = Receipt.parse(hands[i].distribution).outs;
+      const outs = (this.rc.get(hands[i].distribution)) ? this.rc.get(hands[i].distribution).outs : [];
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
           if (typeof outs[pos] === 'undefined') {
             outs[pos] = new BigNumber(0);
           }
-          const value = Receipt.parse(hands[i].lineup[pos].last).amount;
-          let bal = balances[hands[i].lineup[pos].address] || new BigNumber(0);
+          const value = this.rc.get(hands[i].lineup[pos].last).amount;
+          const bal = balances[hands[i].lineup[pos].address] || new BigNumber(0);
           balances[hands[i].lineup[pos].address] = bal.add(outs[pos]).sub(value);
         }
       }
@@ -532,12 +535,12 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
 
     // sum up previous hands
     for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
-      const outs = Receipt.parse(prevHand.distribution).outs;
+      const outs = (this.rc.get(prevHand.distribution)) ? this.rc.get(prevHand.distribution).outs : [];
       if (prevHand.lineup[pos].last) {
         if (typeof outs[pos] === 'undefined') {
           outs[pos] = new BigNumber(0);
         }
-        const value = Receipt.parse(prevHand.lineup[pos].last).amount;
+        const value = this.rc.get(prevHand.lineup[pos].last).amount;
         const bal = balances[prevHand.lineup[pos].address] || new BigNumber(0);
         balances[prevHand.lineup[pos].address] = bal.add(outs[pos]).sub(value);
       }
