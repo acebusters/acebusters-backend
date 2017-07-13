@@ -462,9 +462,9 @@ TableManager.prototype.netting = function netting(tableAddr, handIdStr, nettingS
     }
     // do ecrecover
     const netSigHex = nettingSig.replace('0x', '');
-    const r = new Buffer(netSigHex.substring(0, 64), 'hex');
-    const s = new Buffer(netSigHex.substring(64, 128), 'hex');
-    const v = parseInt(netSigHex.substring(128, 130), 16);
+    const r = new Buffer(netSigHex.substring(2, 66), 'hex');
+    const s = new Buffer(netSigHex.substring(62, 130), 'hex');
+    const v = parseInt(netSigHex.substring(0, 2), 16);
     const payload = new Buffer(hand.netting.newBalances.replace('0x', ''), 'hex');
     const hash = ethUtil.sha3(payload);
     const pub = ethUtil.ecrecover(hash, v, r, s);
