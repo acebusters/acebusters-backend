@@ -377,15 +377,16 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     }
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
+      const outs = Receipt.parse(hands[i].distribution).outs;
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
+          if (typeof outs[pos] === 'undefined') {
+            outs[pos] = new BigNumber(0);
+          }
           const value = Receipt.parse(hands[i].lineup[pos].last).amount;
-          balances[hands[i].lineup[pos].address] = balances[hands[i].lineup[pos].address].sub(value);
+          const bal = balances[hands[i].lineup[pos].address] || new BigNumber(0);
+          balances[hands[i].lineup[pos].address] = bal.add(outs[pos]).sub(value);
         }
-      }
-      const outs = Receipt.parse(hands[i].distribution).outs;
-      for (let j = 0; j < outs.length; j += 1) {
-        balances[hands[i].lineup[j].address] = balances[hands[i].lineup[j].address].add(outs[j]);
       }
     }
     // build receipt
@@ -457,15 +458,16 @@ EventWorker.prototype.getBalances = function getBalances(tableAddr, lineup, lhn,
   return Promise.all(handProms).then((hands) => {
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
+      const outs = Receipt.parse(hands[i].distribution).outs;
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
+          if (typeof outs[pos] === 'undefined') {
+            outs[pos] = new BigNumber(0);
+          }
           const value = Receipt.parse(hands[i].lineup[pos].last).amount;
-          balances[hands[i].lineup[pos].address] = balances[hands[i].lineup[pos].address].sub(value);
+          let bal = balances[hands[i].lineup[pos].address] || new BigNumber(0);
+          balances[hands[i].lineup[pos].address] = bal.add(outs[pos]).sub(value);
         }
-      }
-      const outs = Receipt.parse(hands[i].distribution).outs;
-      for (let j = 0; j < outs.length; j += 1) {
-        balances[hands[i].lineup[j].address] = balances[hands[i].lineup[j].address].add(outs[j]);
       }
     }
     return Promise.resolve(balances);
@@ -530,15 +532,14 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
 
     // sum up previous hands
     for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
+      const outs = Receipt.parse(prevHand.distribution).outs;
       if (prevHand.lineup[pos].last) {
+        if (typeof outs[pos] === 'undefined') {
+          outs[pos] = new BigNumber(0);
+        }
         const value = Receipt.parse(prevHand.lineup[pos].last).amount;
-        balances[prevHand.lineup[pos].address] = balances[prevHand.lineup[pos].address].sub(value);
-      }
-    }
-    const outs = Receipt.parse(prevHand.distribution).outs;
-    for (let j = 0; j < outs.length; j += 1) {
-      if (outs[j] > 0) {
-        balances[prevHand.lineup[j].address] = balances[prevHand.lineup[j].address].add(outs[j]);
+        const bal = balances[prevHand.lineup[pos].address] || new BigNumber(0);
+        balances[prevHand.lineup[pos].address] = bal.add(outs[pos]).sub(value);
       }
     }
 
