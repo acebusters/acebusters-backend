@@ -591,47 +591,4 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
   });
 };
 
-TableManager.prototype.debugInfo = function debugInfo(tableAddr) {
-  const contractData = Promise.all([
-    this.contract.getLineup(tableAddr),
-    this.contract.lastNettingRequestHandId(tableAddr),
-    this.contract.lastNettingRequestTime(tableAddr),
-  ]).then(([
-    { lineup, lastHandNetted },
-    lastNettingRequestHandId,
-    lastNettingRequestTime,
-  ]) => {
-    const promises = [
-      getIns(this.contract, tableAddr, lastHandNetted, lineup),
-      getOuts(this.contract, tableAddr, lastHandNetted, lineup),
-      getIns(this.contract, tableAddr, lastNettingRequestHandId, lineup),
-      getOuts(this.contract, tableAddr, lastNettingRequestHandId, lineup),
-    ];
-
-    return Promise.all(promises)
-      .then(([i1, o1, i2, o2]) => ({
-        lineup,
-        hands: {
-          [lastHandNetted]: { ins: i1, outs: o1 },
-          [lastNettingRequestHandId]: { ins: i2, outs: o2 },
-        },
-        lastHandNetted,
-        lastNettingRequestHandId,
-        lastNettingRequestTime,
-      }));
-  });
-
-  const dbData = this.db.getTableHands(tableAddr);
-
-  return Promise.all([contractData, dbData]).then(result => ({
-    contract: result[0],
-    db: result[1].map(hand => ({
-      handId: hand.handId,
-      netting: hand.netting,
-      distribution: hand.distribution,
-      lineup: hand.lineup,
-    })),
-  }));
-};
-
 module.exports = TableManager;
