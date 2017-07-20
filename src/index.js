@@ -3,7 +3,7 @@ import 'buffer-v6-polyfill';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
-import { EMPTY_ADDR, getIns, getOuts } from './utils';
+const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 const TableManager = function TableManager(
   db,

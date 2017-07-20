@@ -21,15 +21,4 @@ TableContract.prototype.getLineup = contractMethod('getLineup', (lineup) => {
   };
 });
 
-TableContract.prototype.lastNettingRequestHandId = contractMethod('lastNettingRequestHandId');
-
-TableContract.prototype.lastNettingRequestTime = contractMethod('lastNettingRequestTime');
-
-TableContract.prototype.getIn = contractMethod('getIn');
-
-TableContract.prototype.getOut = contractMethod('getIn', result => ({
-  claimCount: result[0],
-  out: result[1],
-}));
-
 module.exports = TableContract;
