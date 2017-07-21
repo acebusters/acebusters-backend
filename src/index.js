@@ -3,7 +3,7 @@ import 'buffer-v6-polyfill';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
-import { EMPTY_ADDR, getIns, getOuts } from './utils';
+const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 const TableManager = function TableManager(
   db,
@@ -589,49 +589,6 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
       tags: { tableAddr, handId: hand.handId },
     });
   });
-};
-
-TableManager.prototype.debugInfo = function debugInfo(tableAddr) {
-  const contractData = Promise.all([
-    this.contract.getLineup(tableAddr),
-    this.contract.lastNettingRequestHandId(tableAddr),
-    this.contract.lastNettingRequestTime(tableAddr),
-  ]).then(([
-    { lineup, lastHandNetted },
-    lastNettingRequestHandId,
-    lastNettingRequestTime,
-  ]) => {
-    const promises = [
-      getIns(this.contract, tableAddr, lastHandNetted, lineup),
-      getOuts(this.contract, tableAddr, lastHandNetted, lineup),
-      getIns(this.contract, tableAddr, lastNettingRequestHandId, lineup),
-      getOuts(this.contract, tableAddr, lastNettingRequestHandId, lineup),
-    ];
-
-    return Promise.all(promises)
-      .then(([i1, o1, i2, o2]) => ({
-        lineup,
-        hands: {
-          [lastHandNetted]: { ins: i1, outs: o1 },
-          [lastNettingRequestHandId]: { ins: i2, outs: o2 },
-        },
-        lastHandNetted,
-        lastNettingRequestHandId,
-        lastNettingRequestTime,
-      }));
-  });
-
-  const dbData = this.db.getTableHands(tableAddr);
-
-  return Promise.all([contractData, dbData]).then(result => ({
-    contract: result[0],
-    db: result[1].map(hand => ({
-      handId: hand.handId,
-      netting: hand.netting,
-      distribution: hand.distribution,
-      lineup: hand.lineup,
-    })),
-  }));
 };
 
 module.exports = TableManager;
