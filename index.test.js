@@ -8,7 +8,6 @@ import BigNumber from 'bignumber.js';
 import EventWorker from './src/index';
 import Table from './src/tableContract';
 import Nutz from './src/nutzContract';
-import Controller from './src/controllerContract';
 import Factory from './src/factoryContract';
 import Db from './src/db';
 import MailerLite from './src/mailerLite';
@@ -169,7 +168,11 @@ describe('Stream worker HandComplete event', () => {
         changed: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
-      const distHand2 = new Receipt(tableAddr).dist(2, 0, [babz(0), babz(0), babz(1485)]).sign(ORACLE_PRIV);
+      const distHand2 = new Receipt(tableAddr).dist(
+        2,
+        0,
+        [babz(0), babz(0), babz(1485)],
+      ).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
       expect(sentry.captureMessage).calledWith(sinon.match(`HandComplete: ${tableAddr}`), sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match(`NewHand: ${tableAddr}`), {
@@ -243,7 +246,11 @@ describe('Stream worker HandComplete event', () => {
         changed: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
-      const distHand2 = new Receipt(tableAddr).dist(2, 0, [babz(0), babz(0), babz(2376), babz(24)]).sign(ORACLE_PRIV);
+      const distHand2 = new Receipt(tableAddr).dist(
+        2,
+        0,
+        [babz(0), babz(0), babz(2376), babz(24)],
+      ).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand2)));
       done();
     }).catch(done);
@@ -511,7 +518,11 @@ describe('Stream worker HandComplete event', () => {
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
-      const distHand4 = new Receipt(tableAddr).dist(4, 0, [babz(1039.5), babz(1039.5)]).sign(ORACLE_PRIV);
+      const distHand4 = new Receipt(tableAddr).dist(
+        4,
+        0,
+        [babz(1039.5), babz(1039.5)],
+      ).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand4)));
       expect(dynamo.putItem).calledWith(sinon.match.has('Item', sinon.match.has('handId', 5)));
       done();
@@ -940,7 +951,7 @@ describe('Stream worker other events', () => {
     const mailer = new MailerLite(http.request, '1234', '4567');
 
     const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR), null, null,
-      sentry, null, new Nutz(web3, senderAddr, '0x9988'), ORACLE_PRIV, mailer, null, pusher);
+      sentry, new Nutz(web3, senderAddr, '0x9988'), ORACLE_PRIV, mailer, null, pusher);
     Promise.all(worker.process(event)).then(() => {
       const nextAddr = '0x312dd66d24da42a564afb553824fb9737f2860a1';
       expect(contract.create.sendTransaction).calledWith(P1_ADDR,
@@ -982,40 +993,6 @@ describe('Stream worker other events', () => {
       const toggleReceipt = '0x0000000cf3beac30c498d9e26865f34fcaa57dbb935b0d74b8203ec9bb03700770ee3664c4819186de8ab490117381159ecc53ef4e5499ea7c14b136cddbd848ff496a0f275bd9e9092d9ed0885e6e95704a9673e2458cc21b';
       expect(contract.toggleActive.sendTransaction).calledWith(toggleReceipt,
         { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
-      done();
-    }).catch(done);
-  });
-
-  it('should handle WalletReset event.', (done) => {
-    const event = {
-      Subject: 'WalletReset::0x1234',
-      Message: JSON.stringify({
-        oldSignerAddr: P1_ADDR,
-        newSignerAddr: P2_ADDR,
-      }),
-    };
-    const contrAddr = P3_ADDR;
-    sinon.stub(contract.getAccount, 'call').yields(null, ['0x1122', contrAddr, new BigNumber(5)]);
-    sinon.stub(contract.changeSigner, 'sendTransaction').yields(null, '0x123456');
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
-    const recoveryReceipt = new Receipt(contrAddr).recover(6, P2_ADDR).sign(ORACLE_PRIV);
-    const recoveryHex = Receipt.parseToParams(recoveryReceipt);
-
-    const worker = new EventWorker(null, new Factory(web3, '0x1255', '0x1234'),
-      null, null, sentry, new Controller(web3, P3_ADDR), new Nutz(web3), ORACLE_PRIV);
-    Promise.all(worker.process(event)).then(() => {
-      expect(contract.changeSigner.sendTransaction).calledWith(
-        ...recoveryHex, { from: P3_ADDR, gas: sinon.match.any }, sinon.match.any);
-      expect(sentry.captureMessage).calledWith(sinon.match.any, {
-        extra: {
-          oldAddr: P1_ADDR,
-          newAddr: P2_ADDR,
-          recoveryReceipt,
-          txHash: '0x123456',
-        },
-        level: 'info',
-        server_name: 'event-worker',
-      });
       done();
     }).catch(done);
   });
@@ -1101,7 +1078,7 @@ describe('Stream worker other events', () => {
     sinon.stub(lambda, 'invoke').yields(null, {});
 
     const worker = new EventWorker(null, null,
-      null, null, null, null, null, null, null, new Lambda(lambda, 'test'));
+      null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({
@@ -1125,7 +1102,7 @@ describe('Stream worker other events', () => {
     sinon.stub(lambda, 'invoke').yields(null, {});
 
     const worker = new EventWorker(null, null,
-      null, null, null, null, null, null, null, new Lambda(lambda, 'test'));
+      null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({
@@ -1142,7 +1119,7 @@ describe('Stream worker other events', () => {
     sinon.stub(lambda, 'invoke').yields(null, {});
 
     const worker = new EventWorker(null, null,
-      null, null, null, null, null, null, null, new Lambda(lambda, 'test'));
+      null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({

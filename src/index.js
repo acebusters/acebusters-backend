@@ -25,11 +25,20 @@ const shuffle = function shuffle() {
   return array;
 };
 
-function EventWorker(table, factory, db, oraclePriv, sentry, controller, nutz,
-  recoveryPriv, mailer, oracle, pusher) {
+function EventWorker(
+  table,
+  factory,
+  db,
+  oraclePriv,
+  sentry,
+  nutz,
+  recoveryPriv,
+  mailer,
+  oracle,
+  pusher,
+) {
   this.table = table;
   this.factory = factory;
-  this.controller = controller;
   this.nutz = nutz;
   this.db = db;
   if (oraclePriv) {
@@ -106,14 +115,9 @@ EventWorker.prototype.process = function process(msg) {
     tasks.push(this.submitNetting(msgBody.tableAddr, msgBody.handId));
   }
 
-  // react to new wallet. deploy proxy and controller on the chain.
+  // react to new wallet. deploy proxy on the chain.
   if (msgType === 'WalletCreated') {
     tasks.push(this.walletCreated(msgBody.signerAddr, msgBody.email));
-  }
-
-  // react to wallet reset. send recovery transaction to controller.
-  if (msgType === 'WalletReset') {
-    tasks.push(this.walletReset(msgBody.oldSignerAddr, msgBody.newSignerAddr));
   }
 
   // toggle table active
@@ -202,18 +206,6 @@ EventWorker.prototype.walletCreated = function walletCreated(signerAddr, email) 
     user: {
       id: signerAddr,
     },
-  }));
-};
-
-EventWorker.prototype.walletReset = function walletReset(oldAddr, newAddr) {
-  let recoveryReceipt;
-  return this.factory.getAccount(oldAddr).then((rsp) => {
-    recoveryReceipt = new Receipt(rsp.controller)
-      .recover(rsp.lastNonce + 1, newAddr).sign(this.recoveryPriv);
-    const recoveryHex = Receipt.parseToParams(recoveryReceipt);
-    return this.controller.changeSigner(rsp.controller, recoveryHex);
-  }).then(txHash => this.log(`tx: controller.changeSigner(${oldAddr}, ${newAddr})`, {
-    extra: { txHash, recoveryReceipt, oldAddr, newAddr },
   }));
 };
 
@@ -383,7 +375,8 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     }
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
-      const outs = (this.rc.get(hands[i].distribution)) ? this.rc.get(hands[i].distribution).outs : [];
+      const distribution = this.rc.get(hands[i].distribution);
+      const outs = distribution ? distribution.outs : [];
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
           if (typeof outs[pos] === 'undefined') {
@@ -461,7 +454,8 @@ EventWorker.prototype.getBalances = function getBalances(tableAddr, lineup, lhn,
   return Promise.all(handProms).then((hands) => {
     // sum up previous hands
     for (let i = 0; i < hands.length; i += 1) {
-      const outs = (this.rc.get(hands[i].distribution)) ? this.rc.get(hands[i].distribution).outs : [];
+      const distribution = this.rc.get(hands[i].distribution);
+      const outs = distribution ? distribution.outs : [];
       for (let pos = 0; pos < hands[i].lineup.length; pos += 1) {
         if (hands[i].lineup[pos].last) {
           if (typeof outs[pos] === 'undefined') {
@@ -488,7 +482,11 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
   // distribute pots
   const outs = [];
   for (let i = 0; i < hand.lineup.length; i += 1) {
-    outs.push(winners[hand.lineup[i].address] ? new BigNumber(winners[hand.lineup[i].address]) : babz(0));
+    outs.push(
+      winners[hand.lineup[i].address]
+        ? new BigNumber(winners[hand.lineup[i].address])
+        : babz(0),
+    );
   }
   let claimId = 0;
   if (hand.distribution) {
@@ -535,7 +533,8 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
 
     // sum up previous hands
     for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
-      const outs = (this.rc.get(prevHand.distribution)) ? this.rc.get(prevHand.distribution).outs : [];
+      const distribution = this.rc.get(prevHand.distribution);
+      const outs = distribution ? distribution.outs : [];
       if (prevHand.lineup[pos].last) {
         if (typeof outs[pos] === 'undefined') {
           outs[pos] = new BigNumber(0);

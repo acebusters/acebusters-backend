@@ -37,7 +37,7 @@ FactoryContract.prototype.getAccount = function getAccount(signerAddr) {
       }
       fulfill({
         signer: val[0],
-        ower: val[1],
+        owner: val[1],
         isLocked: val[2],
       });
     });
