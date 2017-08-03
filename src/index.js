@@ -84,11 +84,12 @@ function checkWallet(walletStr) {
   return wallet;
 }
 
-function AccountManager(db, email, recaptcha, sns, topicArn, sessionPriv) {
+function AccountManager(db, email, recaptcha, sns, topicArn, sessionPriv, factory) {
   this.db = db;
   this.email = email;
   this.recaptcha = recaptcha;
   this.sns = sns;
+  this.factory = factory;
   this.topicArn = topicArn;
   if (sessionPriv) {
     this.sessionPriv = sessionPriv;
@@ -145,6 +146,29 @@ AccountManager.prototype.getRef = function getRef(refCode) {
 
 AccountManager.prototype.queryAccount = function queryAccount(email) {
   return this.db.getAccountByEmail(email).then(account => Promise.resolve(account));
+};
+
+AccountManager.prototype.queryUnlockReceipt = async function queryUnlockReceipt(unlockRequest) {
+  try {
+    const unlockRequestReceipt = Receipt.parse(unlockRequest);
+    const secsFromCreated = Math.floor(Date.now() / 1000) - unlockRequestReceipt.created;
+    const account = await this.factory.getAccount(unlockRequestReceipt.signer);
+
+    if (secsFromCreated > 600) {
+      throw new BadRequest('Receipt is outdated');
+    }
+
+    if (account.proxy !== '0x') {
+      const receipt = new Receipt(account.proxy)
+                      .unlock(unlockRequestReceipt.newOwner)
+                      .sign('0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4');
+      return receipt;
+    }
+
+    throw new BadRequest(`Proxy for ${unlockRequestReceipt.signer} doesn't exist`);
+  } catch (e) {
+    throw e;
+  }
 };
 
 AccountManager.prototype.addAccount = function addAccount(accountId,
