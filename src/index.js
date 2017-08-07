@@ -310,11 +310,10 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
 };
 
 EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
-  let lhn;
-  return this.table.getLineup(tableAddr).then((rsp) => {
-    lhn = rsp.lastHandNetted;
-    return this.db.getLastHand(tableAddr, true);
-  }).then((hand) => {
+  return this.table.getLineup(tableAddr).then(rsp => Promise.all([
+    rsp.lastHandNetted,
+    this.db.getLastHand(tableAddr, true),
+  ])).then(([lhn, hand]) => {
     if (lhn < 2 || hand.handId > lhn) {
       return Promise.resolve(`no work on range lhn: ${lhn} , handId: ${hand.handId}`);
     }
