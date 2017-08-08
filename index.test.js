@@ -46,30 +46,39 @@ const deck = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 const contract = {
   leave: {
     sendTransaction() {},
+    estimateGas() {},
   },
   settle: {
     sendTransaction() {},
+    estimateGas() {},
   },
   payoutFrom: {
     sendTransaction() {},
+    estimateGas() {},
   },
   net: {
     sendTransaction() {},
+    estimateGas() {},
   },
   submit: {
     sendTransaction() {},
+    estimateGas() {},
   },
   create: {
     sendTransaction() {},
+    estimateGas() {},
   },
   changeSigner: {
     sendTransaction() {},
+    estimateGas() {},
   },
   transfer: {
     sendTransaction() {},
+    estimateGas() {},
   },
   toggleActive: {
     sendTransaction() {},
+    estimateGas() {},
   },
   getLineup: {
     call() {},
@@ -631,6 +640,7 @@ describe('Stream worker other events', () => {
       [new BigNumber(50000), new BigNumber(50000)],
       [babz(0), babz(0)],
     ]);
+    sinon.stub(contract.leave, 'estimateGas').yields(null, 1000);
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, 'sentry');
 
@@ -652,6 +662,7 @@ describe('Stream worker other events', () => {
     const tableAddr = EMPTY_ADDR;
 
     const event = { Subject: `ProgressNetting::${tableAddr}` };
+    sinon.stub(contract.net, 'estimateGas').yields(null, 100);
     sinon.stub(contract.net, 'sendTransaction').yields(null, '0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
@@ -690,6 +701,7 @@ describe('Stream worker other events', () => {
       distribution: new Receipt(EMPTY_ADDR).dist(6, 0, [babz(1500)]).sign(ORACLE_PRIV),
     } });
     sinon.stub(contract.submit, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.submit, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
@@ -723,6 +735,8 @@ describe('Stream worker other events', () => {
     ]);
     sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
     sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
+    // sinon.stub(contract.leave, 'estimateGas').yields(null, 100);
+    sinon.stub(contract.payoutFrom, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV, sentry);
@@ -916,6 +930,7 @@ describe('Stream worker other events', () => {
       },
     } });
     sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.settle, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
@@ -942,8 +957,10 @@ describe('Stream worker other events', () => {
       }),
     };
     sinon.stub(contract.create, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.create, 'estimateGas').yields(null, 100);
     sinon.stub(web3.eth, 'getTransactionCount').yields(null, 12);
     sinon.stub(contract.transfer, 'sendTransaction').yields(null, '0x789abc');
+    sinon.stub(contract.transfer, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(http, 'request').yields(null, { statusCode: 200 }, {});
     sinon.stub(pusher, 'trigger').returns(null);
@@ -985,6 +1002,7 @@ describe('Stream worker other events', () => {
       Message: '{}',
     };
     sinon.stub(contract.toggleActive, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.toggleActive, 'estimateGas').yields(null, 100);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(12));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 

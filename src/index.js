@@ -211,20 +211,23 @@ EventWorker.prototype.walletCreated = function walletCreated(signerAddr, email) 
 
 EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, exitHand) {
   let leaveHex;
-  let txHash;
   const leaveReceipt = new Receipt(tableAddr).leave(exitHand, leaverAddr).sign(this.oraclePriv);
   try {
     leaveHex = Receipt.parseToParams(leaveReceipt);
   } catch (error) {
     return Promise.reject(error);
   }
-  return this.table.leave(tableAddr, leaveHex).then((_txHash) => {
-    txHash = _txHash;
-    return this.log('tx: table.leave()', {
+  return this.table.leave(tableAddr, leaveHex).then((txHash) => {
+    this.log('tx: table.leave()', {
       tags: { tableAddr, handId: exitHand },
       extra: { txHash, leaveReceipt },
     });
-  }).then(() => Promise.resolve([txHash]));
+
+    return [txHash];
+  }, error => this.log('tx: table.leave()', {
+    level: 'error',
+    extra: { error },
+  }));
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
@@ -305,6 +308,12 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
       tags: { tableAddr },
       extra: { txHash, receipts },
     });
+  }, (error) => {
+    this.log('tx: table.submit() error', {
+      tags: { tableAddr },
+      extra: { error },
+    });
+    return Promise.reject(error);
   })
   .then(() => Promise.resolve([txHash]));
 };

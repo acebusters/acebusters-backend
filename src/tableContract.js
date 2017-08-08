@@ -5,78 +5,57 @@ function TableContract(web3, senderAddr) {
   this.senderAddr = senderAddr;
 }
 
+TableContract.prototype.sendTransaction = function sendTransaction(
+  contractMethod,
+  maxGas,
+  ...args
+) {
+  return new Promise((fulfill, reject) => {
+    contractMethod.estimateGas(...args, { from: this.senderAddr }, (gasErr, estimate) => {
+      const gas = Math.round(estimate * 1.2);
+      if (gasErr) {
+        reject(`Estimate error: ${JSON.stringify(gasErr)}`);
+      } else if (gas > maxGas) {
+        reject(`Too many gas required for tx (${gas})`);
+      } else {
+        contractMethod.sendTransaction(
+          ...args,
+          { from: this.senderAddr, gas },
+          (txErr, txHash) => {
+            if (txErr) {
+              return reject(`Tx error: ${txErr}`);
+            }
+            return fulfill(txHash);
+          },
+        );
+      }
+    });
+  });
+};
+
 TableContract.prototype.leave = function leave(tableAddr, leaveReceipt) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-  return new Promise((fulfill, reject) => {
-    contract.leave.sendTransaction(...leaveReceipt,
-      { from: this.senderAddr, gas: 200000 },
-      (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val);
-      });
-  });
+  return this.sendTransaction(contract.leave, 200000, ...leaveReceipt);
 };
 
 TableContract.prototype.toggleTable = function toggleTable(tableAddr, activeReceipt) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-  return new Promise((fulfill, reject) => {
-    contract.toggleActive.sendTransaction(activeReceipt,
-      { from: this.senderAddr, gas: 200000 },
-      (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val);
-      });
-  });
+  return this.sendTransaction(contract.toggleActive, 200000, activeReceipt);
 };
 
 TableContract.prototype.settle = function settle(tableAddr, sigs, newBalances) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-  return new Promise((fulfill, reject) => {
-    contract.settle.sendTransaction(sigs, `0x${newBalances.substring(2, 66)}`, `0x${newBalances.substring(66, 130)}`,
-      { from: this.senderAddr, gas: 500000 },
-      (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val);
-      });
-  });
+  return this.sendTransaction(contract.settle, 500000, sigs, `0x${newBalances.substring(2, 66)}`, `0x${newBalances.substring(66, 130)}`);
 };
 
 TableContract.prototype.net = function net(tableAddr) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-  return new Promise((fulfill, reject) => {
-    contract.net.sendTransaction({ from: this.senderAddr, gas: 2600000 },
-      (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val);
-      });
-  });
+  return this.sendTransaction(contract.net, 2600000);
 };
 
 TableContract.prototype.submit = function submit(tableAddr, receipts) {
   const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-  return new Promise((fulfill, reject) => {
-    contract.submit.sendTransaction(receipts,
-      { from: this.senderAddr, gas: 1900000 },
-      (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val);
-      });
-  });
+  return this.sendTransaction(contract.submit, 1900000, receipts);
 };
 
 TableContract.prototype.getSmallBlind = function getSmallBlind(tableAddr) {
