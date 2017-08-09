@@ -13,15 +13,7 @@ export default class NutzContract extends Contract {
   }
 
   balanceOf(owner) {
-    return new Promise((fulfill, reject) => {
-      this.contract.balanceOf.call(owner, (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val.toNumber());
-      });
-    });
+    return this.call(this.contract.balanceOf, owner).then(val => val.toNumber());
   }
 
 }

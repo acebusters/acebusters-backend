@@ -30,55 +30,34 @@ export default class TableContract extends Contract {
 
   getSmallBlind(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return new Promise((fulfill, reject) => {
-      contract.smallBlind.call((err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val.toNumber());
-      });
-    });
+    return this.call(contract.smallBlind).then(val => val.toNumber());
   }
 
   getLastHandNetted(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return new Promise((fulfill, reject) => {
-      contract.lastHandNetted.call((err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val.toNumber());
-      });
-    });
+    return this.call(contract.lastHandNetted).then(val => val.toNumber());
   }
 
   getLineup(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return new Promise((fulfill, reject) => {
-      contract.getLineup.call((err, data) => {
-        let error = err;
-        if (!err && (!data || data.length < 4)) {
-          error = 'lineup response invalid.';
-        }
-        if (error) {
-          reject(error);
-          return;
-        }
-        const rv = [];
-        for (let i = 0; i < data[1].length; i += 1) {
-          rv.push({
-            address: data[1][i],
-            amount: data[2][i],
-            exitHand: data[3][i].toNumber(),
-          });
-        }
-        fulfill({
-          lastHandNetted: data[0].toNumber(),
-          lineup: rv,
+    return this.call(contract.getLineup).then((data) => {
+      if (!data || data.length < 4) {
+        return Promise.reject('lineup response invalid.');
+      }
+
+      const rv = [];
+      for (let i = 0; i < data[1].length; i += 1) {
+        rv.push({
+          address: data[1][i],
+          amount: data[2][i],
+          exitHand: data[3][i].toNumber(),
         });
-      });
+      }
+
+      return {
+        lastHandNetted: data[0].toNumber(),
+        lineup: rv,
+      };
     });
   }
 }

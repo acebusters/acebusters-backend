@@ -10,7 +10,7 @@ export default class Contract {
     maxGas,
     ...args
   ) {
-    return new Promise((fulfill, reject) => {
+    return new Promise((resolve, reject) => {
       contractMethod.estimateGas(...args, (gasErr, gas) => {
         if (gasErr) {
           reject(`Estimate error: ${JSON.stringify(gasErr)}`);
@@ -24,10 +24,23 @@ export default class Contract {
               if (txErr) {
                 return reject(`Tx error: ${txErr}`);
               }
-              return fulfill(txHash);
+              return resolve(txHash);
             },
           );
         }
+      });
+    });
+  }
+
+  call(contractMethod, ...args) { // eslint-disable-line class-methods-use-this
+    const callee = contractMethod.call === Function.prototype.call ? contractMethod
+                                                                   : contractMethod.call;
+    return new Promise((resolve, reject) => {
+      callee(...args, (err, val) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(val);
       });
     });
   }

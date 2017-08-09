@@ -11,15 +11,7 @@ export default class FactoryContract extends Contract {
   }
 
   getTransactionCount() {
-    return new Promise((fulfill, reject) =>
-      this.web3.eth.getTransactionCount(this.factoryAddr, (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill(val);
-      }),
-    );
+    return this.call(this.web3.eth.getTransactionCount, this.factoryAddr);
   }
 
   getNextAddr() {
@@ -30,19 +22,11 @@ export default class FactoryContract extends Contract {
   }
 
   getAccount(signerAddr) {
-    return new Promise((fulfill, reject) => {
-      this.contract.getAccount.call(signerAddr, (err, val) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        fulfill({
-          signer: val[0],
-          owner: val[1],
-          isLocked: val[2],
-        });
-      });
-    });
+    return this.call(this.contract.getAccount, signerAddr).then(val => ({
+      signer: val[0],
+      owner: val[1],
+      isLocked: val[2],
+    }));
   }
 
   createAccount(signerAddr, lockAddr) {

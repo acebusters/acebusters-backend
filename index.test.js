@@ -987,6 +987,7 @@ describe('Stream worker other events', () => {
         url: 'https://api.mailerlite.com/api/v2/groups/4567/subscribers',
       });
       expect(pusher.trigger).callCount(1);
+      expect(web3.eth.getTransactionCount).callCount(1);
       expect(pusher.trigger).calledWith(P1_ADDR, 'update', {
         type: 'txHash',
         payload: '0x123456',
