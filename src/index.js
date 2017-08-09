@@ -414,8 +414,7 @@ EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) 
     for (let i = 0; i < bal.length; i += 1) {
       bal[i] = bal[i].sub(old[i]);
     }
-    const settleReceipt = new Receipt(tableAddr).settle(lhn, handId - 1, bal).sign(this.oraclePriv);
-
+    const settleReceipt = new Receipt(tableAddr).settle(lhn, handId, bal).sign(this.oraclePriv);
     const bytes = Receipt.parseToParams(settleReceipt);
     // write netting
     return this.db.updateNetting(tableAddr, handId, {
@@ -526,7 +525,7 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
       },
       extra: { dist, hand },
     });
-    return Promise.resolve(dist);
+    return dist;
   });
 };
 

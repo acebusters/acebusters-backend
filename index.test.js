@@ -876,8 +876,8 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const netting = {
-        '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x1c9d1c14a033754a7e7a43371e79517a76afc321f2820109733ab9feeeb47ea9124bd6f8c97bfc0837fc7a1213be91fbe782edc4778944f0f9d9883a9921d80f0e',
-        newBalances: '0x00a7010000000090f560ffffff6f0aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+        '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x1ccf13cf61b8e66a91e1964cf07b30c715ff83b9e00cb36bcdb423fbfdcfba4a6237d92a84fd463bb6bdf37ea5bf077da37947839e1d031827d557124edbd9daab',
+        newBalances: '0x00a7020000000090f560ffffff6f0aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':n', netting)));
       done();
