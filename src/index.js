@@ -217,17 +217,20 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, 
   } catch (error) {
     return Promise.reject(error);
   }
-  return this.table.leave(tableAddr, leaveHex).then((txHash) => {
-    this.log('tx: table.leave()', {
-      tags: { tableAddr, handId: exitHand },
-      extra: { txHash, leaveReceipt },
-    });
+  return this.table.leave(tableAddr, leaveHex).then(
+    (txHash) => {
+      this.log('tx: table.leave()', {
+        tags: { tableAddr, handId: exitHand },
+        extra: { txHash, leaveReceipt },
+      });
 
-    return [txHash];
-  }, error => this.log('tx: table.leave()', {
-    level: 'error',
-    extra: { error },
-  }));
+      return [txHash];
+    },
+    error => this.log('tx: table.leave()', {
+      level: 'error',
+      extra: { error, leaveReceipt },
+    }),
+  );
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
@@ -264,10 +267,17 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
 };
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
-  return this.table.net(tableAddr).then(txHash => this.log('tx: table.net()', {
-    tags: { tableAddr },
-    extra: { txHash },
-  }));
+  return this.table.net(tableAddr).then(
+    txHash => this.log('tx: table.net()', {
+      tags: { tableAddr },
+      extra: { txHash },
+    }),
+    error => this.log('tx: table.net()', {
+      tags: { tableAddr },
+      level: 'error',
+      extra: { error },
+    }),
+  );
 };
 
 EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
@@ -275,7 +285,6 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
   const bets = [];
   const dists = [];
   const handProms = [];
-  let txHash;
   let receipts = [];
   for (let i = lastHandNetted + 1; i <= lastNettingRequest; i += 1) {
     handProms.push(this.db.getHand(tableAddr, i));
@@ -302,20 +311,20 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
     }
 
     return this.table.submit(tableAddr, receipts);
-  }).then((_txHash) => {
-    txHash = _txHash;
-    return this.log('tx: table.submit()', {
+  }).then(
+    (txHash) => {
+      this.log('tx: table.submit()', {
+        tags: { tableAddr },
+        extra: { txHash, receipts },
+      });
+      return [txHash];
+    },
+    error => this.log('tx: table.submit()', {
       tags: { tableAddr },
-      extra: { txHash, receipts },
-    });
-  }, (error) => {
-    this.log('tx: table.submit() error', {
-      tags: { tableAddr },
-      extra: { error },
-    });
-    return Promise.reject(error);
-  })
-  .then(() => Promise.resolve([txHash]));
+      level: 'error',
+      extra: { error, receipts },
+    }),
+  );
 };
 
 EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
@@ -345,10 +354,17 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
       }
     });
     return this.table.settle(tableAddr, sigs, hand.netting.newBalances);
-  }).then(txHash => this.log('tx: table.settle()', {
-    tags: { tableAddr },
-    extra: { bals: hand.netting.newBalances, sigs, txHash },
-  }));
+  }).then(
+    txHash => this.log('tx: table.settle()', {
+      tags: { tableAddr },
+      extra: { bals: hand.netting.newBalances, sigs, txHash },
+    }),
+    error => this.log('tx: table.settle()', {
+      tags: { tableAddr },
+      level: 'error',
+      extra: { bals: hand.netting.newBalances, sigs, error },
+    }),
+  );
 };
 
 EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) {
