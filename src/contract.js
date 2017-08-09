@@ -11,8 +11,7 @@ export default class Contract {
     ...args
   ) {
     return new Promise((fulfill, reject) => {
-      contractMethod.estimateGas(...args, (gasErr, estimate) => {
-        const gas = Math.round(estimate * 1.2);
+      contractMethod.estimateGas(...args, (gasErr, gas) => {
         if (gasErr) {
           reject(`Estimate error: ${JSON.stringify(gasErr)}`);
         } else if (gas > maxGas) {
@@ -20,7 +19,7 @@ export default class Contract {
         } else {
           contractMethod.sendTransaction(
             ...args,
-            { from: this.senderAddr, gas },
+            { from: this.senderAddr, gas: Math.round(gas * 1.2) },
             (txErr, txHash) => {
               if (txErr) {
                 return reject(`Tx error: ${txErr}`);
