@@ -63,6 +63,7 @@ const contract = {
   submit: {
     sendTransaction() {},
     estimateGas() {},
+    call() {},
   },
   create: {
     sendTransaction() {},
@@ -701,6 +702,7 @@ describe('Stream worker other events', () => {
       distribution: new Receipt(EMPTY_ADDR).dist(6, 0, [babz(1500)]).sign(ORACLE_PRIV),
     } });
     sinon.stub(contract.submit, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.submit, 'call').yields(null, 1);
     sinon.stub(contract.submit, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
