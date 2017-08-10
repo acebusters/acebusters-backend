@@ -25,7 +25,13 @@ export default class TableContract extends Contract {
 
   submit(tableAddr, receipts) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.sendTransaction(contract.submit, 1900000, receipts);
+
+    return this.call(contract.submit, receipts).then((writeCount) => {
+      if (writeCount === 0) {
+        return Promise.reject('Already submitted');
+      }
+      return this.sendTransaction(contract.submit, 1900000, receipts);
+    });
   }
 
   getSmallBlind(tableAddr) {
