@@ -54,6 +54,8 @@ exports.handler = function handler(event, context, callback) {
       event.txHash,
       event.amount,
     );
+  } else if (!path) {
+    handleRequest = service.cleanup();
   } else {
     handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
   }
