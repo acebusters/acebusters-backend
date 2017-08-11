@@ -25,18 +25,20 @@ export default class ReserveSerivce {
         throw new Error('Seat is busy');
       }
 
-      return await this.db.reserveSeat(tableAddr, pos, signerAddr, txHash, amount);
+      const result = await this.db.reserveSeat(tableAddr, pos, signerAddr, txHash, amount);
       // notify through pusher
+      return result;
     } catch (e) {
       throw e;
     }
   }
 
-  async cleanup() {
-    console.log(this);
-    // find outdated reservations
-    // delete outdated reservations
-    // notify about outdated reservations through pusher
+  async cleanup(timeout) {
+    const deletedItems = await this.db.cleanup(timeout);
+    deletedItems.forEach((item) => {
+      console.log('notify', item);
+      // notify about deleted reservation through pusher
+    });
   }
 
 }

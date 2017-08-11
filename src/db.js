@@ -41,6 +41,7 @@ export default class Db {
         signerAddr: [signerAddr],
         txHash: [txHash],
         amount: [amount],
+        created: [Math.round(Date.now() / 1000)],
       }),
     });
   }
@@ -58,6 +59,21 @@ export default class Db {
         txHash: item.txHash,
       },
     }));
+  }
+
+  async cleanupOutdated(timeout) {
+    const data = await this.sdb.select({
+      SelectExpression: `select * from \`${this.tableName}\` where created>${Math.round(Date.now() / 1000) + timeout}`,
+    });
+    const outdated = data.Items.map(transform);
+
+    await Promise.all(outdated.map((item, i) => this.sdb.deleteAttributes({
+      DomainName: this.tableName,
+      ItemName: `${item.tableAddr}-${item.pos}`,
+      Attributes: data.Items[i],
+    })));
+
+    return outdated;
   }
 
 }

@@ -26,6 +26,7 @@ exports.handler = function handler(event, context, callback) {
   }
 
   // get configuration
+  const cleanupTimeout = process.env.CLEANUP_TIMEOUT || 60;
   const tableName = process.env.TABLE_NAME;
   const providerUrl = process.env.PROVIDER_URL;
   const path = event.context['resource-path'];
@@ -55,7 +56,7 @@ exports.handler = function handler(event, context, callback) {
       event.amount,
     );
   } else if (!path) {
-    handleRequest = service.cleanup();
+    handleRequest = service.cleanup(cleanupTimeout);
   } else {
     handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
   }
