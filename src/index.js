@@ -1,3 +1,5 @@
+import _ from 'lodash';
+
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 export default class ReserveSerivce {
@@ -26,7 +28,10 @@ export default class ReserveSerivce {
       }
 
       const result = await this.db.reserveSeat(tableAddr, pos, signerAddr, txHash, amount);
-      // notify through pusher
+      this.pusher.trigger(tableAddr, 'update', {
+        type: 'seatReserve',
+        payload: { pos, amount, txHash, signerAddr },
+      });
       return result;
     } catch (e) {
       throw e;
@@ -35,9 +40,11 @@ export default class ReserveSerivce {
 
   async cleanup(timeout) {
     const deletedItems = await this.db.cleanup(timeout);
-    deletedItems.forEach((item) => {
-      console.log('notify', item);
-      // notify about deleted reservation through pusher
+    _.forEach(_.groupBy(deletedItems, 'tableAddr'), (items, key) => {
+      this.pusher.trigger(key, 'update', {
+        type: 'seatsRelease',
+        payload: items,
+      });
     });
   }
 
