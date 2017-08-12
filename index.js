@@ -40,7 +40,7 @@ exports.handler = function handler(event, context, callback) {
     }
     web3 = new Web3(web3Provider);
     const table = new Table(web3, process.env.SENDER_ADDR);
-    const factory = new Factory(web3, process.env.SENDER_ADDR, process.env.FACTORY_ADDR);
+    const factory = new Factory(web3, process.env.OWNER_ADDR, process.env.FACTORY_ADDR);
     const nutz = new Nutz(web3, process.env.SENDER_ADDR, process.env.NUTZ_ADDR);
     const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
     const lambda = new Lambda(new Aws.Lambda(), process.env.ORACLE_FUNC_NAME);
