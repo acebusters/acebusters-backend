@@ -39,13 +39,15 @@ export default class ReserveSerivce {
   }
 
   async cleanup(timeout) {
-    const deletedItems = await this.db.cleanup(timeout);
+    const deletedItems = await this.db.cleanupOutdated(timeout);
     _.forEach(_.groupBy(deletedItems, 'tableAddr'), (items, key) => {
       this.pusher.trigger(key, 'update', {
         type: 'seatsRelease',
         payload: items,
       });
     });
+
+    return deletedItems;
   }
 
 }

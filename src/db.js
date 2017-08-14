@@ -60,33 +60,32 @@ export default class Db {
   }
 
   async getTableReservations(tableAddr) {
-    const { Items: reservations } = await this.select({
+    const { Items: reservations = [] } = await this.select({
       SelectExpression: `select * from \`${this.tableName}\` where \`tableAddr\`="${tableAddr}"`,
     });
 
-    return reservations.map(transform).reduce((memo, item) => ({
+    return reservations.map(item => transform(item.Attributes)).reduce((memo, item) => ({
       ...memo,
       [item.pos]: {
         signerAddr: item.signerAddr,
         amount: item.amount,
         txHash: item.txHash,
       },
-    }));
+    }), {});
   }
 
   async cleanupOutdated(timeout) {
     const data = await this.select({
-      SelectExpression: `select * from \`${this.tableName}\` where \`created\`>'${Math.round(Date.now() / 1000) + timeout}'`,
+      SelectExpression: `select * from \`${this.tableName}\` where \`created\`<'${Math.round(Date.now() / 1000) - timeout}'`,
     });
-    const outdated = data.Items.map(transform);
 
-    await Promise.all(outdated.map((item, i) => this.deleteAttributes({
+    await Promise.all((data.Items || []).map(item => this.deleteAttributes({
       DomainName: this.tableName,
-      ItemName: `${item.tableAddr}-${item.pos}`,
-      Attributes: data.Items[i],
+      ItemName: item.Name,
+      Attributes: item.Attributes,
     })));
 
-    return outdated;
+    return data;
   }
 
   method(name, params) {

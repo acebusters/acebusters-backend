@@ -30,7 +30,7 @@ exports.handler = function handler(event, context, callback) {
     const cleanupTimeout = Number(process.env.CLEANUP_TIMEOUT) || 60;
     const tableName = process.env.TABLE_NAME;
     const providerUrl = process.env.PROVIDER_URL;
-    const path = event.context['resource-path'];
+    const path = (event.context || {})['resource-path'] || '';
     let web3;
 
     // set up web3 and worker
@@ -56,7 +56,9 @@ exports.handler = function handler(event, context, callback) {
         event['body-json'].txHash,
         event['body-json'].amount,
       );
-    } else if (!path) {
+    } else if (path.indexOf('lineup') > -1) {
+      handleRequest = service.getReservations(event.params.path.tableAddr);
+    } else if (!path || path.indexOf('clean') > -1) {
       handleRequest = service.cleanup(cleanupTimeout);
     } else {
       handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
