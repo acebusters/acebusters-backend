@@ -4,6 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "lint": "npm run lint:js",
+    "lint:eslint": "eslint --fix --ignore-path .gitignore --ignore-pattern internals/scripts",
+    "lint:js": "npm run lint:eslint -- . ",
+    "build": "npm run build:init && npm run build:js && npm run build:install",
+    "build:init": "rm -rf dist && mkdir dist",
+    "build:js": "babel index.js --out-dir dist && babel src --out-dir dist/src",
+    "build:install": "cp package.json dist/ && cd dist && npm install --production",
+    "package": "npm run build && npm run package:pack",
+    "package:pack": "zip -r artifact.zip dist/*",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "acebusters",

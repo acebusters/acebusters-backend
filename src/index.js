@@ -23,7 +23,7 @@ export default class ReserveSerivce {
       }
 
       const lineup = await this.table.getLineup(tableAddr);
-      if (lineup[1][pos] !== EMPTY_ADDR) {
+      if (lineup[1][pos] && lineup[1][pos] !== EMPTY_ADDR) {
         throw new Error('Seat is busy');
       }
 
