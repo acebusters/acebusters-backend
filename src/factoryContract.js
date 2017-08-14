@@ -22,7 +22,7 @@ export default class FactoryContract extends Contract {
   }
 
   getAccount(signerAddr) {
-    return this.call(this.contract.getAccount, signerAddr).then(val => ({
+    return this.call(this.contract.getAccount.call, signerAddr).then(val => ({
       signer: val[0],
       owner: val[1],
       isLocked: val[2],

@@ -32,11 +32,9 @@ export default class Contract {
     });
   }
 
-  call(contractMethod, ...args) { // eslint-disable-line class-methods-use-this
-    const callee = contractMethod.call === Function.prototype.call ? contractMethod
-                                                                   : contractMethod.call;
+  call(method, ...args) { // eslint-disable-line class-methods-use-this
     return new Promise((resolve, reject) => {
-      callee(...args, (err, val) => {
+      method(...args, (err, val) => {
         if (err) {
           return reject(err);
         }

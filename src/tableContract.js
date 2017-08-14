@@ -26,7 +26,7 @@ export default class TableContract extends Contract {
   submit(tableAddr, receipts) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
 
-    return this.call(contract.submit, receipts).then((writeCount) => {
+    return this.call(contract.submit.call, receipts).then((writeCount) => {
       if (writeCount === 0) {
         return Promise.reject('Already submitted');
       }
@@ -36,17 +36,17 @@ export default class TableContract extends Contract {
 
   getSmallBlind(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.call(contract.smallBlind).then(val => val.toNumber());
+    return this.call(contract.smallBlind.call).then(val => val.toNumber());
   }
 
   getLastHandNetted(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.call(contract.lastHandNetted).then(val => val.toNumber());
+    return this.call(contract.lastHandNetted.call).then(val => val.toNumber());
   }
 
   getLineup(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.call(contract.getLineup).then((data) => {
+    return this.call(contract.getLineup.call).then((data) => {
       if (!data || data.length < 4) {
         return Promise.reject('lineup response invalid.');
       }
