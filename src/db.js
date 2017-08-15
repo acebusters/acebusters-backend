@@ -35,14 +35,14 @@ export default class Db {
     return this.putAttributes({
       DomainName: this.tableName,
       ItemName: `${tableAddr}-${pos}`,
-      Attributes: transform({
-        tableAddr: [tableAddr],
-        pos: [pos],
-        signerAddr: [signerAddr],
-        txHash: [txHash],
-        amount: [amount],
-        created: [`${Math.round(Date.now() / 1000)}`],
-      }),
+      Attributes: [
+        { Name: 'tableAddr', Value: tableAddr },
+        { Name: 'pos', Value: pos },
+        { Name: 'signerAddr', Value: signerAddr },
+        { Name: 'txHash', Value: txHash },
+        { Name: 'amount', Value: amount },
+        { Name: 'created', Value: `${Math.round(Date.now() / 1000)}` },
+      ],
     });
   }
 

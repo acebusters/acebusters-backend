@@ -52,7 +52,7 @@ exports.handler = function handler(event, context, callback) {
       handleRequest = service.reserve(
         event.params.path.tableAddr,
         event.params.path.pos,
-        event['body-json'].singerAddr,
+        event['body-json'].signerAddr,
         event['body-json'].txHash,
         event['body-json'].amount,
       );
@@ -76,7 +76,9 @@ exports.handler = function handler(event, context, callback) {
       });
     });
   } catch (err) {
-    Raven.captureException(err, { server_name: 'reserve-service' }, (sendErr) => {
+    Raven.captureException(err, {
+      server_name: 'reserve-service',
+    }, (sendErr) => {
       if (sendErr) {
         console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
         callback(sendErr);
