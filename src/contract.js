@@ -4,17 +4,19 @@ export default class Contract {
     this.web3 = web3;
   }
 
-  call(contractMethod, ...args) { // eslint-disable-line class-methods-use-this
-    const callee = contractMethod.call === Function.prototype.call ? contractMethod
-                                                                   : contractMethod.call;
+  call(method, ...args) { // eslint-disable-line class-methods-use-this
     return new Promise((resolve, reject) => {
-      callee(...args, (err, val) => {
+      method(...args, (err, val) => {
         if (err) {
           return reject(err);
         }
         return resolve(val);
       });
     });
+  }
+
+  getTransaction(...args) {
+    return this.call(this.web3.eth.getTransaction, ...args);
   }
 
 }

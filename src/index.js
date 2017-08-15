@@ -28,6 +28,15 @@ export default class ReserveSerivce {
 
   async reserve(tableAddr, pos, signerAddr, txHash, amount) {
     try {
+      const transaction = await this.table.getTransaction(txHash);
+      if (!transaction) {
+        throw new Error('Transaction does not exist');
+      }
+
+      if (transaction.input.slice(298, 338) !== tableAddr.replace('0x', '')) {
+        throw new Error('Wrong tableAddr or txHash');
+      }
+
       const reservations = await this.db.getTableReservations(tableAddr);
       if (reservations[pos]) {
         throw new Error('Seat is busy');
