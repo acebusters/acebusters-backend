@@ -75,17 +75,17 @@ export default class Db {
   }
 
   async cleanupOutdated(timeout) {
-    const data = await this.select({
+    const { Items = [] } = await this.select({
       SelectExpression: `select * from \`${this.tableName}\` where \`created\`<'${Math.round(Date.now() / 1000) - timeout}'`,
     });
 
-    await Promise.all((data.Items || []).map(item => this.deleteAttributes({
+    await Promise.all(Items.map(item => this.deleteAttributes({
       DomainName: this.tableName,
       ItemName: item.Name,
       Attributes: item.Attributes,
     })));
 
-    return data;
+    return Items.map(item => transform(item.Attributes));
   }
 
   method(name, params) {
