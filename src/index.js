@@ -28,15 +28,23 @@ export default class ReserveSerivce {
 
   async reserve(tableAddr, pos, signerAddr, txHash, amount) {
     try {
-      const seat = await this.db.getSeat(tableAddr, pos);
-
-      if (seat) {
+      const reservations = await this.db.getTableReservations(tableAddr);
+      if (reservations[pos]) {
         throw new Error('Seat is busy');
+      }
+
+      const signerAddrs = Object.keys(reservations).map(k => reservations[k].signerAddr);
+      if (signerAddrs.indexOf(signerAddr) > -1) {
+        throw new Error('Already on table');
       }
 
       const lineup = await this.table.getLineup(tableAddr);
       if (lineup[1][pos] && lineup[1][pos] !== EMPTY_ADDR) {
         throw new Error('Seat is busy');
+      }
+
+      if (Array.isArray(lineup[1]) && lineup[1].indexOf(signerAddr) > -1) {
+        throw new Error('Already on table');
       }
 
       const result = await this.db.reserveSeat(tableAddr, pos, signerAddr, txHash, amount);
