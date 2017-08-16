@@ -1,7 +1,7 @@
 import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
-import { it, describe, afterEach } from 'mocha';
+import { it, describe, afterEach, beforeEach } from 'mocha';
 import Db from './src/db';
 import TableContract from './src/tableContract';
 import Service from './src/index';
@@ -39,17 +39,8 @@ const TX_INPUT = '0xd7f31eb9000000000000000000000000179237e4e955369a69bd26499e3b
 sinon.stub(web3.eth, 'contract').returns(web3.eth);
 sinon.stub(web3.eth, 'at').returns(contract);
 sinon.stub(pusher, 'trigger').yields(null);
-    // sinon.stub(sdb, 'select').yields(null, {});
-    // const manager = new AccountManager(new Db({}));
-    // try {
-    //   manager.addAccount('123', TEST_MAIL, {});
-    // } catch (err) {
-    //   expect(err.message).to.contain('Bad Request: ');
-    //   return;
-    // }
-    // throw new Error('should have thrown');
 
-describe('Reservation Service - reserve seat ', () => {
+describe('Reservation Service - reserve seat', () => {
   it('should reserve seat for player and notify about that', async () => {
     const db = new Db(sdb, 'tableName');
     const service = new Service(
@@ -220,6 +211,153 @@ describe('Reservation Service - reserve seat ', () => {
     } catch (e) {
       expect(e.message).equal('Wrong tableAddr or txHash');
     }
+  });
+
+  afterEach(() => {
+    if (sdb.getAttributes.restore) sdb.getAttributes.restore();
+    if (sdb.putAttributes.restore) sdb.putAttributes.restore();
+    if (sdb.deleteAttributes.restore) sdb.deleteAttributes.restore();
+    if (sdb.select.restore) sdb.select.restore();
+    if (contract.getLineup.call.restore) contract.getLineup.call.restore();
+    if (web3.eth.getTransaction.restore) web3.eth.getTransaction.restore();
+  });
+});
+
+describe('Reservation Service - lineup', () => {
+  it('should format table reservations for response', async () => {
+    const db = new Db(sdb, 'tableName');
+    const service = new Service(
+      new TableContract(web3),
+      pusher,
+      db,
+    );
+
+    sinon.stub(sdb, 'select').yields(null, {
+      Items: [
+        {
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: SIGNER_ADDR },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+        {
+          Attributes: [
+            { Name: 'pos', Value: '2' },
+            { Name: 'signerAddr', Value: '0x00' },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+      ],
+    });
+
+    const lineup = await service.getReservations(TABLE_ADDR);
+    expect(lineup[0].signerAddr).eq(SIGNER_ADDR);
+    expect(lineup[0].txHash).eq(TX_HASH);
+    expect(lineup[0].amount).eq('10000');
+
+    expect(lineup[2].signerAddr).eq('0x00');
+    expect(lineup[2].txHash).eq(TX_HASH);
+    expect(lineup[2].amount).eq('10000');
+  });
+
+  afterEach(() => {
+    if (sdb.getAttributes.restore) sdb.getAttributes.restore();
+    if (sdb.putAttributes.restore) sdb.putAttributes.restore();
+    if (sdb.deleteAttributes.restore) sdb.deleteAttributes.restore();
+    if (sdb.select.restore) sdb.select.restore();
+    if (contract.getLineup.call.restore) contract.getLineup.call.restore();
+    if (web3.eth.getTransaction.restore) web3.eth.getTransaction.restore();
+  });
+});
+
+describe('Reservation Service - cleanup', () => {
+  beforeEach(() => {
+    if (pusher.trigger.restore) pusher.trigger.restore();
+    sinon.stub(pusher, 'trigger').yields(null);
+  });
+
+  it('should return deleted items', async () => {
+    const db = new Db(sdb, 'tableName');
+    const service = new Service(
+      new TableContract(web3),
+      pusher,
+      db,
+    );
+
+    sinon.stub(sdb, 'deleteAttributes').yields(null);
+    sinon.stub(sdb, 'select').yields(null, {
+      Items: [
+        {
+          Name: `${TABLE_ADDR}-0`,
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: SIGNER_ADDR },
+            { Name: 'tableAddr', Value: TABLE_ADDR },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+        {
+          Name: '0x111222333444-0',
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: '0x00' },
+            { Name: 'tableAddr', Value: '0x111222333444' },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+      ],
+    });
+
+    const deletedItems = await service.cleanup(60);
+
+    expect(sdb.deleteAttributes).callCount(2);
+    expect(deletedItems).length(2);
+    expect(deletedItems[0].tableAddr).eq(TABLE_ADDR);
+    expect(deletedItems[1].tableAddr).eq('0x111222333444');
+  });
+
+  it('should notify about deleted items', async () => {
+    const db = new Db(sdb, 'tableName');
+    const service = new Service(
+      new TableContract(web3),
+      pusher,
+      db,
+    );
+
+    sinon.stub(sdb, 'deleteAttributes').yields(null);
+    sinon.stub(sdb, 'select').yields(null, {
+      Items: [
+        {
+          Name: `${TABLE_ADDR}-0`,
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: SIGNER_ADDR },
+            { Name: 'tableAddr', Value: TABLE_ADDR },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+        {
+          Name: '0x111222333444-0',
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: '0x00' },
+            { Name: 'tableAddr', Value: '0x111222333444' },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+      ],
+    });
+
+    await service.cleanup(60);
+
+    expect(pusher.trigger).callCount(2);
   });
 
   afterEach(() => {
