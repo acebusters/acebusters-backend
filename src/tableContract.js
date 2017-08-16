@@ -6,7 +6,7 @@ export default class TableContract extends Contract {
 
   getLineup(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.call(contract.getLineup);
+    return this.call(contract.getLineup.call);
   }
 
 }

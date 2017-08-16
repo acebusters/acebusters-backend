@@ -37,11 +37,11 @@ export default class Db {
       ItemName: `${tableAddr}-${pos}`,
       Attributes: [
         { Name: 'tableAddr', Value: tableAddr },
-        { Name: 'pos', Value: pos },
+        { Name: 'pos', Value: String(pos) },
         { Name: 'signerAddr', Value: signerAddr },
         { Name: 'txHash', Value: txHash },
         { Name: 'amount', Value: amount },
-        { Name: 'created', Value: `${Math.round(Date.now() / 1000)}` },
+        { Name: 'created', Value: String(Math.round(Date.now() / 1000)) },
       ],
     });
   }

@@ -44,7 +44,7 @@ export default class ReserveSerivce {
 
       const signerAddrs = Object.keys(reservations).map(k => reservations[k].signerAddr);
       if (signerAddrs.indexOf(signerAddr) > -1) {
-        throw new Error('Already on table');
+        throw new Error('Already at table');
       }
 
       const lineup = await this.table.getLineup(tableAddr);
@@ -53,13 +53,13 @@ export default class ReserveSerivce {
       }
 
       if (Array.isArray(lineup[1]) && lineup[1].indexOf(signerAddr) > -1) {
-        throw new Error('Already on table');
+        throw new Error('Already at table');
       }
 
       const result = await this.db.reserveSeat(tableAddr, pos, signerAddr, txHash, amount);
       await this.notify(tableAddr, {
         type: 'seatReserve',
-        payload: { pos, amount, txHash, signerAddr },
+        payload: { pos: String(pos), amount, txHash, signerAddr },
       });
       return result;
     } catch (e) {

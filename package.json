@@ -13,7 +13,7 @@
     "build:install": "cp package.json dist/ && cd dist && npm install --production",
     "package": "npm run build && npm run package:pack",
     "package:pack": "zip -r artifact.zip dist/*",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha -r babel-register -r babel-polyfill index.test.js"
   },
   "author": "acebusters",
   "devDependencies": {
