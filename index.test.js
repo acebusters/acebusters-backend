@@ -1035,7 +1035,7 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
-  it('should prevent sitout toggle in same hand.', (done) => {
+  it('should prevent sit-out, then sit-in during same hand.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 13,
       dealer: 0,
@@ -1060,6 +1060,39 @@ describe('Oracle pay', () => {
     const sitout = new Receipt(tableAddr).sitOut(13, babz(100)).sign(P1_PRIV);
     oracle.pay(tableAddr, sitout).catch((err) => {
       expect(err.message).to.contain('can not toggle sitout');
+      done();
+    }).catch(done);
+  });
+
+  it('should allow to sit-in, then sitout with higher amount in same hand.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 13,
+      dealer: 0,
+      sb: '50000000000000',
+      state: 'flop',
+      lineup: [{
+        address: P1_ADDR,
+        last: new Receipt(tableAddr).sitOut(13, babz(0)).sign(P1_PRIV),
+      }, {
+        address: P2_ADDR,
+        last: new Receipt(tableAddr).bet(13, babz(50)).sign(P2_PRIV),
+      }, {
+        address: P3_ADDR,
+        last: new Receipt(tableAddr).bet(13, babz(100)).sign(P2_PRIV),
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    const sitout = new Receipt(tableAddr).sitOut(13, babz(100)).sign(P1_PRIV);
+    oracle.pay(tableAddr, sitout).then((rsp) => {
+      expect(rsp).to.eql({});
+      const seat = {
+        address: P1_ADDR,
+        sitout: sinon.match.any,
+        last: sitout };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
       done();
     }).catch(done);
   });
