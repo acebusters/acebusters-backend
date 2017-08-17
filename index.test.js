@@ -203,7 +203,7 @@ describe('Interval Scanner', () => {
       expect(sns.publish).callCount(1);
       expect(sns.publish).calledWith({
         Subject: `TableNettingRequest::${set.addresses[0]}`,
-        Message: `{"handId":6,"tableAddr":"${set.addresses[0]}"}`,
+        Message: `{"handId":7,"tableAddr":"${set.addresses[0]}"}`,
         TopicArn: set.topicArn,
       });
       done();
@@ -251,7 +251,7 @@ describe('Interval Scanner', () => {
       expect(sns.publish).callCount(3);
       expect(sns.publish).calledWith({
         Subject: `TableNettingRequest::${set.addresses[0]}`,
-        Message: `{"handId":6,"tableAddr":"${set.addresses[0]}"}`,
+        Message: `{"handId":7,"tableAddr":"${set.addresses[0]}"}`,
         TopicArn: set.topicArn,
       });
       expect(sns.publish).calledWith({

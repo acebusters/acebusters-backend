@@ -143,7 +143,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
       // prepare netting in db
       const subject = `TableNettingRequest::${tableAddr}`;
       results.push(this.notify({
-        handId: lhn + 1,
+        handId: lastHand.handId - 1,
         tableAddr,
       }, subject).then(() =>
         this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: lastHand.handId } })),
