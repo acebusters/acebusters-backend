@@ -1,63 +1,31 @@
 const P_EMPTY = '0x0000000000000000000000000000000000000000';
 
-function ScanManager(factory, table, dynamo, sns, sentry, topicArn) {
-  this.factory = factory;
-  this.table = table;
-  this.dynamo = dynamo;
-  this.sns = sns;
-  this.sentry = sentry;
-  this.topicArn = topicArn;
-}
+class ScanManager {
+  constructor(factory, table, dynamo, sns, sentry, topicArn) {
+    this.factory = factory;
+    this.table = table;
+    this.dynamo = dynamo;
+    this.sns = sns;
+    this.sentry = sentry;
+    this.topicArn = topicArn;
+  }
 
-ScanManager.prototype.scan = function scan() {
-  return this.factory.getTables().then((set) => {
-    if (!set || set.length === 0) {
+  async scan() {
+    const tables = await this.factory.getTables();
+    if (!tables || tables.length === 0) {
       this.log('no contracts to scan');
     }
-    const actions = [];
-    set.forEach((tableAddr) => {
-      actions.push(this.handleTable(tableAddr));
-    });
-    return Promise.all(actions);
-  });
-};
 
-ScanManager.prototype.err = function err(e) {
-  this.sentry.captureException(e, { server_name: 'interval-scanner' }, (sendErr) => {
-    if (sendErr) {
-      console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line no-console
-    }
-  });
-  return e;
-};
+    return Promise.all(tables.map(this.handleTable.bind(this)));
+  }
 
-ScanManager.prototype.log = function log(message, context) {
-  const cntxt = (context) || {};
-  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
-  cntxt.server_name = 'interval-scanner';
-  return new Promise((fulfill, reject) => {
-    const now = Math.floor(Date.now() / 1000);
-    this.sentry.captureMessage(`${now} - ${message}`, cntxt, (error, eventId) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      fulfill(eventId);
-    });
-  });
-};
+  async handleTable(tableAddr) {
+    const [lhn, lnr, lnt] = await Promise.all([
+      this.table.getLastHandNetted(tableAddr),
+      this.table.getLNRHandId(tableAddr),
+      this.table.getLNRTime(tableAddr),
+    ]);
 
-ScanManager.prototype.handleTable = function handleTable(tableAddr) {
-  const lhnProm = this.table.getLastHandNetted(tableAddr);
-  const lnrProm = this.table.getLNRHandId(tableAddr);
-  const lntProm = this.table.getLNRTime(tableAddr);
-  let lhn;
-  let lnr;
-  let lnt;
-  return Promise.all([lhnProm, lnrProm, lntProm]).then((rsp) => {
-    lhn = rsp[0];
-    lnr = rsp[1];
-    lnt = rsp[2];
     if (lnr > lhn) {
       const now = Math.floor(Date.now() / 1000);
       if (lnt + (60 * 10) < now) {
@@ -92,21 +60,16 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
 
     // contract is netted up,
     // check if more netting can be done from oracle
-    return Promise.all([
+    const [lastHand, lineup] = await Promise.all([
       this.dynamo.getLastHand(tableAddr),
       this.table.getLineup(tableAddr),
     ]);
-  }).then((response) => {
-    const results = [];
-    if (!Array.isArray(response)) {
-      return null;
-    }
 
-    const [lastHand, lineup] = response;
     if (!lastHand || !lastHand.handId) {
       return null;
     }
 
+    const results = [];
     // 1 hour
     const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
     if (lastHand.lineup) {
@@ -149,24 +112,50 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
         this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: lastHand.handId } })),
       );
     }
-    return Promise.all(results);
-  });
-};
 
-ScanManager.prototype.notify = function notify(event, subject) {
-  return new Promise((fulfill, reject) => {
-    this.sns.publish({
-      Message: JSON.stringify(event),
-      Subject: subject,
-      TopicArn: this.topicArn,
-    }, (err) => {
-      if (err) {
-        reject(err);
-        return;
+    return Promise.all(results);
+  }
+
+  err(e) {
+    this.sentry.captureException(e, { server_name: 'interval-scanner' }, (sendErr) => {
+      if (sendErr) {
+        console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line no-console
       }
-      fulfill(subject);
     });
-  });
-};
+    return e;
+  }
+
+  log(message, context) {
+    const ctx = context || {};
+    ctx.level = (ctx.level) ? ctx.level : 'info';
+    ctx.server_name = 'interval-scanner';
+    return new Promise((fulfill, reject) => {
+      const now = Math.floor(Date.now() / 1000);
+      this.sentry.captureMessage(`${now} - ${message}`, ctx, (error, eventId) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        fulfill(eventId);
+      });
+    });
+  }
+
+  notify(event, subject) {
+    return new Promise((resolve, reject) => {
+      this.sns.publish({
+        Message: JSON.stringify(event),
+        Subject: subject,
+        TopicArn: this.topicArn,
+      }, (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(subject);
+      });
+    });
+  }
+}
 
 module.exports = ScanManager;
