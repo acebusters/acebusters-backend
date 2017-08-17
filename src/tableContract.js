@@ -42,4 +42,19 @@ TableContract.prototype.getLNRTime = function getLNRTime(tableAddr) {
   });
 };
 
+TableContract.prototype.getLineup = function getLineup(tableAddr) {
+  const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
+  return new Promise((fulfill, reject) => {
+    contract.getLineup.call((err, val) => {
+      if (err) {
+        reject(err);
+      }
+      fulfill([
+        ...val.slice(0, 3),
+        val[3].map(n => n.toNumber()),
+      ]);
+    });
+  });
+};
+
 module.exports = TableContract;

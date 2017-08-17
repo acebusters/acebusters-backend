@@ -30,6 +30,7 @@ const contract = {
   lastNettingRequestHandId: { call() {} },
   lastNettingRequestTime: { call() {} },
   getTables: { call() {} },
+  getLineup: { call() {} },
 };
 
 const web3 = { eth: {
@@ -75,6 +76,7 @@ describe('Interval Scanner', () => {
     const now = Math.floor(Date.now() / 1000);
     sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [], [], []]);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
@@ -94,6 +96,7 @@ describe('Interval Scanner', () => {
     const now = Math.floor(Date.now() / 1000) - 3601;
     sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0], set.addresses[1]]);
     sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [], [], []]);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
@@ -114,6 +117,7 @@ describe('Interval Scanner', () => {
     const now = Math.floor(Date.now() / 1000) - 181;
     sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [], [], []]);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
@@ -144,6 +148,7 @@ describe('Interval Scanner', () => {
     const now = Math.floor(Date.now() / 1000) - 601;
     sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
     sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [], [], []]);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
@@ -178,6 +183,7 @@ describe('Interval Scanner', () => {
       changed: now,
     }] });
     sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [], [], [new BigNumber(3)]]);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(0));
@@ -197,7 +203,7 @@ describe('Interval Scanner', () => {
       expect(sns.publish).callCount(1);
       expect(sns.publish).calledWith({
         Subject: `TableNettingRequest::${set.addresses[0]}`,
-        Message: `{"handId":7,"tableAddr":"${set.addresses[0]}"}`,
+        Message: `{"handId":6,"tableAddr":"${set.addresses[0]}"}`,
         TopicArn: set.topicArn,
       });
       done();
@@ -218,6 +224,7 @@ describe('Interval Scanner', () => {
       }],
     }] });
     sinon.stub(sns, 'publish').yields(null, {});
+    sinon.stub(contract.getLineup, 'call').yields(null, [0, [], [], [new BigNumber(2)]]);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(5));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(0));
@@ -244,7 +251,7 @@ describe('Interval Scanner', () => {
       expect(sns.publish).callCount(3);
       expect(sns.publish).calledWith({
         Subject: `TableNettingRequest::${set.addresses[0]}`,
-        Message: `{"handId":7,"tableAddr":"${set.addresses[0]}"}`,
+        Message: `{"handId":6,"tableAddr":"${set.addresses[0]}"}`,
         TopicArn: set.topicArn,
       });
       expect(sns.publish).calledWith({
@@ -265,6 +272,7 @@ describe('Interval Scanner', () => {
     if (sns.publish.restore) sns.publish.restore();
     if (contract.getTables.call.restore) contract.getTables.call.restore();
     if (contract.lastHandNetted.call.restore) { contract.lastHandNetted.call.restore(); }
+    if (contract.getLineup.call.restore) { contract.getLineup.call.restore(); }
     if (contract.lastNettingRequestHandId.call.restore) {
       contract.lastNettingRequestHandId.call.restore();
     }

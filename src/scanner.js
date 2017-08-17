@@ -68,7 +68,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
           return this.notify({}, subject).then(() =>
             this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
         }
-        return Promise.resolve(null);
+        return null;
         // if dispute period is over since more than 1 hour,
         // do nothing
       }
@@ -86,29 +86,39 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
           extra: { lhn, lnr, lnt, now },
         }));
       }
-    } else {
-      // contract is netted up,
-      // check if more netting can be done from oracle
-      return this.dynamo.getLastHand(tableAddr);
+
+      return null;
     }
-    return Promise.resolve(null);
-  }).then((rsp) => {
+
+    // contract is netted up,
+    // check if more netting can be done from oracle
+    return Promise.all([
+      this.dynamo.getLastHand(tableAddr),
+      this.table.getLineup(tableAddr),
+    ]);
+  }).then((response) => {
     const results = [];
-    if (!rsp || !rsp.handId) {
-      return Promise.resolve(null);
+    if (!Array.isArray(response)) {
+      return null;
     }
+
+    const [lastHand, lineup] = response;
+    if (!lastHand || !lastHand.handId) {
+      return null;
+    }
+
     // 1 hour
     const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
-    if (rsp.lineup) {
+    if (lastHand.lineup) {
       // 5 minutes
       const old = Math.floor(Date.now() / 1000) - (5 * 60);
       const subject = `Kick::${tableAddr}`;
       let hasPlayer = false;
-      for (let i = 0; i < rsp.lineup.length; i += 1) {
-        if (rsp.lineup[i].sitout && typeof rsp.lineup[i].sitout === 'number') {
+      for (let i = 0; i < lastHand.lineup.length; i += 1) {
+        if (lastHand.lineup[i].sitout && typeof lastHand.lineup[i].sitout === 'number') {
           // check if any of the sitout flags are older than 5 min
-          if (rsp.lineup[i].sitout < old) {
-            const seat = rsp.lineup[i];
+          if (lastHand.lineup[i].sitout < old) {
+            const seat = lastHand.lineup[i];
             results.push(this.notify({ pos: i, tableAddr }, subject).then(() =>
               this.log(subject, {
                 tags: { tableAddr },
@@ -118,23 +128,25 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
             ));
           }
         }
-        if (rsp.lineup[i].address !== P_EMPTY) {
+        if (lastHand.lineup[i].address !== P_EMPTY) {
           hasPlayer = true;
         }
       }
-      if (rsp.changed > tooOld && hasPlayer) {
+      if (lastHand.changed > tooOld && hasPlayer) {
         results.push(this.notify({ tableAddr }, `Timeout::${tableAddr}`));
       }
     }
-    if (rsp.handId >= lhn + 2 && rsp.changed > (tooOld)) {
-      // if there are more than 2 hands not netted
+
+    const hasExitHands = lineup[3].some(exitHand => exitHand > 0);
+    if (hasExitHands && lastHand.changed > tooOld) {
+      // if some players trying to leave
       // prepare netting in db
       const subject = `TableNettingRequest::${tableAddr}`;
       results.push(this.notify({
-        handId: rsp.handId - 1,
+        handId: lhn + 1,
         tableAddr,
       }, subject).then(() =>
-        this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: rsp.handId } })),
+        this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: lastHand.handId } })),
       );
     }
     return Promise.all(results);
