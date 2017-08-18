@@ -93,9 +93,10 @@ StreamScanner.prototype.process = function process(record) {
     }, this.topicArn));
     pos = lineupHasLeave(newHand);
     if (pos > -1 && newHand.netting === undefined) {
+      const handId = newHand.state === 'waiting' ? newHand.handId - 1 : newHand.handId;
       tasks.push(this.notify(`TableNettingRequest::${keys.tableAddr}`, {
         tableAddr: keys.tableAddr,
-        handId: newHand.handId,
+        handId,
       }, this.topicArn));
     }
   }
