@@ -175,41 +175,6 @@ describe('Interval Scanner', () => {
     }).catch(done);
   });
 
-  it('should initiate new netting requests', (done) => {
-    const now = Math.floor(Date.now() / 1000);
-    sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
-    sinon.stub(dynamo, 'query').yields(null, { Items: [{
-      handId: 8,
-      changed: now,
-    }] });
-    sinon.stub(sns, 'publish').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [0, [], [], [new BigNumber(3)]]);
-    sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(5));
-    sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(5));
-    sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(0));
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
-
-    const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), new Dynamo(dynamo), sns, sentry, topicArn);
-
-    manager.scan().then(() => {
-      expect(sentry.captureMessage).callCount(1);
-      expect(sentry.captureMessage).calledWith(sinon.match(`TableNettingRequest::${set.addresses[0]}`), {
-        level: 'info',
-        server_name: 'interval-scanner',
-        tags: { tableAddr: set.addresses[0] },
-        extra: { handId: 8, lhn: 5 },
-      });
-      expect(sns.publish).callCount(1);
-      expect(sns.publish).calledWith({
-        Subject: `TableNettingRequest::${set.addresses[0]}`,
-        Message: `{"handId":7,"tableAddr":"${set.addresses[0]}"}`,
-        TopicArn: set.topicArn,
-      });
-      done();
-    }).catch(done);
-  });
-
   it('should kick a player', (done) => {
     const tenMinAgo = Math.floor((Date.now() / 1000) - (60 * 10)); // 10 minutes ago
     sinon.stub(contract.getTables, 'call').yields(null, [set.addresses[0]]);
@@ -234,13 +199,7 @@ describe('Interval Scanner', () => {
       new Table(web3), new Dynamo(dynamo), sns, sentry, topicArn);
 
     manager.scan().then(() => {
-      expect(sentry.captureMessage).callCount(2);
-      expect(sentry.captureMessage).calledWith(sinon.match(`TableNettingRequest::${set.addresses[0]}`), {
-        level: 'info',
-        server_name: 'interval-scanner',
-        tags: { tableAddr: set.addresses[0] },
-        extra: { handId: 8, lhn: 5 },
-      });
+      expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(sinon.match(`Kick::${set.addresses[0]}`), {
         level: 'info',
         server_name: 'interval-scanner',
@@ -248,12 +207,7 @@ describe('Interval Scanner', () => {
         tags: { tableAddr: set.addresses[0] },
         extra: sinon.match.any,
       });
-      expect(sns.publish).callCount(3);
-      expect(sns.publish).calledWith({
-        Subject: `TableNettingRequest::${set.addresses[0]}`,
-        Message: `{"handId":7,"tableAddr":"${set.addresses[0]}"}`,
-        TopicArn: set.topicArn,
-      });
+      expect(sns.publish).callCount(2);
       expect(sns.publish).calledWith({
         Subject: `Kick::${set.addresses[0]}`,
         Message: `{"pos":1,"tableAddr":"${set.addresses[0]}"}`,
