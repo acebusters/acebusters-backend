@@ -1,63 +1,31 @@
 const P_EMPTY = '0x0000000000000000000000000000000000000000';
 
-function ScanManager(factory, table, dynamo, sns, sentry, topicArn) {
-  this.factory = factory;
-  this.table = table;
-  this.dynamo = dynamo;
-  this.sns = sns;
-  this.sentry = sentry;
-  this.topicArn = topicArn;
-}
+class ScanManager {
+  constructor(factory, table, dynamo, sns, sentry, topicArn) {
+    this.factory = factory;
+    this.table = table;
+    this.dynamo = dynamo;
+    this.sns = sns;
+    this.sentry = sentry;
+    this.topicArn = topicArn;
+  }
 
-ScanManager.prototype.scan = function scan() {
-  return this.factory.getTables().then((set) => {
-    if (!set || set.length === 0) {
+  async scan() {
+    const tables = await this.factory.getTables();
+    if (!tables || tables.length === 0) {
       this.log('no contracts to scan');
     }
-    const actions = [];
-    set.forEach((tableAddr) => {
-      actions.push(this.handleTable(tableAddr));
-    });
-    return Promise.all(actions);
-  });
-};
 
-ScanManager.prototype.err = function err(e) {
-  this.sentry.captureException(e, { server_name: 'interval-scanner' }, (sendErr) => {
-    if (sendErr) {
-      console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line no-console
-    }
-  });
-  return e;
-};
+    return Promise.all(tables.map(this.handleTable.bind(this)));
+  }
 
-ScanManager.prototype.log = function log(message, context) {
-  const cntxt = (context) || {};
-  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
-  cntxt.server_name = 'interval-scanner';
-  return new Promise((fulfill, reject) => {
-    const now = Math.floor(Date.now() / 1000);
-    this.sentry.captureMessage(`${now} - ${message}`, cntxt, (error, eventId) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      fulfill(eventId);
-    });
-  });
-};
+  async handleTable(tableAddr) {
+    const [lhn, lnr, lnt] = await Promise.all([
+      this.table.getLastHandNetted(tableAddr),
+      this.table.getLNRHandId(tableAddr),
+      this.table.getLNRTime(tableAddr),
+    ]);
 
-ScanManager.prototype.handleTable = function handleTable(tableAddr) {
-  const lhnProm = this.table.getLastHandNetted(tableAddr);
-  const lnrProm = this.table.getLNRHandId(tableAddr);
-  const lntProm = this.table.getLNRTime(tableAddr);
-  let lhn;
-  let lnr;
-  let lnt;
-  return Promise.all([lhnProm, lnrProm, lntProm]).then((rsp) => {
-    lhn = rsp[0];
-    lnr = rsp[1];
-    lnt = rsp[2];
     if (lnr > lhn) {
       const now = Math.floor(Date.now() / 1000);
       if (lnt + (60 * 10) < now) {
@@ -68,7 +36,7 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
           return this.notify({}, subject).then(() =>
             this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
         }
-        return Promise.resolve(null);
+        return null;
         // if dispute period is over since more than 1 hour,
         // do nothing
       }
@@ -86,29 +54,31 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
           extra: { lhn, lnr, lnt, now },
         }));
       }
-    } else {
-      // contract is netted up,
-      // check if more netting can be done from oracle
-      return this.dynamo.getLastHand(tableAddr);
+
+      return null;
     }
-    return Promise.resolve(null);
-  }).then((rsp) => {
+
+    // contract is netted up,
+    // check if more netting can be done from oracle
+    const lastHand = await this.dynamo.getLastHand(tableAddr);
+
+    if (!lastHand || !lastHand.handId) {
+      return null;
+    }
+
     const results = [];
-    if (!rsp || !rsp.handId) {
-      return Promise.resolve(null);
-    }
     // 1 hour
     const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
-    if (rsp.lineup) {
+    if (lastHand.lineup) {
       // 5 minutes
       const old = Math.floor(Date.now() / 1000) - (5 * 60);
       const subject = `Kick::${tableAddr}`;
       let hasPlayer = false;
-      for (let i = 0; i < rsp.lineup.length; i += 1) {
-        if (rsp.lineup[i].sitout && typeof rsp.lineup[i].sitout === 'number') {
+      for (let i = 0; i < lastHand.lineup.length; i += 1) {
+        if (lastHand.lineup[i].sitout && typeof lastHand.lineup[i].sitout === 'number') {
           // check if any of the sitout flags are older than 5 min
-          if (rsp.lineup[i].sitout < old) {
-            const seat = rsp.lineup[i];
+          if (lastHand.lineup[i].sitout < old) {
+            const seat = lastHand.lineup[i];
             results.push(this.notify({ pos: i, tableAddr }, subject).then(() =>
               this.log(subject, {
                 tags: { tableAddr },
@@ -118,43 +88,58 @@ ScanManager.prototype.handleTable = function handleTable(tableAddr) {
             ));
           }
         }
-        if (rsp.lineup[i].address !== P_EMPTY) {
+        if (lastHand.lineup[i].address !== P_EMPTY) {
           hasPlayer = true;
         }
       }
-      if (rsp.changed > tooOld && hasPlayer) {
+      if (lastHand.changed > tooOld && hasPlayer) {
         results.push(this.notify({ tableAddr }, `Timeout::${tableAddr}`));
       }
     }
-    if (rsp.handId >= lhn + 2 && rsp.changed > (tooOld)) {
-      // if there are more than 2 hands not netted
-      // prepare netting in db
-      const subject = `TableNettingRequest::${tableAddr}`;
-      results.push(this.notify({
-        handId: rsp.handId - 1,
-        tableAddr,
-      }, subject).then(() =>
-        this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: rsp.handId } })),
-      );
-    }
-    return Promise.all(results);
-  });
-};
 
-ScanManager.prototype.notify = function notify(event, subject) {
-  return new Promise((fulfill, reject) => {
-    this.sns.publish({
-      Message: JSON.stringify(event),
-      Subject: subject,
-      TopicArn: this.topicArn,
-    }, (err) => {
-      if (err) {
-        reject(err);
-        return;
+    return Promise.all(results);
+  }
+
+  err(e) {
+    this.sentry.captureException(e, { server_name: 'interval-scanner' }, (sendErr) => {
+      if (sendErr) {
+        console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line no-console
       }
-      fulfill(subject);
     });
-  });
-};
+    return e;
+  }
+
+  log(message, context) {
+    const ctx = context || {};
+    ctx.level = (ctx.level) ? ctx.level : 'info';
+    ctx.server_name = 'interval-scanner';
+    return new Promise((fulfill, reject) => {
+      const now = Math.floor(Date.now() / 1000);
+      this.sentry.captureMessage(`${now} - ${message}`, ctx, (error, eventId) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        fulfill(eventId);
+      });
+    });
+  }
+
+  notify(event, subject) {
+    return new Promise((resolve, reject) => {
+      this.sns.publish({
+        Message: JSON.stringify(event),
+        Subject: subject,
+        TopicArn: this.topicArn,
+      }, (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(subject);
+      });
+    });
+  }
+}
 
 module.exports = ScanManager;
