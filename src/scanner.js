@@ -60,10 +60,7 @@ class ScanManager {
 
     // contract is netted up,
     // check if more netting can be done from oracle
-    const [lastHand, lineup] = await Promise.all([
-      this.dynamo.getLastHand(tableAddr),
-      this.table.getLineup(tableAddr),
-    ]);
+    const lastHand = await this.dynamo.getLastHand(tableAddr);
 
     if (!lastHand || !lastHand.handId) {
       return null;
@@ -98,19 +95,6 @@ class ScanManager {
       if (lastHand.changed > tooOld && hasPlayer) {
         results.push(this.notify({ tableAddr }, `Timeout::${tableAddr}`));
       }
-    }
-
-    const hasExitHands = lineup[3].some(exitHand => exitHand > 0);
-    if (hasExitHands && lastHand.changed > tooOld) {
-      // if some players trying to leave
-      // prepare netting in db
-      const subject = `TableNettingRequest::${tableAddr}`;
-      results.push(this.notify({
-        handId: lastHand.handId - 1,
-        tableAddr,
-      }, subject).then(() =>
-        this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: lastHand.handId } })),
-      );
     }
 
     return Promise.all(results);
