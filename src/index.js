@@ -168,11 +168,13 @@ TableManager.prototype.pay = function pay(tableAddr, receiptHash) {
       }
 
       if (prevReceipt.type === Type.SIT_OUT) {
-        if (receipt.type === Type.SIT_OUT && typeof hand.lineup[pos].sitout === 'number') {
-          throw new BadRequest('can not toggle sitout in same hand.');
-        }
-        if (receipt.amount > 0 && prevReceipt.amount > 0) {
-          throw new BadRequest('wait for next hand.');
+        if (hand.state !== 'waiting' && hand.state !== 'dealing') {
+          if (receipt.type === Type.SIT_OUT && typeof hand.lineup[pos].sitout === 'number') {
+            throw new BadRequest('can not toggle sitout in same hand.');
+          }
+          if (receipt.amount > 0 && prevReceipt.amount > 0) {
+            throw new BadRequest('wait for next hand.');
+          }
         }
       }
 
