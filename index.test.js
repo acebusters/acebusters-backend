@@ -3,7 +3,7 @@ import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
 import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
-import { Receipt, ReceiptCache } from 'poker-helper';
+import { Receipt, ReceiptCache, PokerHelper } from 'poker-helper';
 import Oracle from './src/index';
 import Db from './src/db';
 import TableContract from './src/tableContract';
@@ -83,6 +83,7 @@ const sentry = {
 };
 
 const rc = new ReceiptCache();
+const helper = new PokerHelper(rc);
 sinon.stub(web3.eth, 'contract').returns(web3);
 sinon.stub(web3, 'at').returns(contract);
 
@@ -1088,6 +1089,42 @@ describe('Oracle pay', () => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
       const seat = { address: P1_ADDR, last: sitout };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('should finish hand when there is no active players and only one all-in player.', (done) => {
+    const lineup = [{
+      address: P1_ADDR,
+      last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
+      sitout: 'allin',
+    }, {
+      address: P2_ADDR,
+      last: new Receipt(tableAddr).bet(3, babz(100)).sign(P2_PRIV),
+    }];
+
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'preflop',
+      dealer: 0,
+      sb: '50000000000000',
+      lineup,
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+
+    expect(helper.isHandComplete(lineup, 0, 'preflop')).to.eql(false);
+
+    const fold = new Receipt(tableAddr).fold(3, new BigNumber(0)).sign(P2_PRIV);
+    oracle.pay(tableAddr, fold).then((rsp) => {
+      expect(rsp).to.eql({});
+      const trueIsh = sinon.match((value) => {
+        const l = [lineup[0], value.ExpressionAttributeValues[':l']];
+        return helper.isHandComplete(l, 0, 'preflop');
+      }, 'trueIsh');
+
+      expect(dynamo.updateItem).calledWith(sinon.match(trueIsh));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
       done();
     }).catch(done);
   });

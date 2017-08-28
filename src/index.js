@@ -285,6 +285,7 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
   }
   const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
   let streetMaxBet;
+  const prevState = hand.state;
   if (bettingComplete && !handComplete) {
     if (hand.state === 'river') {
       hand.state = 'showdown';
@@ -310,8 +311,15 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
   // take care of all-in
   const activePlayerCount = this.helper.countActivePlayers(hand.lineup, hand.state);
   const allInPlayerCount = this.helper.countAllIn(hand.lineup);
-  if (bettingComplete && activePlayerCount <= 1 && allInPlayerCount > 0) {
-    hand.state = 'showdown';
+  if (bettingComplete) {
+    if ((activePlayerCount === 1 && allInPlayerCount > 0) ||
+        (activePlayerCount === 0 && allInPlayerCount > 1)) {
+      hand.state = 'showdown';
+    } else if (activePlayerCount === 0 && allInPlayerCount < 2) {
+      // when there are no active players and only one all-in player,
+      // then we should just finish hand
+      hand.state = prevState;
+    }
   }
   // update db
   return this.db.updateSeat(tableAddr,
