@@ -31,7 +31,6 @@ function EventWorker(
   db,
   oraclePriv,
   sentry,
-  nutz,
   recoveryPriv,
   mailer,
   oracle,
@@ -39,7 +38,6 @@ function EventWorker(
 ) {
   this.table = table;
   this.factory = factory;
-  this.nutz = nutz;
   this.db = db;
   if (oraclePriv) {
     this.oraclePriv = oraclePriv;
@@ -193,15 +191,8 @@ EventWorker.prototype.log = function log(message, context) {
 };
 
 EventWorker.prototype.walletCreated = function walletCreated(signerAddr, email) {
-  const nextAddrProm = this.factory.getNextAddr();
-  const createProm = this.factory.createAccount(signerAddr, this.recoveryAddr);
-  return Promise.all([nextAddrProm, createProm]).then((rsps) => {
-    const nextAddr = rsps[0];
-    const txHash = rsps[1];
-    const faucetProm = this.nutz.transfer(nextAddr, 1500000000000000);
-    const mailerProm = this.mailer.add(email);
-    const pusherProm = this.publishUpdate(signerAddr, txHash);
-    return Promise.all([faucetProm, mailerProm, pusherProm]);
+  return this.factory.createAccount(signerAddr, this.recoveryAddr).then(() => {
+    return this.mailer.add(email);
   }).then(() => this.log(`WalletCreated: ${signerAddr}`, {
     user: {
       id: signerAddr,
@@ -221,7 +212,7 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, 
     (txHash) => {
       this.log('tx: table.leave()', {
         tags: { tableAddr, handId: exitHand },
-        extra: { txHash, leaveReceipt },
+        extra: { leaveReceipt },
       });
 
       return [txHash];
@@ -270,7 +261,6 @@ EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
   return this.table.net(tableAddr).then(
     txHash => this.log('tx: table.net()', {
       tags: { tableAddr },
-      extra: { txHash },
     }),
     error => this.log('tx: table.net()', {
       tags: { tableAddr },
@@ -357,7 +347,7 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
   }).then(
     txHash => this.log('tx: table.settle()', {
       tags: { tableAddr },
-      extra: { bals: hand.netting.newBalances, sigs, txHash },
+      extra: { bals: hand.netting.newBalances, sigs },
     }),
     error => this.log('tx: table.settle()', {
       tags: { tableAddr },

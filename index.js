@@ -8,7 +8,6 @@ import Pusher from 'pusher';
 import Db from './src/db';
 import EventWorker from './src/index';
 import Table from './src/tableContract';
-import Nutz from './src/nutzContract';
 import Factory from './src/factoryContract';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
@@ -39,9 +38,8 @@ exports.handler = function handler(event, context, callback) {
       web3Provider = new web3.providers.HttpProvider(process.env.PROVIDER_URL);
     }
     web3 = new Web3(web3Provider);
-    const table = new Table(web3, process.env.SENDER_ADDR);
-    const factory = new Factory(web3, process.env.OWNER_ADDR, process.env.FACTORY_ADDR);
-    const nutz = new Nutz(web3, process.env.SENDER_ADDR, process.env.NUTZ_ADDR);
+    const table = new Table(web3, process.env.SENDER_ADDR, new Aws.SQS(), process.env.QUEUE_URL);
+    const factory = new Factory(web3, process.env.OWNER_ADDR, process.env.FACTORY_ADDR, new Aws.SQS(), process.env.QUEUE_URL);
     const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
     const lambda = new Lambda(new Aws.Lambda(), process.env.ORACLE_FUNC_NAME);
 
@@ -56,7 +54,6 @@ exports.handler = function handler(event, context, callback) {
       new Db(dynamo, tableName),
       process.env.ORACLE_PRIV,
       Raven,
-      nutz,
       process.env.RECOVERY_PRIV,
       mailer,
       lambda,

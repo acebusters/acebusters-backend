@@ -5,22 +5,22 @@ const TABLE_ABI = [{ constant: true, inputs: [], name: 'active', outputs: [{ nam
 export default class TableContract extends Contract {
   leave(tableAddr, leaveReceipt) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.sendTransaction(contract.leave, 200000, ...leaveReceipt);
+    return this.sendTransaction(tableAddr, contract.leave, 200000, ...leaveReceipt);
   }
 
   toggleTable(tableAddr, activeReceipt) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.sendTransaction(contract.toggleActive, 200000, activeReceipt);
+    return this.sendTransaction(tableAddr, contract.toggleActive, 200000, activeReceipt);
   }
 
   settle(tableAddr, sigs, newBalances) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.sendTransaction(contract.settle, 500000, sigs, `0x${newBalances.substring(2, 66)}`, `0x${newBalances.substring(66, 130)}`);
+    return this.sendTransaction(tableAddr, contract.settle, 500000, sigs, `0x${newBalances.substring(2, 66)}`, `0x${newBalances.substring(66, 130)}`);
   }
 
   net(tableAddr) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.sendTransaction(contract.net, 2600000);
+    return this.sendTransaction(tableAddr, contract.net, 2600000);
   }
 
   submit(tableAddr, receipts) {
@@ -30,7 +30,7 @@ export default class TableContract extends Contract {
       if (writeCount === 0) {
         return Promise.reject('Already submitted');
       }
-      return this.sendTransaction(contract.submit, 1900000, receipts);
+      return this.sendTransaction(tableAddr, contract.submit, 1900000, receipts);
     });
   }
 
