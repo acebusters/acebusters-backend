@@ -135,7 +135,7 @@ const sqs = {
 };
 
 sinon.stub(web3.eth, 'contract').returns(web3.eth);
-sinon.stub(web3.eth, 'at').returns(contract);
+sinon.stub(web3.eth, 'at', address => ({ ...contract, address }));
 
 describe('Stream worker HandComplete event', () => {
   it('should handle HandComplete event.', (done) => {
@@ -629,7 +629,6 @@ describe('Stream worker other events', () => {
     const handId = 2;
     const tableAddr = P2_ADDR;
     const leaveReceipt = new Receipt(tableAddr).leave(handId, P1_ADDR).sign(ORACLE_PRIV);
-    const leaveHex = Receipt.parseToParams(leaveReceipt);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -654,8 +653,8 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
         MessageBody: `{"from":"0x1255","to":"${P2_ADDR}","gas":1200,"data":"0x112233"}`,
-        MessageGroupId: "someGroup",
-        QueueUrl: "url"
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
       }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.leave()'), {
         level: 'info',
@@ -681,8 +680,8 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
         MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":120,"data":"0x112233"}`,
-        MessageGroupId: "someGroup",
-        QueueUrl: "url"
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
       }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.net()'), {
         level: 'info',
@@ -722,11 +721,10 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, new Db(dynamo), null, sentry);
 
     Promise.all(worker.process(event)).then(() => {
-      //const receipts = ['0xcc5cc64c2850c3f6d3f034d76af90862eee9d68e0003ce5b9a0f67105686b36a', '0x47d86bb61ce0c78b8d4b3a7955f88d6220479f26676e1502fa8b576606abec8f', '0x1b000000000000060200000007a1200000000000000000000000000000000000', '0x69ef7ebf6836ebef343dfde3a159ed34b040a23fb26214ed6aa1046fde2cfd23', '0x6d43ecf6bcf571ea2e43396293986ffc2551afe434811d34dea102556e4f911f', '0x1c00000000000006020000000f42400000000000000000000000000000000000', '0xc680dc3d286d146ce6ddfce50931626d335d0715f63a598ed5be51e6ad10eb1c', '0x7bd65eff1db6a7dcfe07feeea5ce5a8507da9b831f91403713a937780b347820', '0x1c000000000000061500010000000016e3600000000000000000000000000000', '0x0000000000000000000000000000000000000000000000000000000000000000'];
       expect(sqs.sendMessage).calledWith({
         MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":120,"data":"0x112233"}`,
-        MessageGroupId: "someGroup",
-        QueueUrl: "url"
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
       }, sinon.match.any);
       done();
     }).catch(done);
@@ -736,7 +734,6 @@ describe('Stream worker other events', () => {
     const handId = 2;
     const tableAddr = P3_ADDR;
     const leaveReceipt = new Receipt(tableAddr).leave(handId, P1_ADDR).sign(ORACLE_PRIV);
-    const leaveHex = Receipt.parseToParams(leaveReceipt);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -763,8 +760,8 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
         MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":1200,"data":"0x112233"}`,
-        MessageGroupId: "someGroup",
-        QueueUrl: "url"
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
       }, sinon.match.any);
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.leave()'), {
@@ -811,7 +808,6 @@ describe('Stream worker other events', () => {
 
     Promise.all(worker.process(event)).then(() => {
       const leaveReceipt = new Receipt(tableAddr).leave(2, P1_ADDR).sign(ORACLE_PRIV);
-      const leaveHex = Receipt.parseToParams(leaveReceipt);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.leave()'), {
         level: 'info',
         server_name: 'event-worker',
@@ -970,7 +966,6 @@ describe('Stream worker other events', () => {
   });
 
   it('should handle WalletCreated event.', (done) => {
-    const senderAddr = '0x3322';
     const event = {
       Subject: 'WalletCreated::0x1234',
       Message: JSON.stringify({
@@ -990,11 +985,10 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR, sqs, 'queue'), null, null,
       sentry, ORACLE_PRIV, mailer, null, pusher);
     Promise.all(worker.process(event)).then(() => {
-      const nextAddr = '0x312dd66d24da42a564afb553824fb9737f2860a1';
       expect(sqs.sendMessage).calledWith({
         MessageBody: `{"from":"0x1255","to":"${P1_ADDR}","gas":120,"data":"0x123456","signerAddr":"${P2_ADDR}"}`,
-        MessageGroupId: "someGroup",
-        QueueUrl: "queue"
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'queue',
       }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match.any, {
         level: 'info',
@@ -1027,8 +1021,8 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
         MessageBody: `{"from":"0x3322","to":"${P1_ADDR}","gas":120,"data":"0x123456"}`,
-        MessageGroupId: "someGroup",
-        QueueUrl: "url"
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
       }, sinon.match.any);
       done();
     }).catch(done);

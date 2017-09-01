@@ -191,13 +191,13 @@ EventWorker.prototype.log = function log(message, context) {
 };
 
 EventWorker.prototype.walletCreated = function walletCreated(signerAddr, email) {
-  return this.factory.createAccount(signerAddr, this.recoveryAddr).then(() => {
-    return this.mailer.add(email);
-  }).then(() => this.log(`WalletCreated: ${signerAddr}`, {
-    user: {
-      id: signerAddr,
-    },
-  }));
+  return this.factory.createAccount(signerAddr, this.recoveryAddr)
+    .then(() => this.mailer.add(email))
+    .then(() => this.log(`WalletCreated: ${signerAddr}`, {
+      user: {
+        id: signerAddr,
+      },
+    }));
 };
 
 EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, exitHand) {
@@ -259,7 +259,7 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
   return this.table.net(tableAddr).then(
-    txHash => this.log('tx: table.net()', {
+    () => this.log('tx: table.net()', {
       tags: { tableAddr },
     }),
     error => this.log('tx: table.net()', {
@@ -345,7 +345,7 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
     });
     return this.table.settle(tableAddr, sigs, hand.netting.newBalances);
   }).then(
-    txHash => this.log('tx: table.settle()', {
+    () => this.log('tx: table.settle()', {
       tags: { tableAddr },
       extra: { bals: hand.netting.newBalances, sigs },
     }),

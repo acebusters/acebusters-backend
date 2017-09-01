@@ -8,11 +8,13 @@ export default class Contract {
   }
 
   sendTransaction(
-    tableAddr,
-    contractMethod,
+    contractInstance,
+    methodName,
     maxGas,
-    ...args
+    args = [],
+    params = {},
   ) {
+    const contractMethod = contractInstance[methodName];
     return new Promise((resolve, reject) => {
       contractMethod.estimateGas(...args, (gasErr, gas) => {
         if (gasErr) {
@@ -21,14 +23,16 @@ export default class Contract {
           reject(`Too many gas required for tx (${gas})`);
         } else {
           const callData = contractMethod.getData(...args);
-          this.sqs.sendMessage({ MessageBody: JSON.stringify({
+          this.sqs.sendMessage({
+            MessageBody: JSON.stringify({
               from: this.senderAddr,
-              to: tableAddr,
+              to: contractInstance.address,
               gas: Math.round(gas * 1.2),
-              data: callData
+              data: callData,
+              ...params,
             }),
             QueueUrl: this.queueUrl,
-            MessageGroupId: 'someGroup'
+            MessageGroupId: 'someGroup',
           }, (err, data) => {
             if (err) {
               reject(`sqs error: ${err}`);

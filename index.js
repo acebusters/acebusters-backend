@@ -39,7 +39,13 @@ exports.handler = function handler(event, context, callback) {
     }
     web3 = new Web3(web3Provider);
     const table = new Table(web3, process.env.SENDER_ADDR, new Aws.SQS(), process.env.QUEUE_URL);
-    const factory = new Factory(web3, process.env.OWNER_ADDR, process.env.FACTORY_ADDR, new Aws.SQS(), process.env.QUEUE_URL);
+    const factory = new Factory(
+      web3,
+      process.env.OWNER_ADDR,
+      process.env.FACTORY_ADDR,
+      new Aws.SQS(),
+      process.env.QUEUE_URL,
+    );
     const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
     const lambda = new Lambda(new Aws.Lambda(), process.env.ORACLE_FUNC_NAME);
 
