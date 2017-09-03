@@ -7,7 +7,6 @@ import BigNumber from 'bignumber.js';
 
 import EventWorker from './src/index';
 import Table from './src/tableContract';
-import Nutz from './src/nutzContract';
 import Factory from './src/factoryContract';
 import Db from './src/db';
 import MailerLite from './src/mailerLite';
@@ -45,40 +44,40 @@ const deck = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 
 const contract = {
   leave: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   settle: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   payoutFrom: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   net: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   submit: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
     call() {},
   },
   create: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   changeSigner: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   transfer: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   toggleActive: {
-    sendTransaction() {},
+    getData() {},
     estimateGas() {},
   },
   getLineup: {
@@ -131,8 +130,12 @@ const lambda = {
   invoke() {},
 };
 
+const sqs = {
+  sendMessage() {},
+};
+
 sinon.stub(web3.eth, 'contract').returns(web3.eth);
-sinon.stub(web3.eth, 'at').returns(contract);
+sinon.stub(web3.eth, 'at', address => ({ ...contract, address }));
 
 describe('Stream worker HandComplete event', () => {
   it('should handle HandComplete event.', (done) => {
@@ -605,11 +608,11 @@ describe('Stream worker HandComplete event', () => {
 
 
   afterEach(() => {
-    if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
-    if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
-    if (contract.payoutFrom.sendTransaction.restore) contract.payoutFrom.sendTransaction.restore();
-    if (contract.net.sendTransaction.restore) contract.net.sendTransaction.restore();
-    if (contract.create.sendTransaction.restore) contract.create.sendTransaction.restore();
+    if (contract.leave.getData.restore) contract.leave.getData.restore();
+    if (contract.settle.getData.restore) contract.settle.getData.restore();
+    if (contract.payoutFrom.getData.restore) contract.payoutFrom.getData.restore();
+    if (contract.net.getData.restore) contract.net.getData.restore();
+    if (contract.create.getData.restore) contract.create.getData.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
@@ -624,9 +627,8 @@ describe('Stream worker HandComplete event', () => {
 describe('Stream worker other events', () => {
   it('should handle TableLeave event.', (done) => {
     const handId = 2;
-    const tableAddr = EMPTY_ADDR;
+    const tableAddr = P2_ADDR;
     const leaveReceipt = new Receipt(tableAddr).leave(handId, P1_ADDR).sign(ORACLE_PRIV);
-    const leaveHex = Receipt.parseToParams(leaveReceipt);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -642,40 +644,49 @@ describe('Stream worker other events', () => {
       [babz(0), babz(0)],
     ]);
     sinon.stub(contract.leave, 'estimateGas').yields(null, 1000);
-    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.leave, 'getData').returns('0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, 'sentry');
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, null, ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
-      expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sqs.sendMessage).calledWith({
+        MessageBody: `{"from":"0x1255","to":"${P2_ADDR}","gas":1200,"data":"0x112233"}`,
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
+      }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.leave()'), {
         level: 'info',
         server_name: 'event-worker',
         tags: { tableAddr, handId },
-        extra: { leaveReceipt, txHash: '0x112233' },
+        extra: { leaveReceipt },
       });
       done();
     }).catch(done);
   });
 
   it('should handle ProgressNetting event.', (done) => {
-    const tableAddr = EMPTY_ADDR;
+    const tableAddr = P2_ADDR;
 
     const event = { Subject: `ProgressNetting::${tableAddr}` };
     sinon.stub(contract.net, 'estimateGas').yields(null, 100);
-    sinon.stub(contract.net, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.net, 'getData').returns('0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, null, null, sentry);
 
     Promise.all(worker.process(event)).then(() => {
-      expect(contract.net.sendTransaction).calledWith({ from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sqs.sendMessage).calledWith({
+        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":120,"data":"0x112233"}`,
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
+      }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.net()'), {
         level: 'info',
         server_name: 'event-worker',
         tags: { tableAddr },
-        extra: { txHash: '0x112233' },
       });
       done();
     }).catch(done);
@@ -701,26 +712,28 @@ describe('Stream worker other events', () => {
       }],
       distribution: new Receipt(EMPTY_ADDR).dist(6, 0, [babz(1500)]).sign(ORACLE_PRIV),
     } });
-    sinon.stub(contract.submit, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.submit, 'getData').returns('0x112233');
     sinon.stub(contract.submit, 'call').yields(null, 1);
     sinon.stub(contract.submit, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, new Db(dynamo), null, sentry);
 
-    Promise.all(worker.process(event)).then((tx) => {
-      expect(tx[0]).to.eql(['0x112233']);
-      const receipts = ['0xcc5cc64c2850c3f6d3f034d76af90862eee9d68e0003ce5b9a0f67105686b36a', '0x47d86bb61ce0c78b8d4b3a7955f88d6220479f26676e1502fa8b576606abec8f', '0x1b000000000000060200000007a1200000000000000000000000000000000000', '0x69ef7ebf6836ebef343dfde3a159ed34b040a23fb26214ed6aa1046fde2cfd23', '0x6d43ecf6bcf571ea2e43396293986ffc2551afe434811d34dea102556e4f911f', '0x1c00000000000006020000000f42400000000000000000000000000000000000', '0xc680dc3d286d146ce6ddfce50931626d335d0715f63a598ed5be51e6ad10eb1c', '0x7bd65eff1db6a7dcfe07feeea5ce5a8507da9b831f91403713a937780b347820', '0x1c000000000000061500010000000016e3600000000000000000000000000000', '0x0000000000000000000000000000000000000000000000000000000000000000'];
-      expect(contract.submit.sendTransaction).calledWith(receipts, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+    Promise.all(worker.process(event)).then(() => {
+      expect(sqs.sendMessage).calledWith({
+        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":120,"data":"0x112233"}`,
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
+      }, sinon.match.any);
       done();
     }).catch(done);
   });
 
   it('should handle TableLeave and Payout if netting not needed.', (done) => {
     const handId = 2;
-    const tableAddr = EMPTY_ADDR;
+    const tableAddr = P3_ADDR;
     const leaveReceipt = new Receipt(tableAddr).leave(handId, P1_ADDR).sign(ORACLE_PRIV);
-    const leaveHex = Receipt.parseToParams(leaveReceipt);
 
     const event = {
       Subject: `TableLeave::${tableAddr}`,
@@ -735,22 +748,27 @@ describe('Stream worker other events', () => {
       [new BigNumber(50000), new BigNumber(50000)],
       [babz(0), babz(0)],
     ]);
-    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
-    sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
+    sinon.stub(contract.leave, 'getData').returns('0x112233');
+    sinon.stub(contract.payoutFrom, 'getData').returns('0x445566');
     // sinon.stub(contract.leave, 'estimateGas').yields(null, 100);
     sinon.stub(contract.payoutFrom, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, null, ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, null, ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
-      expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
+      expect(sqs.sendMessage).calledWith({
+        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":1200,"data":"0x112233"}`,
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
+      }, sinon.match.any);
       expect(sentry.captureMessage).callCount(1);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.leave()'), {
         level: 'info',
         server_name: 'event-worker',
         tags: { tableAddr, handId },
-        extra: { txHash: '0x112233', leaveReceipt },
+        extra: { leaveReceipt },
       });
 
       done();
@@ -781,21 +799,20 @@ describe('Stream worker other events', () => {
         address: P2_ADDR,
       }],
     }] });
-    sinon.stub(contract.leave, 'sendTransaction').yields(null, '0x112233');
+    sinon.stub(contract.leave, 'getData').returns('0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
-    sinon.stub(contract.payoutFrom, 'sendTransaction').yields(null, '0x445566');
+    sinon.stub(contract.payoutFrom, 'getData').returns('0x445566');
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, new Db(dynamo), ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       const leaveReceipt = new Receipt(tableAddr).leave(2, P1_ADDR).sign(ORACLE_PRIV);
-      const leaveHex = Receipt.parseToParams(leaveReceipt);
-      expect(contract.leave.sendTransaction).calledWith(...leaveHex, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.leave()'), {
         level: 'info',
         server_name: 'event-worker',
         tags: { tableAddr, handId: 2 },
-        extra: { txHash: '0x112233', leaveReceipt },
+        extra: { leaveReceipt },
       });
       done();
     }).catch(done);
@@ -931,68 +948,58 @@ describe('Stream worker other events', () => {
         [P2_ADDR]: '0x445566',
       },
     } });
-    sinon.stub(contract.settle, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.settle, 'getData').returns('0x123456');
     sinon.stub(contract.settle, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
-      expect(contract.settle.sendTransaction).calledWith('0x223344334455445566', '0x1122331122331122331122331122331122331122331122331122331122331122', '0x8899aabbccddeeff8899aabbccddeeff8899aabbccddeeff8899aabbccddeeff', { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.settle()'), {
         level: 'info',
         server_name: 'event-worker',
         tags: { tableAddr: '0x77aabb11ee00' },
-        extra: { txHash: '0x123456', bals, sigs: '0x223344334455445566' },
+        extra: { bals, sigs: '0x223344334455445566' },
       });
       done();
     }).catch(done);
   });
 
   it('should handle WalletCreated event.', (done) => {
-    const senderAddr = '0x3322';
     const event = {
       Subject: 'WalletCreated::0x1234',
       Message: JSON.stringify({
-        signerAddr: P1_ADDR,
+        signerAddr: P2_ADDR,
         email: 'test@mail.com',
         accountId: 'someuuid',
       }),
     };
-    sinon.stub(contract.create, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.create, 'getData').returns('0x123456');
     sinon.stub(contract.create, 'estimateGas').yields(null, 100);
-    sinon.stub(web3.eth, 'getTransactionCount').yields(null, 12);
-    sinon.stub(contract.transfer, 'sendTransaction').yields(null, '0x789abc');
-    sinon.stub(contract.transfer, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(http, 'request').yields(null, { statusCode: 200 }, {});
-    sinon.stub(pusher, 'trigger').returns(null);
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
     const mailer = new MailerLite(http.request, '1234', '4567');
 
-    const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR), null, null,
-      sentry, new Nutz(web3, senderAddr, '0x9988'), ORACLE_PRIV, mailer, null, pusher);
+    const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR, sqs, 'queue'), null, null,
+      sentry, ORACLE_PRIV, mailer, null, pusher);
     Promise.all(worker.process(event)).then(() => {
-      const nextAddr = '0x312dd66d24da42a564afb553824fb9737f2860a1';
-      expect(contract.create.sendTransaction).calledWith(P1_ADDR,
-        ORACLE_ADDR, { from: '0x1255', gas: sinon.match.any }, sinon.match.any);
-      expect(contract.transfer.sendTransaction).calledWith(nextAddr,
-        1500000000000000, { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
+      expect(sqs.sendMessage).calledWith({
+        MessageBody: `{"from":"0x1255","to":"${P1_ADDR}","gas":120,"data":"0x123456","signerAddr":"${P2_ADDR}"}`,
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'queue',
+      }, sinon.match.any);
       expect(sentry.captureMessage).calledWith(sinon.match.any, {
         level: 'info',
         server_name: 'event-worker',
-        user: { id: P1_ADDR },
+        user: { id: P2_ADDR },
       });
       expect(http.request).calledWith({
         body: '{"email":"test@mail.com"}',
         headers: { 'Content-Type': 'application/json', 'X-MailerLite-ApiKey': '1234' },
         method: 'POST',
         url: 'https://api.mailerlite.com/api/v2/groups/4567/subscribers',
-      });
-      expect(pusher.trigger).callCount(1);
-      expect(web3.eth.getTransactionCount).callCount(1);
-      expect(pusher.trigger).calledWith(P1_ADDR, 'update', {
-        type: 'txHash',
-        payload: '0x123456',
       });
       done();
     }).catch(done);
@@ -1004,16 +1011,19 @@ describe('Stream worker other events', () => {
       Subject: `ToggleTable::${P1_ADDR}`,
       Message: '{}',
     };
-    sinon.stub(contract.toggleActive, 'sendTransaction').yields(null, '0x123456');
+    sinon.stub(contract.toggleActive, 'getData').returns('0x123456');
     sinon.stub(contract.toggleActive, 'estimateGas').yields(null, 100);
     sinon.stub(contract.lastHandNetted, 'call').yields(null, new BigNumber(12));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, senderAddr), null, null, ORACLE_PRIV);
+    const worker = new EventWorker(new Table(web3, senderAddr, sqs, 'url'), null, null, ORACLE_PRIV);
     Promise.all(worker.process(event)).then(() => {
-      const toggleReceipt = '0x0000000cf3beac30c498d9e26865f34fcaa57dbb935b0d74b8203ec9bb03700770ee3664c4819186de8ab490117381159ecc53ef4e5499ea7c14b136cddbd848ff496a0f275bd9e9092d9ed0885e6e95704a9673e2458cc21b';
-      expect(contract.toggleActive.sendTransaction).calledWith(toggleReceipt,
-        { from: senderAddr, gas: sinon.match.any }, sinon.match.any);
+      expect(sqs.sendMessage).calledWith({
+        MessageBody: `{"from":"0x3322","to":"${P1_ADDR}","gas":120,"data":"0x123456"}`,
+        MessageGroupId: 'someGroup',
+        QueueUrl: 'url',
+      }, sinon.match.any);
       done();
     }).catch(done);
   });
@@ -1099,7 +1109,7 @@ describe('Stream worker other events', () => {
     sinon.stub(lambda, 'invoke').yields(null, {});
 
     const worker = new EventWorker(null, null,
-      null, null, null, null, null, null, new Lambda(lambda, 'test'));
+      null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({
@@ -1123,7 +1133,7 @@ describe('Stream worker other events', () => {
     sinon.stub(lambda, 'invoke').yields(null, {});
 
     const worker = new EventWorker(null, null,
-      null, null, null, null, null, null, new Lambda(lambda, 'test'));
+      null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({
@@ -1140,7 +1150,7 @@ describe('Stream worker other events', () => {
     sinon.stub(lambda, 'invoke').yields(null, {});
 
     const worker = new EventWorker(null, null,
-      null, null, null, null, null, null, new Lambda(lambda, 'test'));
+      null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({
@@ -1153,13 +1163,14 @@ describe('Stream worker other events', () => {
   });
 
   afterEach(() => {
-    if (contract.leave.sendTransaction.restore) contract.leave.sendTransaction.restore();
-    if (contract.settle.sendTransaction.restore) contract.settle.sendTransaction.restore();
-    if (contract.payoutFrom.sendTransaction.restore) contract.payoutFrom.sendTransaction.restore();
-    if (contract.net.sendTransaction.restore) contract.net.sendTransaction.restore();
-    if (contract.create.sendTransaction.restore) contract.create.sendTransaction.restore();
+    if (contract.leave.getData.restore) contract.leave.getData.restore();
+    if (contract.settle.getData.restore) contract.settle.getData.restore();
+    if (contract.payoutFrom.getData.restore) contract.payoutFrom.getData.restore();
+    if (contract.net.getData.restore) contract.net.getData.restore();
+    if (contract.create.getData.restore) contract.create.getData.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
+    if (sqs.sendMessage.restore) sqs.sendMessage.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
