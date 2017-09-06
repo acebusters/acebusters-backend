@@ -9,6 +9,35 @@ export default class Db {
     this.dynamoTableName = dynamoTableName;
   }
 
+  async setAllowance(refCode, allowance) {
+    return this.putAttributes({
+      DomainName: this.sdbTableName,
+      ItemName: refCode,
+      Attributes: [{ Name: 'allowance', Value: String(allowance), Replace: true }],
+    });
+  }
+
+  async getReferral(refCode) {
+    try {
+      const data = await this.getAttributes({
+        DomainName: this.sdbTableName,
+        ItemName: refCode,
+      });
+
+      if (!data.Attributes) {
+        throw new Error(`Referral with ID ${refCode} not found.`);
+      }
+
+      const referral = transform(data.Attributes);
+      return {
+        ...referral,
+        allowance: Number(referral.allowance),
+      };
+    } catch (err) {
+      throw new Error(`Error: ${err}`);
+    }
+  }
+
   async getHand(tableAddr, handId) {
     if (handId < 1) {
       return { distribution: {} };

@@ -155,8 +155,9 @@ EventWorker.prototype.process = function process(msg) {
   return tasks;
 };
 
-EventWorker.prototype.addPromoAllowace = function addPromoAllowace(refCode, amount) {
-  console.log(refCode, amount);
+EventWorker.prototype.addPromoAllowace = async function addPromoAllowace(refCode, value) {
+  const referral = await this.db.getReferral(refCode);
+  return this.db.setAllowance(refCode, referral.allowance + Number(value));
 };
 
 EventWorker.prototype.publishUpdate = function publishUpdate(topic, msg) {
