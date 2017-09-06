@@ -147,8 +147,16 @@ EventWorker.prototype.process = function process(msg) {
     tasks.push(this.removePlayer(msgBody.address));
   }
 
+  if (msgType === 'AddPromo') {
+    tasks.push(this.addPromoAllowace(...msg.Subject.split('::').slice(1)));
+  }
+
   // nothing to do
   return tasks;
+};
+
+EventWorker.prototype.addPromoAllowace = function addPromoAllowace(refCode, amount) {
+  console.log(refCode, amount);
 };
 
 EventWorker.prototype.publishUpdate = function publishUpdate(topic, msg) {

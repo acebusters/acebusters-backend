@@ -1,7 +1,7 @@
 import doc from 'dynamodb-doc';
 import Web3 from 'web3';
 import Raven from 'raven';
-import Aws from 'aws-sdk';
+import AWS from 'aws-sdk';
 import request from 'request';
 import Pusher from 'pusher';
 
@@ -15,9 +15,10 @@ import Lambda from './src/lambda';
 let web3Provider;
 let pusher;
 let dynamo;
+let sdb;
 
 exports.handler = function handler(event, context, callback) {
-  const tableName = process.env.TABLE_NAME;
+  // const tableName = ;
 
   Raven.config(process.env.SENTRY_URL).install();
 
@@ -38,26 +39,30 @@ exports.handler = function handler(event, context, callback) {
       web3Provider = new web3.providers.HttpProvider(process.env.PROVIDER_URL);
     }
     web3 = new Web3(web3Provider);
-    const table = new Table(web3, process.env.SENDER_ADDR, new Aws.SQS(), process.env.QUEUE_URL);
+    const table = new Table(web3, process.env.SENDER_ADDR, new AWS.SQS(), process.env.QUEUE_URL);
     const factory = new Factory(
       web3,
       process.env.OWNER_ADDR,
       process.env.FACTORY_ADDR,
-      new Aws.SQS(),
+      new AWS.SQS(),
       process.env.QUEUE_URL,
     );
     const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
-    const lambda = new Lambda(new Aws.Lambda(), process.env.ORACLE_FUNC_NAME);
+    const lambda = new Lambda(new AWS.Lambda(), process.env.ORACLE_FUNC_NAME);
 
     if (!dynamo) {
       dynamo = new doc.DynamoDB();
+    }
+
+    if (!sdb) {
+      sdb = new AWS.SimpleDB();
     }
 
     let requests = [];
     const worker = new EventWorker(
       table,
       factory,
-      new Db(dynamo, tableName),
+      new Db(dynamo, process.env.DYNAMO_TABLE_NAME, sdb, process.env.SDB_TABLE_NAME),
       process.env.ORACLE_PRIV,
       Raven,
       process.env.RECOVERY_PRIV,
