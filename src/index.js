@@ -147,8 +147,17 @@ EventWorker.prototype.process = function process(msg) {
     tasks.push(this.removePlayer(msgBody.address));
   }
 
+  if (msgType === 'AddPromo') {
+    tasks.push(this.addPromoAllowace(...msg.Subject.split('::').slice(1)));
+  }
+
   // nothing to do
   return tasks;
+};
+
+EventWorker.prototype.addPromoAllowace = async function addPromoAllowace(refCode, value) {
+  const referral = await this.db.getReferral(refCode);
+  return this.db.setAllowance(refCode, referral.allowance + Number(value));
 };
 
 EventWorker.prototype.publishUpdate = function publishUpdate(topic, msg) {

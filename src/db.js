@@ -1,58 +1,79 @@
+import { dbMethod, transform } from './utils';
 
-function Db(dynamo, tableName) {
-  this.dynamo = dynamo;
-  this.tableName = (typeof tableName === 'undefined') ? 'sb_cashgame' : tableName;
-}
+export default class Db {
 
-Db.prototype.getHand = function getHand(tableAddr, handId) {
-  return new Promise((fulfill, reject) => {
-    if (handId < 1) {
-      fulfill({ distribution: {} }); // return the genensis hand
-      return;
-    }
-    this.dynamo.getItem({
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-    }, (err, data) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      if (!data.Item) {
-        reject(`Not Found: handId ${handId} not found.`);
-        return;
-      }
-      fulfill(data.Item);
+  constructor(dynamo, dynamoTableName = 'sb_cashgame', sdb, sdbTableName) {
+    this.sdb = sdb;
+    this.dynamo = dynamo;
+    this.sdbTableName = sdbTableName;
+    this.dynamoTableName = dynamoTableName;
+  }
+
+  async setAllowance(refCode, allowance) {
+    return this.putAttributes({
+      DomainName: this.sdbTableName,
+      ItemName: refCode,
+      Attributes: [{ Name: 'allowance', Value: String(allowance), Replace: true }],
     });
-  });
-};
+  }
 
-Db.prototype.getLastHand = function getLastHand(tableAddr, scanForward = false) {
-  return new Promise((fulfill, reject) => {
-    this.dynamo.query({
+  async getReferral(refCode) {
+    try {
+      const data = await this.getAttributes({
+        DomainName: this.sdbTableName,
+        ItemName: refCode,
+      });
+
+      if (!data.Attributes) {
+        throw new Error(`Referral with ID ${refCode} not found.`);
+      }
+
+      const referral = transform(data.Attributes);
+      return {
+        ...referral,
+        allowance: Number(referral.allowance),
+      };
+    } catch (err) {
+      throw new Error(`Error: ${err}`);
+    }
+  }
+
+  async getHand(tableAddr, handId) {
+    if (handId < 1) {
+      return { distribution: {} };
+    }
+
+    const data = await this.getItem({
+      TableName: this.dynamoTableName,
+      Key: { tableAddr, handId },
+    });
+
+    if (!data.Item) {
+      throw new Error(`Not Found: handId ${handId} not found.`);
+    }
+
+    return data.Item;
+  }
+
+  async getLastHand(tableAddr, scanForward = false) {
+    const rsp = await this.query({
       TableName: this.tableName,
       KeyConditionExpression: 'tableAddr = :a',
       ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
       ScanIndexForward: scanForward,
-    }, (err, rsp) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      if (!rsp.Items || rsp.Items.length < 1) {
-        reject(`Not Found: table with address ${tableAddr} unknown.`);
-        return;
-      }
-      fulfill(rsp.Items[0]);
     });
-  });
-};
 
-Db.prototype.updateSeat = function updateSeat(tableAddr, handId, seat, pos, time, dealer) {
-  return new Promise((fulfill, reject) => {
+    if (!rsp.Items || rsp.Items.length < 1) {
+      return Promise.reject(`Not Found: table with address ${tableAddr} unknown.`);
+    }
+
+    return rsp.Items[0];
+  }
+
+  async updateSeat(tableAddr, handId, seat, pos, time, dealer) {
     const params = {
-      TableName: this.tableName,
+      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: `set lineup[${pos}] = :s, changed = :t, dealer = :d`,
       ExpressionAttributeValues: {
@@ -61,116 +82,127 @@ Db.prototype.updateSeat = function updateSeat(tableAddr, handId, seat, pos, time
         ':d': dealer,
       },
     };
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      fulfill(rsp.Item);
-    });
-  });
-};
+    const rsp = await this.updateItem(params);
+    return rsp.Item;
+  }
 
-Db.prototype.emptySeat = function emptySeat(tableAddr, handId, pos) {
-  return new Promise((fulfill, reject) => {
+  async emptySeat(tableAddr, handId, pos) {
     const params = {
-      TableName: this.tableName,
+      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: `set lineup[${pos}] = :s`,
       ExpressionAttributeValues: {
         ':s': { address: '0x0000000000000000000000000000000000000000' },
       },
     };
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      fulfill(rsp.Item);
-    });
-  });
-};
+    const rsp = await this.updateItem(params);
+    return rsp.Item;
+  }
 
-Db.prototype.updateNetting = function updateNetting(tableAddr, handId, netting) {
-  return new Promise((fulfill, reject) => {
+  async updateNetting(tableAddr, handId, netting) {
     const params = {
-      TableName: this.tableName,
+      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: 'set netting = :n',
       ExpressionAttributeValues: {
         ':n': netting,
       },
     };
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        reject(err);
-      }
-      fulfill(rsp.Item);
-    });
-  });
-};
+    const rsp = await this.updateItem(params);
+    return rsp.Item;
+  }
 
-Db.prototype.putHand = function putHand(tableAddr, handId, lineup, dealer, deck, sb, changed) {
-  return new Promise((fulfill, reject) => {
-    this.dynamo.putItem({
-      TableName: this.tableName,
-      Item: {
-        tableAddr,
-        handId,
-        lineup,
-        dealer,
-        state: 'waiting',
-        deck,
-        sb,
-        changed,
-      },
-    }, (err, data) => {
-      if (err) {
-        reject(`Error: Dynamo failed: ${err}`);
-        return;
-      }
-      fulfill(data.Item);
-    });
-  });
-};
+  async putHand(tableAddr, handId, lineup, dealer, deck, sb, changed) {
+    try {
+      const data = await this.putItem({
+        TableName: this.dynamoTableName,
+        Item: {
+          tableAddr,
+          handId,
+          lineup,
+          dealer,
+          state: 'waiting',
+          deck,
+          sb,
+          changed,
+        },
+      });
 
-Db.prototype.updateDistribution = function updateDistribution(tableAddr, handId, distribution) {
-  return new Promise((fulfill, reject) => {
+      return data.Item;
+    } catch (err) {
+      throw new Error(`Error: Dynamo failed: ${err}`);
+    }
+  }
+
+  async updateDistribution(tableAddr, handId, distribution) {
     const params = {
-      TableName: this.tableName,
+      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: 'set distribution = :d',
       ExpressionAttributeValues: {
         ':d': distribution,
       },
     };
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      fulfill(rsp.Item);
-    });
-  });
-};
+    const rsp = await this.updateItem(params);
+    return rsp.Item;
+  }
 
-Db.prototype.deleteHand = function deleteHand(tableAddr, handId) {
-  return new Promise((fulfill, reject) => {
+  async deleteHand(tableAddr, handId) {
     // avoid deleting unwanted entries
     if (!handId || !tableAddr) {
-      reject('null key value detected on delete.');
+      throw new Error('null key value detected on delete.');
     }
-    this.dynamo.deleteItem({
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-    }, (err, rsp) => {
-      if (err) {
-        reject(`Error: Dynamo failed: ${err}`);
-        return;
-      }
-      fulfill(rsp);
-    });
-  });
-};
 
-module.exports = Db;
+    try {
+      const rsp = await this.deleteItem({
+        TableName: this.dynamoTableName,
+        Key: { tableAddr, handId },
+      });
+
+      return rsp;
+    } catch (err) {
+      throw new Error(`Error: Dynamo failed: ${err}`);
+    }
+  }
+
+  query(params) {
+    return dbMethod(this.dynamo, 'query', params);
+  }
+
+  putItem(params) {
+    return dbMethod(this.dynamo, 'putItem', params);
+  }
+
+  getItem(params) {
+    return dbMethod(this.dynamo, 'getItem', params);
+  }
+
+  updateItem(params) {
+    return dbMethod(this.dynamo, 'updateItem', params);
+  }
+
+  deleteItem(params) {
+    return dbMethod(this.dynamo, 'deleteItem', params);
+  }
+
+  putAttributes(params) {
+    return dbMethod(this.sdb, 'putAttributes', params);
+  }
+
+  select(params) {
+    return dbMethod(this.sdb, 'select', params);
+  }
+
+  getAttributes(params) {
+    return dbMethod(this.sdb, 'getAttributes', params);
+  }
+
+  deleteAttributes(params) {
+    return dbMethod(this.sdb, 'deleteAttributes', params);
+  }
+
+  createDomain(params) {
+    return dbMethod(this.sdb, 'createDomain', params);
+  }
+
+}

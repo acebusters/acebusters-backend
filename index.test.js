@@ -118,6 +118,12 @@ const dynamo = {
   deleteItem() {},
 };
 
+const sdb = {
+  putAttributes() {},
+  select() {},
+  getAttributes() {},
+};
+
 const pusher = {
   trigger() {},
 };
@@ -625,6 +631,39 @@ describe('Stream worker HandComplete event', () => {
 });
 
 describe('Stream worker other events', () => {
+  it('should handle AddPromo event.', (done) => {
+    const event = {
+      Subject: 'AddPromo::00000000::2',
+      Message: JSON.stringify({}),
+    };
+
+    sinon.stub(sdb, 'getAttributes').yields(null, {
+      Attributes: [
+        { Name: 'allowance', Value: '1' },
+      ],
+    });
+    sinon.stub(sdb, 'putAttributes').yields(null, {});
+
+    const worker = new EventWorker(
+      null,
+      null,
+      new Db(dynamo, 'sb_cashgame', sdb, 'promo'),
+      ORACLE_PRIV,
+      sentry,
+    );
+
+    Promise.all(worker.process(event)).then(() => {
+      expect(sdb.putAttributes).calledWith({
+        DomainName: 'promo',
+        ItemName: '00000000',
+        Attributes: [
+          { Name: 'allowance', Value: '3', Replace: true },
+        ],
+      });
+      done();
+    }).catch(done);
+  });
+
   it('should handle TableLeave event.', (done) => {
     const handId = 2;
     const tableAddr = P2_ADDR;
