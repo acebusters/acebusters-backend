@@ -57,7 +57,7 @@ export default class Db {
 
   async getLastHand(tableAddr, scanForward = false) {
     const rsp = await this.query({
-      TableName: this.tableName,
+      TableName: this.dynamoTableName,
       KeyConditionExpression: 'tableAddr = :a',
       ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
