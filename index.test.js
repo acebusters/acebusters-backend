@@ -7,7 +7,6 @@ import BigNumber from 'bignumber.js';
 
 import EventWorker from './src/index';
 import Table from './src/tableContract';
-import Factory from './src/factoryContract';
 import Db from './src/db';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
@@ -174,7 +173,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.putItem).calledWith({ Item: {
         tableAddr,
@@ -242,7 +241,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.putItem).calledWith({ Item: {
         tableAddr,
@@ -306,8 +305,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'),
-      null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const distHand2 = new Receipt(tableAddr).dist(2, 0, [babz(0), babz(693)]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(
@@ -365,7 +363,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const distHand3 = new Receipt(tableAddr).dist(3, 0, [babz(2079)]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
@@ -423,7 +421,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const distHand3 = new Receipt(tableAddr).dist(3, 0, [babz(1980)]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
@@ -481,7 +479,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const distHand3 = new Receipt(tableAddr).dist(3, 0, [babz(1980)]).sign(ORACLE_PRIV);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', distHand3)));
@@ -535,7 +533,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'putItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const distHand4 = new Receipt(tableAddr).dist(
         4,
@@ -590,7 +588,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sentry, 'captureException').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.putItem).calledWith({ Item: {
         tableAddr,
@@ -646,7 +644,6 @@ describe('Stream worker other events', () => {
 
     const worker = new EventWorker(
       null,
-      null,
       new Db(dynamo, 'sb_cashgame', sdb, 'promo'),
       ORACLE_PRIV,
       sentry,
@@ -687,7 +684,7 @@ describe('Stream worker other events', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, 'sentry');
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, null, ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
@@ -714,7 +711,7 @@ describe('Stream worker other events', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, null, null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, null, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
@@ -757,7 +754,7 @@ describe('Stream worker other events', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), new Db(dynamo), null, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
@@ -794,7 +791,7 @@ describe('Stream worker other events', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, null, ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
@@ -843,7 +840,7 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.payoutFrom, 'getData').returns('0x445566');
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), new Db(dynamo), ORACLE_PRIV, sentry);
 
     Promise.all(worker.process(event)).then(() => {
       const leaveReceipt = new Receipt(tableAddr).leave(2, P1_ADDR).sign(ORACLE_PRIV);
@@ -870,7 +867,7 @@ describe('Stream worker other events', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sentry, 'captureException').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.putItem).calledWith({ Item: {
         tableAddr: '0xa2de',
@@ -931,7 +928,7 @@ describe('Stream worker other events', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       const netting = {
         '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f': '0x1ccf13cf61b8e66a91e1964cf07b30c715ff83b9e00cb36bcdb423fbfdcfba4a6237d92a84fd463bb6bdf37ea5bf077da37947839e1d031827d557124edbd9daab',
@@ -962,7 +959,7 @@ describe('Stream worker other events', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), ORACLE_PRIV, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.updateItem).callCount(0);
       done();
@@ -992,7 +989,7 @@ describe('Stream worker other events', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(sentry.captureMessage).calledWith(sinon.match('tx: table.settle()'), {
         level: 'info',
@@ -1015,25 +1012,12 @@ describe('Stream worker other events', () => {
     };
     sinon.stub(contract.create, 'getData').returns('0x123456');
     sinon.stub(contract.create, 'estimateGas').yields(null, 100);
-    sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(http, 'request').yields(null, { statusCode: 200 }, {});
-    sinon.stub(sqs, 'sendMessage').yields(null, {});
 
     const mailer = new MailerLite(http.request, '1234', '4567');
 
-    const worker = new EventWorker(null, new Factory(web3, '0x1255', P1_ADDR, sqs, 'queue'), null, null,
-      sentry, ORACLE_PRIV, mailer, null, pusher);
+    const worker = new EventWorker(null, null, null, sentry, ORACLE_PRIV, mailer, null, pusher);
     Promise.all(worker.process(event)).then(() => {
-      expect(sqs.sendMessage).calledWith({
-        MessageBody: `{"from":"0x1255","to":"${P1_ADDR}","gas":120,"data":"0x123456","signerAddr":"${P2_ADDR}"}`,
-        MessageGroupId: 'someGroup',
-        QueueUrl: 'queue',
-      }, sinon.match.any);
-      expect(sentry.captureMessage).calledWith(sinon.match.any, {
-        level: 'info',
-        server_name: 'event-worker',
-        user: { id: P2_ADDR },
-      });
       expect(http.request).calledWith({
         body: '{"email":"test@mail.com"}',
         headers: { 'Content-Type': 'application/json', 'X-MailerLite-ApiKey': '1234' },
@@ -1056,7 +1040,7 @@ describe('Stream worker other events', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, senderAddr, sqs, 'url'), null, null, ORACLE_PRIV);
+    const worker = new EventWorker(new Table(web3, senderAddr, sqs, 'url'), null, ORACLE_PRIV);
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
         MessageBody: `{"from":"0x3322","to":"${P1_ADDR}","gas":120,"data":"0x123456"}`,
@@ -1088,7 +1072,7 @@ describe('Stream worker other events', () => {
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.deleteItem).callCount(2);
       expect(dynamo.deleteItem).calledWith({ Key: {
@@ -1124,7 +1108,7 @@ describe('Stream worker other events', () => {
     sinon.stub(dynamo, 'deleteItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255'), null, new Db(dynamo), null, sentry);
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), null, sentry);
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.deleteItem).callCount(1);
       expect(dynamo.deleteItem).calledWith({ Key: {
@@ -1147,8 +1131,7 @@ describe('Stream worker other events', () => {
     };
     sinon.stub(lambda, 'invoke').yields(null, {});
 
-    const worker = new EventWorker(null, null,
-      null, null, null, null, null, new Lambda(lambda, 'test'));
+    const worker = new EventWorker(null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({
@@ -1171,8 +1154,7 @@ describe('Stream worker other events', () => {
     };
     sinon.stub(lambda, 'invoke').yields(null, {});
 
-    const worker = new EventWorker(null, null,
-      null, null, null, null, null, new Lambda(lambda, 'test'));
+    const worker = new EventWorker(null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({
@@ -1188,8 +1170,7 @@ describe('Stream worker other events', () => {
     const event = { Subject: 'Timeout::0x77aabb11ee00' };
     sinon.stub(lambda, 'invoke').yields(null, {});
 
-    const worker = new EventWorker(null, null,
-      null, null, null, null, null, new Lambda(lambda, 'test'));
+    const worker = new EventWorker(null, null, null, null, null, null, new Lambda(lambda, 'test'));
     Promise.all(worker.process(event)).then(() => {
       expect(lambda.invoke).callCount(1);
       expect(lambda.invoke).calledWith({

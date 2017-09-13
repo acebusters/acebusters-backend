@@ -8,7 +8,6 @@ import Pusher from 'pusher';
 import Db from './src/db';
 import EventWorker from './src/index';
 import Table from './src/tableContract';
-import Factory from './src/factoryContract';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
 
@@ -18,8 +17,6 @@ let dynamo;
 let sdb;
 
 exports.handler = function handler(event, context, callback) {
-  // const tableName = ;
-
   Raven.config(process.env.SENTRY_URL).install();
 
   if (typeof pusher === 'undefined') {
@@ -40,13 +37,6 @@ exports.handler = function handler(event, context, callback) {
     }
     web3 = new Web3(web3Provider);
     const table = new Table(web3, process.env.SENDER_ADDR, new AWS.SQS(), process.env.QUEUE_URL);
-    const factory = new Factory(
-      web3,
-      process.env.OWNER_ADDR,
-      process.env.FACTORY_ADDR,
-      new AWS.SQS(),
-      process.env.QUEUE_URL,
-    );
     const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
     const lambda = new Lambda(new AWS.Lambda(), process.env.ORACLE_FUNC_NAME);
 
@@ -61,7 +51,6 @@ exports.handler = function handler(event, context, callback) {
     let requests = [];
     const worker = new EventWorker(
       table,
-      factory,
       new Db(dynamo, process.env.DYNAMO_TABLE_NAME, sdb, process.env.SDB_TABLE_NAME),
       process.env.ORACLE_PRIV,
       Raven,
