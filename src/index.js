@@ -27,7 +27,6 @@ const shuffle = function shuffle() {
 
 function EventWorker(
   table,
-  factory,
   db,
   oraclePriv,
   sentry,
@@ -37,7 +36,6 @@ function EventWorker(
   pusher,
 ) {
   this.table = table;
-  this.factory = factory;
   this.db = db;
   if (oraclePriv) {
     this.oraclePriv = oraclePriv;
@@ -115,7 +113,7 @@ EventWorker.prototype.process = function process(msg) {
 
   // react to new wallet. deploy proxy on the chain.
   if (msgType === 'WalletCreated') {
-    tasks.push(this.walletCreated(msgBody.signerAddr, msgBody.email));
+    tasks.push(this.walletCreated(msgBody.email));
   }
 
   // toggle table active
@@ -199,14 +197,8 @@ EventWorker.prototype.log = function log(message, context) {
   });
 };
 
-EventWorker.prototype.walletCreated = function walletCreated(signerAddr, email) {
-  return this.factory.createAccount(signerAddr, this.recoveryAddr)
-    .then(() => this.mailer.add(email))
-    .then(() => this.log(`WalletCreated: ${signerAddr}`, {
-      user: {
-        id: signerAddr,
-      },
-    }));
+EventWorker.prototype.walletCreated = function walletCreated(email) {
+  return this.mailer.add(email);
 };
 
 EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, exitHand) {
