@@ -202,27 +202,27 @@ EventWorker.prototype.walletCreated = function walletCreated(email) {
 };
 
 EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, exitHand) {
-  let leaveHex;
   const leaveReceipt = new Receipt(tableAddr).leave(exitHand, leaverAddr).sign(this.oraclePriv);
   try {
-    leaveHex = Receipt.parseToParams(leaveReceipt);
+    const leaveHex = Receipt.parseToParams(leaveReceipt);
+    return this.table.leave(tableAddr, leaveHex).then(
+      (txHash) => {
+        this.log('tx: table.leave()', {
+          tags: { tableAddr, handId: exitHand },
+          extra: { leaveReceipt },
+        });
+
+        return [txHash];
+      },
+      error => this.log('tx: table.leave()', {
+        level: 'error',
+        tags: { tableAddr, handId: exitHand },
+        extra: { error, leaveReceipt },
+      }),
+    );
   } catch (error) {
     return Promise.reject(error);
   }
-  return this.table.leave(tableAddr, leaveHex).then(
-    (txHash) => {
-      this.log('tx: table.leave()', {
-        tags: { tableAddr, handId: exitHand },
-        extra: { leaveReceipt },
-      });
-
-      return [txHash];
-    },
-    error => this.log('tx: table.leave()', {
-      level: 'error',
-      extra: { error, leaveReceipt },
-    }),
-  );
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
