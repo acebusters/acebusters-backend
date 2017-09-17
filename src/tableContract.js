@@ -5,7 +5,7 @@ const TABLE_ABI = [{ constant: true, inputs: [], name: 'active', outputs: [{ nam
 export default class TableContract extends Contract {
   leave(tableAddr, leaveReceipt) {
     const contract = this.web3.eth.contract(TABLE_ABI).at(tableAddr);
-    return this.sendTransaction(contract, 'leave', 200000, [leaveReceipt]);
+    return this.sendTransaction(contract, 'leave', 200000, leaveReceipt);
   }
 
   toggleTable(tableAddr, activeReceipt) {
