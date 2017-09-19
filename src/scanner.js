@@ -92,7 +92,8 @@ class ScanManager {
           hasPlayer = true;
         }
       }
-      if (lastHand.changed > tooOld && hasPlayer) {
+      // last hand played an hour ago and the table still has players -> timeout the table
+      if (lastHand.changed < tooOld && hasPlayer) {
         results.push(this.notify({ tableAddr }, `Timeout::${tableAddr}`));
       }
     }
