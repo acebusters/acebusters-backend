@@ -6,6 +6,7 @@ import AWS from 'aws-sdk';
 import Db from './src/db';
 import TableContract from './src/tableContract';
 import ReserveService from './src/index';
+import Logger from './src/logger';
 
 const simpledb = new AWS.SimpleDB();
 let web3Provider;
@@ -14,6 +15,7 @@ let pusher;
 exports.handler = function handler(event, context, callback) {
   context.callbackWaitsForEmptyEventLoop = false; // eslint-disable-line no-param-reassign
   Raven.config(process.env.SENTRY_URL).install();
+  const logger = new Logger(Raven, context.functionName || 'reserve-service');
 
   try {
     if (typeof pusher === 'undefined') {
@@ -66,25 +68,9 @@ exports.handler = function handler(event, context, callback) {
     handleRequest.then((data) => {
       callback(null, data);
     }).catch((err) => {
-      Raven.captureException(err, { server_name: 'reserve-service' }, (sendErr) => {
-        if (sendErr) {
-          console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
-          callback(sendErr);
-          return;
-        }
-        callback(err);
-      });
+      logger.exception(err).then(callback);
     });
   } catch (err) {
-    Raven.captureException(err, {
-      server_name: 'reserve-service',
-    }, (sendErr) => {
-      if (sendErr) {
-        console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
-        callback(sendErr);
-        return;
-      }
-      callback(err);
-    });
+    logger.exception(err).then(callback);
   }
 };
