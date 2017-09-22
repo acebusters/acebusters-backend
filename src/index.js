@@ -281,7 +281,9 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
     bettingComplete = this.helper.isBettingDone(hand.lineup,
     hand.dealer, hand.state, hand.sb * 2);
   } catch (err) {
-    console.log(err); // eslint-disable-line no-console
+    this.log(`'is betting done' error`, {
+      tags: { tableAddr, handId: hand.handId },
+    });
   }
   const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
   let streetMaxBet;
@@ -568,17 +570,17 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
       return Promise.resolve('no changes for lineup detected.');
     }
     const jobProms = [];
-    for (let i = 0; i < leavePos.length; i += 1) {
-      // we only update the seat, as not to affect the game
-      jobProms.push(this.db.setSeat(tableAddr, hand.handId, leavePos[i]));
-    }
     // now
     const now = Math.floor(Date.now() / 1000);
+    for (let i = 0; i < leavePos.length; i += 1) {
+      // we only update the seat, as not to affect the game
+      jobProms.push(this.db.setSeat(tableAddr, hand.handId, leavePos[i], now));
+    }
     const sitout = (hand.state !== 'waiting' && hand.state !== 'dealing') ? now : null;
     for (let i = 0; i < joinPos.length; i += 1) {
       // we only update the seat, as not to affect the game
       jobProms.push(this.db.setSeat(tableAddr,
-        hand.handId, joinPos[i].pos, joinPos[i].addr, sitout));
+        hand.handId, joinPos[i].pos, now, joinPos[i].addr, sitout));
     }
     if (hand.state === 'waiting' && !this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state)) {
       // TODO: optimize this, when handstate waiting, we can update everything at once

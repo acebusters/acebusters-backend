@@ -150,15 +150,16 @@ Db.prototype.updateNetting = function updateNetting(tableAddr, handId, signer, n
   });
 };
 
-Db.prototype.setSeat = function setSeat(tableAddr, handId, pos, addr, sitout) {
+Db.prototype.setSeat = function setSeat(tableAddr, handId, pos, changed, addr, sitout) {
   const address = addr || '0x0000000000000000000000000000000000000000';
   return new Promise((fulfill, reject) => {
     const params = {
       TableName: this.tableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :s`,
+      UpdateExpression: `set lineup[${pos}] = :s, changed = :c`,
       ExpressionAttributeValues: {
         ':s': { address },
+        ':c': changed
       },
     };
     if (sitout) {
