@@ -86,7 +86,7 @@ StreamScanner.prototype.process = function process(record) {
       // give up
     }
   }
-  if (newHandComplete === true && oldHandComplete === false) {
+  if (newHandComplete === true && oldHandComplete === false && newHand.state !== 'waiting') {
     tasks.push(this.notify(`HandComplete::${keys.tableAddr}`, {
       tableAddr: keys.tableAddr,
       handId: newHand.handId,

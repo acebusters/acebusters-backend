@@ -264,6 +264,46 @@ describe('Stream scanner', () => {
     }).catch(done);
   });
 
+  it('should not send HandComplete event when hand is in waiting state and small blind times out.', (done) => {
+    const event = {
+      eventName: 'MODIFY',
+      dynamodb: {
+        Keys: {
+          tableAddr: {
+            S: '0x77aabb11ee0000',
+          },
+        },
+        OldImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          state: { S: 'waiting' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR } }},
+            { M: { address: { S: P2_ADDR } }},
+          ] },
+        },
+        NewImage: {
+          dealer: { N: '0' },
+          handId: { N: '2' },
+          state: { S: 'waiting' },
+          lineup: { L: [
+            { M: { address: { S: P1_ADDR }, sitout: { N: '123' } } },
+            { M: { address: { S: P2_ADDR } }},
+          ] },
+        },
+      },
+    };
+
+    sinon.stub(sns, 'publish').yields(null, {});
+
+    const worker = new StreamWorker(sns, topicArn, pusher, rc);
+
+    worker.process(event).then(() => {
+      expect(sns.publish).callCount(0);
+      done();
+    }).catch(done);
+  });
+
   it('should not send event when hand was complete already.', (done) => {
     const bet2 = new Receipt(EMPTY_ADDR).bet(2, babz(1000)).sign(P2_PRIV);
     const fold = new Receipt(EMPTY_ADDR).fold(2, babz(500)).sign(P1_PRIV);
