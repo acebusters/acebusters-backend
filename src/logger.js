@@ -1,8 +1,14 @@
 export default class Logger {
 
-  constructor(sentry, serverName) {
+  constructor(sentry, serverName, serviceName) {
     this.sentry = sentry;
-    this.serverName = serverName;
+    this.serverName = serverName || serviceName;
+
+    if (process.env.SERVICE_NAME !== serviceName) {
+      this.log(`${serviceName} is deployed on ${serverName}, but expected ${process.env.SERVICE_NAME}`, {
+        level: 'error',
+      });
+    }
   }
 
   log(message, context) {

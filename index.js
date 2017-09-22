@@ -19,13 +19,7 @@ let sdb;
 
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL).install();
-  const logger = new Logger(Raven, context.functionName || 'event-worker');
-
-  if (process.env.SERVICE_NAME !== 'event-worker') {
-    logger.log(`event-worker is deployed on ${context.functionName}, but expected ${process.env.SERVICE_NAME}`, {
-      level: 'error',
-    });
-  }
+  const logger = new Logger(Raven, context.functionName, 'event-worker');
 
   if (typeof pusher === 'undefined') {
     pusher = new Pusher({
