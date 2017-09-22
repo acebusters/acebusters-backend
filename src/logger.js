@@ -2,7 +2,7 @@ export default class Logger {
 
   constructor(sentry, serverName) {
     this.sentry = sentry;
-    this.server_name = serverName;
+    this.serverName = serverName;
   }
 
   log(message, context) {

@@ -1,3 +1,10 @@
+const TX_TIMEOUT = 10000;
+const TIMEOUT_STEP = 500;
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export default class Contract {
 
   constructor(web3) {
@@ -15,8 +22,15 @@ export default class Contract {
     });
   }
 
-  getTransaction(...args) {
-    return this.call(this.web3.eth.getTransaction, ...args);
+  async getTransaction(...args) {
+    for (let i = 0; i < TX_TIMEOUT / TIMEOUT_STEP; i += 1) {
+      const tx = await this.call(this.web3.eth.getTransaction, ...args); // eslint-disable-line
+      if (tx) {
+        return tx;
+      }
+      await delay(TIMEOUT_STEP); // eslint-disable-line
+    }
+    return null;
   }
 
 }
