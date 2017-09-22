@@ -5,6 +5,7 @@ import BigNumber from 'bignumber.js';
 import { Receipt, ReceiptCache } from 'poker-helper';
 import { it, describe, afterEach } from 'mocha';
 import StreamWorker from './src/index';
+import Logger from './src/logger';
 
 chai.use(sinonChai);
 
@@ -37,6 +38,8 @@ const pusher = {
 const sentry = {
   captureMessage() {},
 };
+
+const logger = new Logger(sentry, 'stream-scanner');
 
 const rc = new ReceiptCache();
 
@@ -200,7 +203,7 @@ describe('Stream scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn, pusher, rc, sentry);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc, logger);
 
     worker.process(event).then(() => {
       expect(sns.publish).callCount(1);
@@ -336,7 +339,7 @@ describe('Stream scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sns, 'publish').yields(null, {});
 
-    const worker = new StreamWorker(sns, topicArn, pusher, rc, sentry);
+    const worker = new StreamWorker(sns, topicArn, pusher, rc, logger);
 
     worker.process(event).then(() => {
       expect(sns.publish).callCount(2);

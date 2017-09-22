@@ -22,12 +22,12 @@ const lineupHasLeave = function lineupHasLeave(newHand) {
   return -1;
 };
 
-const StreamScanner = function StreamScanner(sns, topicArn, pusher, rc, sentry) {
+const StreamScanner = function StreamScanner(sns, topicArn, pusher, rc, logger) {
   this.sns = sns;
   this.topicArn = topicArn;
   this.pusher = pusher;
   this.rc = rc;
-  this.sentry = sentry;
+  this.logger = logger;
 };
 
 StreamScanner.prototype.process = function process(record) {
@@ -129,21 +129,6 @@ StreamScanner.prototype.publishUpdate = function publishUpdate(topic, msg) {
     } catch (err) {
       reject(err);
     }
-  });
-};
-
-StreamScanner.prototype.log = function log(message, context) {
-  const cntxt = (context) || {};
-  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
-  cntxt.server_name = 'stream-scanner';
-  return new Promise((fulfill, reject) => {
-    this.sentry.captureMessage(message, cntxt, (error, eventId) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      fulfill(eventId);
-    });
   });
 };
 
