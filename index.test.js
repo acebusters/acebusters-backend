@@ -7,6 +7,7 @@ import BigNumber from 'bignumber.js';
 import ScanManager from './src/scanner';
 import Dynamo from './src/dynamo';
 import Table from './src/tableContract';
+import Logger from './src/logger';
 import Factory from './src/factoryContract';
 
 chai.use(sinonChai);
@@ -43,6 +44,8 @@ const sentry = {
   captureException() {},
 };
 
+const logger = new Logger(sentry, 'interval-scanner');
+
 const set = {
   id: 'tables',
   addresses: ['0x4C4A59e59172A8369562a3901737d57c84fC9A3C', '0x37a9679c41e99dB270Bda88DE8FF50c0Cd23f326'],
@@ -63,7 +66,7 @@ describe('Interval Scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, topicArn);
+      new Table(web3), null, sns, logger, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(0);
@@ -83,7 +86,7 @@ describe('Interval Scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, topicArn);
+      new Table(web3), null, sns, logger, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(0);
@@ -103,7 +106,7 @@ describe('Interval Scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, topicArn);
+      new Table(web3), null, sns, logger, topicArn);
 
     manager.scan().then((rsp) => {
       expect(rsp.length).to.eql(2);
@@ -124,7 +127,7 @@ describe('Interval Scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, topicArn);
+      new Table(web3), null, sns, logger, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
@@ -155,7 +158,7 @@ describe('Interval Scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), null, sns, sentry, topicArn);
+      new Table(web3), null, sns, logger, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
@@ -196,7 +199,7 @@ describe('Interval Scanner', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
-      new Table(web3), new Dynamo(dynamo), sns, sentry, topicArn);
+      new Table(web3), new Dynamo(dynamo), sns, logger, topicArn);
 
     manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(1);
@@ -207,15 +210,10 @@ describe('Interval Scanner', () => {
         tags: { tableAddr: set.addresses[0] },
         extra: sinon.match.any,
       });
-      expect(sns.publish).callCount(2);
+      expect(sns.publish).callCount(1);
       expect(sns.publish).calledWith({
         Subject: `Kick::${set.addresses[0]}`,
         Message: `{"pos":1,"tableAddr":"${set.addresses[0]}"}`,
-        TopicArn: set.topicArn,
-      });
-      expect(sns.publish).calledWith({
-        Subject: `Timeout::${set.addresses[0]}`,
-        Message: `{"tableAddr":"${set.addresses[0]}"}`,
         TopicArn: set.topicArn,
       });
       done();
