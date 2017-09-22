@@ -1,19 +1,19 @@
 const P_EMPTY = '0x0000000000000000000000000000000000000000';
 
 class ScanManager {
-  constructor(factory, table, dynamo, sns, sentry, topicArn) {
+  constructor(factory, table, dynamo, sns, logger, topicArn) {
     this.factory = factory;
     this.table = table;
     this.dynamo = dynamo;
     this.sns = sns;
-    this.sentry = sentry;
+    this.logger = logger;
     this.topicArn = topicArn;
   }
 
   async scan() {
     const tables = await this.factory.getTables();
     if (!tables || tables.length === 0) {
-      this.log('no contracts to scan');
+      this.logger.log('no contracts to scan');
     }
 
     return Promise.all(tables.map(this.handleTable.bind(this)));
@@ -34,7 +34,7 @@ class ScanManager {
           // send transaction to net up in contract
           const subject = `ProgressNetting::${tableAddr}`;
           return this.notify({}, subject).then(() =>
-            this.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
+            this.logger.log(subject, { tags: { tableAddr }, extra: { lhn, lnr, lnt, now } }));
         }
         return null;
         // if dispute period is over since more than 1 hour,
@@ -49,7 +49,7 @@ class ScanManager {
           tableAddr,
           lastHandNetted: lhn,
           lastNettingRequest: lnr,
-        }, subject).then(() => this.log(subject, {
+        }, subject).then(() => this.logger.log(subject, {
           tags: { tableAddr },
           extra: { lhn, lnr, lnt, now },
         }));
@@ -80,7 +80,7 @@ class ScanManager {
           if (lastHand.lineup[i].sitout < old) {
             const seat = lastHand.lineup[i];
             results.push(this.notify({ pos: i, tableAddr }, subject).then(() =>
-              this.log(subject, {
+              this.logger.log(subject, {
                 tags: { tableAddr },
                 user: { id: seat.address },
                 extra: { sitout: seat.sitout },
@@ -99,31 +99,6 @@ class ScanManager {
     }
 
     return Promise.all(results);
-  }
-
-  err(e) {
-    this.sentry.captureException(e, { server_name: 'interval-scanner' }, (sendErr) => {
-      if (sendErr) {
-        console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line no-console
-      }
-    });
-    return e;
-  }
-
-  log(message, context) {
-    const ctx = context || {};
-    ctx.level = (ctx.level) ? ctx.level : 'info';
-    ctx.server_name = 'interval-scanner';
-    return new Promise((fulfill, reject) => {
-      const now = Math.floor(Date.now() / 1000);
-      this.sentry.captureMessage(`${now} - ${message}`, ctx, (error, eventId) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        fulfill(eventId);
-      });
-    });
   }
 
   notify(event, subject) {
