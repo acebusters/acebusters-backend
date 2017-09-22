@@ -838,6 +838,7 @@ describe('Stream worker other events', () => {
         address: P2_ADDR,
       }],
     }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.leave, 'getData').returns('0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(contract.payoutFrom, 'getData').returns('0x445566');
@@ -853,6 +854,11 @@ describe('Stream worker other events', () => {
         tags: { tableAddr, handId: 2 },
         extra: { leaveReceipt },
       });
+      expect(dynamo.updateItem).callCount(1);
+      expect(dynamo.updateItem).calledWith(
+          sinon.match.has('ExpressionAttributeValues',
+            sinon.match.has(':s', { address: P1_ADDR, sitout: 1, exitHand: 2 })
+          ));
       done();
     }).catch(done);
   });
