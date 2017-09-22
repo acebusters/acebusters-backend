@@ -29,7 +29,7 @@ function EventWorker(
   table,
   db,
   oraclePriv,
-  sentry,
+  logger,
   recoveryPriv,
   mailer,
   oracle,
@@ -48,7 +48,7 @@ function EventWorker(
     this.recoveryAddr = `0x${ethUtil.privateToAddress(recPrivBuf).toString('hex')}`;
   }
   this.helper = new PokerHelper();
-  this.sentry = sentry;
+  this.logger = logger;
   this.mailer = mailer;
   this.oracle = oracle;
   this.pusher = pusher;
@@ -172,31 +172,6 @@ EventWorker.prototype.publishUpdate = function publishUpdate(topic, msg) {
   });
 };
 
-EventWorker.prototype.err = function err(e) {
-  this.sentry.captureException(e, { server_name: 'event-worker' }, (sendErr) => {
-    if (sendErr) {
-      console.error(`Failed to send captured exception to Sentry: ${sendErr}`); // eslint-disable-line  no-console
-    }
-  });
-  return e;
-};
-
-EventWorker.prototype.log = function log(message, context) {
-  const cntxt = (context) || {};
-  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
-  cntxt.server_name = 'event-worker';
-  return new Promise((fulfill, reject) => {
-    const now = Math.floor(Date.now() / 1000);
-    this.sentry.captureMessage(`${now} - ${message}`, cntxt, (error, eventId) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      fulfill(eventId);
-    });
-  });
-};
-
 EventWorker.prototype.walletCreated = function walletCreated(email) {
   return this.mailer.add(email);
 };
@@ -207,14 +182,14 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, 
     const leaveHex = Receipt.parseToParams(leaveReceipt);
     return this.table.leave(tableAddr, leaveHex).then(
       (txHash) => {
-        this.log('tx: table.leave()', {
+        this.logger.log('tx: table.leave()', {
           tags: { tableAddr, handId: exitHand },
           extra: { leaveReceipt },
         });
 
         return [txHash];
       },
-      error => this.log('tx: table.leave()', {
+      error => this.logger.log('tx: table.leave()', {
         level: 'error',
         tags: { tableAddr, handId: exitHand },
         extra: { error, leaveReceipt },
@@ -260,10 +235,10 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
   return this.table.net(tableAddr).then(
-    () => this.log('tx: table.net()', {
+    () => this.logger.log('tx: table.net()', {
       tags: { tableAddr },
     }),
-    error => this.log('tx: table.net()', {
+    error => this.logger.log('tx: table.net()', {
       tags: { tableAddr },
       level: 'error',
       extra: { error },
@@ -304,13 +279,13 @@ EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
     return this.table.submit(tableAddr, receipts);
   }).then(
     (txHash) => {
-      this.log('tx: table.submit()', {
+      this.logger.log('tx: table.submit()', {
         tags: { tableAddr },
         extra: { txHash, receipts },
       });
       return [txHash];
     },
-    error => this.log('tx: table.submit()', {
+    error => this.logger.log('tx: table.submit()', {
       tags: { tableAddr },
       level: 'error',
       extra: { error, receipts },
@@ -346,11 +321,11 @@ EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) 
     });
     return this.table.settle(tableAddr, sigs, hand.netting.newBalances);
   }).then(
-    () => this.log('tx: table.settle()', {
+    () => this.logger.log('tx: table.settle()', {
       tags: { tableAddr },
       extra: { bals: hand.netting.newBalances, sigs },
     }),
-    error => this.log('tx: table.settle()', {
+    error => this.logger.log('tx: table.settle()', {
       tags: { tableAddr },
       level: 'error',
       extra: { bals: hand.netting.newBalances, sigs, error },
@@ -508,7 +483,7 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
   }
   const dist = new Receipt(tableAddr).dist(hand.handId, claimId, outs).sign(this.oraclePriv);
   return this.db.updateDistribution(tableAddr, hand.handId, dist).then(() => {
-    this.log(`HandComplete: ${tableAddr}`, {
+    this.logger.log(`HandComplete: ${tableAddr}`, {
       level: 'info',
       tags: {
         tableAddr,
@@ -598,7 +573,7 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
     const changed = Math.floor(Date.now() / 1000);
     return this.db.putHand(tableAddr, prevHand.handId + 1,
       lineup, newDealer, deck, smallBlind, changed);
-  }).then(() => this.log(`NewHand: ${tableAddr}`, {
+  }).then(() => this.logger.log(`NewHand: ${tableAddr}`, {
     level: 'info',
     tags: {
       tableAddr,
@@ -625,7 +600,7 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
       const changed = Math.floor(Date.now() / 1000);
       return this.db.putHand(tableAddr, rsp[1].lastHandNetted + 1,
         lineup, 0, deck, smallBlind, changed);
-    }).then(() => this.log(`NewHand: ${tableAddr}`, {
+    }).then(() => this.logger.log(`NewHand: ${tableAddr}`, {
       level: 'info',
       tags: {
         tableAddr,

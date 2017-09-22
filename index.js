@@ -10,6 +10,7 @@ import EventWorker from './src/index';
 import Table from './src/tableContract';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
+import Logger from './src/logger';
 
 let web3Provider;
 let pusher;
@@ -18,6 +19,13 @@ let sdb;
 
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL).install();
+  const logger = new Logger(Raven, context.functionName || 'event-worker');
+
+  if (process.env.SERVICE_NAME !== 'event-worker') {
+    logger.log(`event-worker is deployed on ${context.functionName}, but expected ${process.env.SERVICE_NAME}`, {
+      level: 'error',
+    });
+  }
 
   if (typeof pusher === 'undefined') {
     pusher = new Pusher({
@@ -53,7 +61,7 @@ exports.handler = function handler(event, context, callback) {
       table,
       new Db(dynamo, process.env.DYNAMO_TABLE_NAME, sdb, process.env.SDB_TABLE_NAME),
       process.env.ORACLE_PRIV,
-      Raven,
+      logger,
       process.env.RECOVERY_PRIV,
       mailer,
       lambda,
@@ -65,14 +73,7 @@ exports.handler = function handler(event, context, callback) {
     Promise.all(requests).then((data) => {
       callback(null, data);
     }).catch((err) => {
-      Raven.captureException(err, { server_name: 'event-worker' }, (sendErr) => {
-        if (sendErr) {
-          console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
-          callback(sendErr);
-          return;
-        }
-        callback(null, err);
-      });
+      logger.exception(err).then(callback);
     });
   } else {
     console.log('Context received:\n', JSON.stringify(context)); // eslint-disable-line no-console
