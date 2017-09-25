@@ -159,7 +159,7 @@ Db.prototype.setSeat = function setSeat(tableAddr, handId, pos, changed, addr, s
       UpdateExpression: `set lineup[${pos}] = :s, changed = :c`,
       ExpressionAttributeValues: {
         ':s': { address },
-        ':c': changed
+        ':c': changed,
       },
     };
     if (sitout) {

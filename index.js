@@ -7,35 +7,21 @@ import Pusher from 'pusher';
 import Db from './src/db';
 import TableContract from './src/tableContract';
 import TableManager from './src/index';
+import Logger from './src/logger';
 
 let web3;
 let pusher;
 const dynamo = new doc.DynamoDB();
 const rc = new ReceiptCache();
 
-const handleError = function handleError(err, callback) {
+const handleError = function handleError(err, logger, callback) {
   if (err.errName) {
     // these are known errors: 4xx
-    Raven.captureMessage(err, {
-      server_name: 'oracle-cashgame',
+    logger.message(err, {
       level: 'warning',
-    }, (sendErr) => {
-      if (sendErr) {
-        console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
-        callback(`Error: ${err.message}`);
-        return;
-      }
-      callback(err.message);
-    });
+    }).then(callback);
   } else {
-    Raven.captureException(err, { server_name: 'oracle-cashgame' }, (sendErr) => {
-      if (sendErr) {
-        console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
-        callback(`Error: ${sendErr} - ${err.message}`);
-        return;
-      }
-      callback(`Error: ${err.message}`);
-    });
+    logger.exception(err).then(callback);
   }
 };
 
@@ -53,6 +39,7 @@ exports.handler = function handler(event, context, callback) {
   };
 
   Raven.config(sentryUrl).install();
+  const logger = new Logger(Raven, context.functionName, 'oracle-cashgame');
 
   if (typeof pusher === 'undefined') {
     pusher = new Pusher({
@@ -68,7 +55,6 @@ exports.handler = function handler(event, context, callback) {
     web3 = new Web3(new Web3.providers.HttpProvider(providerUrl));
   }
 
-
   let handleRequest;
   const manager = new TableManager(
     new Db(dynamo, tableName),
@@ -77,6 +63,7 @@ exports.handler = function handler(event, context, callback) {
     getTimeout,
     pusher,
     providerUrl,
+    logger,
   );
   const path = event.context['resource-path'];
   const tableAddr = event.params.path.tableAddr;
@@ -106,15 +93,10 @@ exports.handler = function handler(event, context, callback) {
       handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
     }
   } catch (err) {
-    handleError(err, callback);
-    return;
+    return handleError(err, logger, callback);
   }
 
-  handleRequest
-  .then((data) => {
-    callback(null, data);
-  })
-  .catch((err) => {
-    handleError(err, callback);
-  });
+  return handleRequest
+    .then(data => callback(null, data))
+    .catch(err => handleError(err, logger, callback));
 };

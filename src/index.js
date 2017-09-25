@@ -12,7 +12,7 @@ const TableManager = function TableManager(
   timeout,
   pusher,
   providerUrl,
-  sentry,
+  logger,
 ) {
   this.db = db;
   this.rc = receiptCache;
@@ -27,23 +27,7 @@ const TableManager = function TableManager(
     this.getTimeout = timeout;
   }
 
-  this.sentry = sentry;
-};
-
-TableManager.prototype.log = function log(message, context) {
-  const cntxt = (context) || {};
-  cntxt.level = (cntxt.level) ? cntxt.level : 'info';
-  cntxt.server_name = 'oracle-cashgame';
-  return new Promise((resolve, reject) => {
-    const now = Math.floor(Date.now() / 1000);
-    this.sentry.captureMessage(`${now} - ${message}`, cntxt, (error, eventId) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(eventId);
-    });
-  });
+  this.logger = logger;
 };
 
 TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
@@ -281,7 +265,7 @@ TableManager.prototype.updateState = function updateState(tableAddr, handParam, 
     bettingComplete = this.helper.isBettingDone(hand.lineup,
     hand.dealer, hand.state, hand.sb * 2);
   } catch (err) {
-    this.log(`'is betting done' error`, {
+    this.logger.log('\'is betting done\' error', {
       tags: { tableAddr, handId: hand.handId },
     });
   }
@@ -365,7 +349,7 @@ TableManager.prototype.calcBalance = function calcBalance(tableAddr, pos, receip
   return Promise.resolve();
 };
 
-TableManager.prototype.show = function show(tableAddr, ewt, cards) {
+TableManager.prototype.show = function show(tableAddr, receiptString, cards) {
   if (!cards || Object.prototype.toString.call(cards) !== '[object Array]' || cards.length !== 2) {
     throw new BadRequest('cards should be submitted as array.');
   }
@@ -373,7 +357,7 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
   let deck;
   let dist;
   let pos;
-  const receipt = this.rc.get(ewt);
+  const receipt = this.rc.get(receiptString);
   // check receipt type
   if (receipt.type !== Type.SHOW) {
     throw new BadRequest('only "show" receipts permitted in showdown.');
@@ -397,8 +381,8 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
     if (!this.helper.isActivePlayer(hand.lineup, pos, hand.state) && hand.lineup[pos].sitout !== 'allin') {
       throw new Forbidden(`seat ${pos} is not an active player.`);
     }
-    // check ewt not reused
-    if (hand.lineup[pos].last === ewt) {
+    // check receiptString not reused
+    if (hand.lineup[pos].last === receiptString) {
       throw new Unauthorized('you can not reuse receipts.');
     }
 
@@ -413,7 +397,7 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
     }
 
     // set the new data
-    hand.lineup[pos].last = ewt;
+    hand.lineup[pos].last = receiptString;
     if (receipt.type === Type.SHOW) {
       hand.lineup[pos].cards = cards;
     }
@@ -426,10 +410,10 @@ TableManager.prototype.show = function show(tableAddr, ewt, cards) {
   }).then(() => Promise.resolve(dist));
 };
 
-TableManager.prototype.leave = function leave(tableAddr, ewt) {
+TableManager.prototype.leave = function leave(tableAddr, receiptString) {
   let hand;
   let pos = -1;
-  const receipt = this.rc.get(ewt);
+  const receipt = this.rc.get(receiptString);
   const { handId, leaverAddr } = receipt;
   // check if this hand exists
   return this.db.getLastHand(tableAddr).then((_hand) => {
@@ -597,7 +581,7 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
     }
     return Promise.all(jobProms);
   }).then(() => {
-    this.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
+    this.logger.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
       tags: { tableAddr, handId: hand.handId },
     });
   });

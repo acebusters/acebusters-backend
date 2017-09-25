@@ -6,6 +6,7 @@ import BigNumber from 'bignumber.js';
 import { Receipt, ReceiptCache, PokerHelper } from 'poker-helper';
 import Oracle from './src/index';
 import Db from './src/db';
+import Logger from './src/logger';
 import TableContract from './src/tableContract';
 
 chai.use(sinonChai);
@@ -81,6 +82,8 @@ const sentry = {
   captureException() {
   },
 };
+
+const logger = new Logger(sentry, 'oracle-cashgame');
 
 const rc = new ReceiptCache();
 const helper = new PokerHelper(rc);
@@ -2486,7 +2489,7 @@ describe('Oracle lineup', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, sentry);
+      new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       const seat = { address: EMPTY_ADDR };
       expect(dynamo.updateItem).callCount(1);
@@ -2520,7 +2523,7 @@ describe('Oracle lineup', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, sentry);
+      new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       const seat = { address: P2_ADDR };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
@@ -2552,7 +2555,7 @@ describe('Oracle lineup', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, sentry);
+      new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       const seat = { address: P2_ADDR };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
@@ -2585,7 +2588,7 @@ describe('Oracle lineup', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, sentry);
+      new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       const seat = { address: P3_ADDR, sitout: sinon.match.number };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
