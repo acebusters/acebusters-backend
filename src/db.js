@@ -66,14 +66,15 @@ Db.prototype.getHand = function getHand(tableAddr, handId) {
   });
 };
 
-Db.prototype.updateLeave = function updateLeave(tableAddr, handId, seat, pos) {
+Db.prototype.updateLeave = function updateLeave(tableAddr, handId, seat, pos, changed) {
   return new Promise((fulfill, reject) => {
     const params = {
       TableName: this.tableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :s`,
+      UpdateExpression: `set lineup[${pos}] = :s, changed = :c`,
       ExpressionAttributeValues: {
         ':s': seat,
+        ':c': changed,
       },
     };
     this.dynamo.updateItem(params, (err, rsp) => {

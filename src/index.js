@@ -30,6 +30,10 @@ const TableManager = function TableManager(
   this.logger = logger;
 };
 
+TableManager.prototype.nowSeconds = function nowSeconds() {
+  return Math.floor(Date.now() / 1000);
+};
+
 TableManager.prototype.publishUpdate = function publishUpdate(topic, msg) {
   return new Promise((resolve, reject) => {
     try {
@@ -104,7 +108,7 @@ TableManager.prototype.handleMessage = function handleMessage(msgReceipt) {
 
 TableManager.prototype.pay = function pay(tableAddr, receiptHash) {
   const receipt = this.rc.get(receiptHash);
-  const now = Math.floor(Date.now() / 1000);
+  const now = this.nowSeconds();
   const { handId } = receipt;
   let hand;
   let turn;
@@ -259,7 +263,7 @@ TableManager.prototype.pay = function pay(tableAddr, receiptHash) {
 
 TableManager.prototype.updateState = function updateState(tableAddr, handParam, pos) {
   const hand = handParam;
-  const changed = Math.floor(Date.now() / 1000);
+  const changed = this.nowSeconds();
   let bettingComplete = false;
   try {
     bettingComplete = this.helper.isBettingDone(hand.lineup,
@@ -405,7 +409,7 @@ TableManager.prototype.show = function show(tableAddr, receiptString, cards) {
       delete hand.lineup[pos].sitout;
     }
     // update db
-    const changed = Math.floor(Date.now() / 1000);
+    const changed = this.nowSeconds();
     return this.db.updateSeat(tableAddr, hand.handId, hand.lineup[pos], pos, hand.state, changed);
   }).then(() => Promise.resolve(dist));
 };
@@ -443,7 +447,7 @@ TableManager.prototype.leave = function leave(tableAddr, receiptString) {
     if (receipt.handId < hand.handId) {
       hand.lineup[pos].sitout = 1;
     }
-    return this.db.updateLeave(tableAddr, hand.handId, hand.lineup[pos], pos);
+    return this.db.updateLeave(tableAddr, hand.handId, hand.lineup[pos], pos, this.nowSeconds());
   });
 };
 
@@ -503,7 +507,7 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
     }
 
 
-    const now = Math.floor(Date.now() / 1000);
+    const now = this.nowSeconds();
     const leftTime = (hand.changed + this.getTimeout(hand.state)) - now;
     if (leftTime > 0) {
       return Promise.resolve(`player ${pos} still got ${leftTime} seconds to act.`);
@@ -555,7 +559,7 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
     }
     const jobProms = [];
     // now
-    const now = Math.floor(Date.now() / 1000);
+    const now = this.nowSeconds();
     for (let i = 0; i < leavePos.length; i += 1) {
       // we only update the seat, as not to affect the game
       jobProms.push(this.db.setSeat(tableAddr, hand.handId, leavePos[i], now));
