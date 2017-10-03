@@ -75,10 +75,7 @@ export default class Db {
     const params = {
       TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}].#eh = :h, changed = :t`,
-      ExpressionAttributeNames: {
-        '#eh': 'exitHand',
-      },
+      UpdateExpression: `set lineup[${pos}].exitHand = :h, changed = :t`,
       ExpressionAttributeValues: {
         ':t': time,
         ':h': handId,
