@@ -201,7 +201,8 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, 
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
-  let hand, handId;
+  let hand;
+  let handId;
   const lineupProm = this.table.getLineup(tableAddr);
   const lastHandProm = this.db.getLastHand(tableAddr);
   return Promise.all([lineupProm, lastHandProm]).then((rsps) => {
@@ -229,12 +230,7 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
     }
     handId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
     return this.submitLeave(tableAddr, addr, handId);
-  }).then(() => {
-    let seat = hand.lineup[pos];
-    seat.exitHand = handId;
-    const now = this._now();
-    return this.db.updateSeat(tableAddr, handId, seat, pos, now);
-  });
+  }).then(() => this.db.updateSeatLeave(tableAddr, handId, pos, this._now()));
 };
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {

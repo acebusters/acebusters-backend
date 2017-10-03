@@ -71,16 +71,20 @@ export default class Db {
     return rsp.Items[0];
   }
 
-  async updateSeat(tableAddr, handId, seat, pos, time) {
+  async updateSeatLeave(tableAddr, handId, pos, time) {
     const params = {
       TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :s, changed = :t`,
+      UpdateExpression: `set lineup[${pos}].#eh = :h, changed = :t`,
+      ExpressionAttributeNames: {
+        '#eh': 'exitHand',
+      },
       ExpressionAttributeValues: {
-        ':s': seat,
-        ':t': time
+        ':t': time,
+        ':h': handId,
       },
     };
+
     const rsp = await this.updateItem(params);
     return rsp.Item;
   }

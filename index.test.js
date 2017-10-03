@@ -857,7 +857,7 @@ describe('Stream worker other events', () => {
       expect(dynamo.updateItem).callCount(1);
       expect(dynamo.updateItem).calledWith(
           sinon.match.has('ExpressionAttributeValues',
-            sinon.match.has(':s', { address: P1_ADDR, sitout: 1, exitHand: 2 })
+            sinon.match.has(':h', 2),
           ));
       done();
     }).catch(done);
