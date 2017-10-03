@@ -11,6 +11,10 @@ function babz(ntz) {
   return new BigNumber(ntz).mul(NTZ_DECIMAL);
 }
 
+function now(secs = 0) {
+  return Math.floor(Date.now() / 1000) + secs;
+}
+
 const shuffle = function shuffle() {
   const array = [];
   for (let i = 0; i < 52; i += 1) {
@@ -201,7 +205,8 @@ EventWorker.prototype.submitLeave = function submitLeave(tableAddr, leaverAddr, 
 };
 
 EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
-  let hand, handId;
+  let hand;
+  let handId;
   const lineupProm = this.table.getLineup(tableAddr);
   const lastHandProm = this.db.getLastHand(tableAddr);
   return Promise.all([lineupProm, lastHandProm]).then((rsps) => {
@@ -222,19 +227,14 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
       return Promise.reject(`player ${addr} not in lineup.`);
     }
     // check if on sitout for more than 5 minutes
-    const old = this._now() - (5 * 60);
+    const old = now(-5 * 60);
     if (!hand.lineup[pos].sitout || typeof hand.lineup[pos].sitout !== 'number' ||
       hand.lineup[pos].sitout > old) {
       return Promise.reject(`player ${addr} still got ${hand.lineup[pos].sitout - old} seconds to sit out, not yet to be kicked.`);
     }
     handId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
     return this.submitLeave(tableAddr, addr, handId);
-  }).then(() => {
-    let seat = hand.lineup[pos];
-    seat.exitHand = handId;
-    const now = this._now();
-    return this.db.updateSeat(tableAddr, handId, seat, pos, now);
-  });
+  }).then(() => this.db.updateSeatLeave(tableAddr, handId, pos, now()));
 };
 
 EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
@@ -414,10 +414,6 @@ EventWorker.prototype.toggleTable = function toggleTable(tableAddr) {
   });
 };
 
-EventWorker.prototype._now = function() {
-  return Math.floor(Date.now() / 1000);
-};
-
 EventWorker.prototype.addPlayer = function addPlayer(tableAddr) {
   // call lineup on oracle
   return this.oracle.lineup(tableAddr);
@@ -577,7 +573,7 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
     const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
     const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
     const deck = shuffle();
-    const changed = this._now();
+    const changed = now();
     return this.db.putHand(tableAddr, prevHand.handId + 1,
       lineup, newDealer, deck, smallBlind, changed);
   }).then(() => this.logger.log(`NewHand: ${tableAddr}`, {
@@ -604,7 +600,7 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
         delete lineup[i].exitHand;
       }
       const deck = shuffle();
-      const changed = this._now();
+      const changed = now();
       return this.db.putHand(tableAddr, rsp[1].lastHandNetted + 1,
         lineup, 0, deck, smallBlind, changed);
     }).then(() => this.logger.log(`NewHand: ${tableAddr}`, {
