@@ -442,12 +442,16 @@ TableManager.prototype.leave = function leave(tableAddr, receiptString) {
     if (hand.lineup[pos].exitHand) {
       throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} already set.`);
     }
+
     // set exitHand
-    hand.lineup[pos].exitHand = receipt.handId;
-    if (receipt.handId < hand.handId) {
-      hand.lineup[pos].sitout = 1;
+    const exitHand = receipt.handId;
+
+    let sitout;
+    // set sitout if next hand started after leave receipt
+    if (exitHand < hand.handId) {
+      sitout = 1;
     }
-    return this.db.updateLeave(tableAddr, hand.handId, hand.lineup[pos], pos, this.nowSeconds());
+    return this.db.updateLeave(tableAddr, hand.handId, pos, exitHand, sitout, this.nowSeconds());
   });
 };
 
@@ -562,7 +566,7 @@ TableManager.prototype.lineup = function lineup(tableAddr) {
     const now = this.nowSeconds();
     for (let i = 0; i < leavePos.length; i += 1) {
       // we only update the seat, as not to affect the game
-      jobProms.push(this.db.setSeat(tableAddr, hand.handId, leavePos[i], now));
+      jobProms.push(this.db.emptySeat(tableAddr, hand.handId, leavePos[i], now));
     }
     const sitout = (hand.state !== 'waiting' && hand.state !== 'dealing') ? now : null;
     for (let i = 0; i < joinPos.length; i += 1) {

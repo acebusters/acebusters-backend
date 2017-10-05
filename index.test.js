@@ -2122,7 +2122,7 @@ describe('Oracle leave', () => {
         address: P1_ADDR,
         exitHand: 2,
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':eh', seat.exitHand)));
       done();
     }).catch(done);
   });
@@ -2147,7 +2147,8 @@ describe('Oracle leave', () => {
         exitHand: 2,
         sitout: 1,
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':eh', seat.exitHand)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', seat.sitout)));
       done();
     }).catch(done);
   });
@@ -2525,8 +2526,7 @@ describe('Oracle lineup', () => {
     const oracle = new Oracle(new Db(dynamo),
       new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
-      const seat = { address: P2_ADDR };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':a', P2_ADDR)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
       done();
     }).catch(done);
@@ -2557,8 +2557,7 @@ describe('Oracle lineup', () => {
     const oracle = new Oracle(new Db(dynamo),
       new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
-      const seat = { address: P2_ADDR };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':a', P2_ADDR)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
       done();
     }).catch(done);
@@ -2590,8 +2589,8 @@ describe('Oracle lineup', () => {
     const oracle = new Oracle(new Db(dynamo),
       new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
-      const seat = { address: P3_ADDR, sitout: sinon.match.number };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':a', P3_ADDR)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', sinon.match.number)));
       done();
     }).catch(done);
   });

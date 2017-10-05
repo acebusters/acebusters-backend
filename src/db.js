@@ -5,6 +5,17 @@ function Db(dynamo, tableName) {
   this.tableName = (typeof tableName === 'undefined') ? 'sb_cashgame' : tableName;
 }
 
+Db.prototype.updateItem = function updateItem(params) {
+  return new Promise((fulfill, reject) => {
+    this.dynamo.updateItem(params, (err, rsp) => {
+      if (err) {
+        return reject(err);
+      }
+      return fulfill(rsp.Item);
+    });
+  });
+};
+
 Db.prototype.getTableHands = function getTableHands(tableAddr) {
   return new Promise((fulfill, reject) => {
     this.dynamo.query({
@@ -66,134 +77,123 @@ Db.prototype.getHand = function getHand(tableAddr, handId) {
   });
 };
 
-Db.prototype.updateLeave = function updateLeave(tableAddr, handId, seat, pos, changed) {
-  return new Promise((fulfill, reject) => {
-    const params = {
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :s, changed = :c`,
-      ExpressionAttributeValues: {
-        ':s': seat,
-        ':c': changed,
-      },
-    };
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        return reject(err);
-      }
-      return fulfill(rsp.Item);
-    });
-  });
+Db.prototype.updateLeave = function updateLeave(tableAddr, handId, pos, exitHand, sitout, changed) {
+  const params = {
+    TableName: this.tableName,
+    Key: { tableAddr, handId },
+    UpdateExpression: `set lineup[${pos}].#exitHand = :eh, changed = :c`,
+    ExpressionAttributeNames: {
+      '#exitHand': 'exitHand',
+    },
+    ExpressionAttributeValues: {
+      ':eh': exitHand,
+      ':c': changed,
+    },
+  };
+
+  if (sitout) {
+    params.UpdateExpression += `, lineup[${pos}].#sitout = :so`;
+    params.ExpressionAttributeNames['#sitout'] = 'sitout';
+    params.ExpressionAttributeValues[':so'] = sitout;
+  }
+
+  return this.updateItem(params);
 };
 
 Db.prototype.updateSeat = function updateSeat(tableAddr,
   handId, seat, pos, state, changed, streetMaxBet) {
-  return new Promise((fulfill, reject) => {
-    const params = {
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :l, #hand_state = :s, changed = :c`,
-      ExpressionAttributeValues: {
-        ':l': seat,
-        ':s': state,
-        ':c': changed,
-      },
-      ExpressionAttributeNames: {
-        '#hand_state': 'state',
-      },
-    };
-    if (streetMaxBet && streetMaxBet > 0) {
-      let attribute = 'preMaxBet';
-      if (state === 'showdown') {
-        attribute = 'riverMaxBet';
-      }
-      if (state === 'river') {
-        attribute = 'turnMaxBet';
-      }
-      if (state === 'turn') {
-        attribute = 'flopMaxBet';
-      }
-      params.UpdateExpression += `, ${attribute} = :m`;
-      params.ExpressionAttributeValues[':m'] = streetMaxBet;
+  const params = {
+    TableName: this.tableName,
+    Key: { tableAddr, handId },
+    UpdateExpression: `set lineup[${pos}] = :l, #hand_state = :s, changed = :c`,
+    ExpressionAttributeValues: {
+      ':l': seat,
+      ':s': state,
+      ':c': changed,
+    },
+    ExpressionAttributeNames: {
+      '#hand_state': 'state',
+    },
+  };
+  if (streetMaxBet && streetMaxBet > 0) {
+    let attribute = 'preMaxBet';
+    if (state === 'showdown') {
+      attribute = 'riverMaxBet';
     }
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        return reject(err);
-      }
-      return fulfill(rsp.Item);
-    });
-  });
+    if (state === 'river') {
+      attribute = 'turnMaxBet';
+    }
+    if (state === 'turn') {
+      attribute = 'flopMaxBet';
+    }
+    params.UpdateExpression += `, ${attribute} = :m`;
+    params.ExpressionAttributeValues[':m'] = streetMaxBet;
+  }
+  return this.updateItem(params);
 };
 
 Db.prototype.updateNetting = function updateNetting(tableAddr, handId, signer, nettingSig) {
-  return new Promise((fulfill, reject) => {
-    const params = {
-      TableName: this.tableName,
-      Key: {
-        tableAddr,
-        handId,
-      },
-      UpdateExpression: 'set netting.#signer = :s',
-      ExpressionAttributeNames: {
-        '#signer': signer,
-      },
-      ExpressionAttributeValues: {
-        ':s': nettingSig,
-      },
-      ReturnValues: 'ALL_NEW',
-    };
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        return reject(err);
-      }
-      return fulfill(rsp.Item);
-    });
-  });
+  const params = {
+    TableName: this.tableName,
+    Key: { tableAddr, handId },
+    UpdateExpression: 'set netting.#signer = :s',
+    ExpressionAttributeNames: {
+      '#signer': signer,
+    },
+    ExpressionAttributeValues: {
+      ':s': nettingSig,
+    },
+    ReturnValues: 'ALL_NEW',
+  };
+  return this.updateItem(params);
 };
 
 Db.prototype.setSeat = function setSeat(tableAddr, handId, pos, changed, addr, sitout) {
-  const address = addr || '0x0000000000000000000000000000000000000000';
-  return new Promise((fulfill, reject) => {
-    const params = {
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :s, changed = :c`,
-      ExpressionAttributeValues: {
-        ':s': { address },
-        ':c': changed,
-      },
-    };
-    if (sitout) {
-      params.ExpressionAttributeValues[':s'].sitout = sitout;
-    }
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      fulfill(rsp.Item);
-    });
-  });
+  const params = {
+    TableName: this.tableName,
+    Key: { tableAddr, handId },
+    UpdateExpression: `set lineup[${pos}].#address = :a, changed = :c`,
+    ExpressionAttributeNames: {
+      '#address': 'address',
+    },
+    ExpressionAttributeValues: {
+      ':a': addr,
+      ':c': changed,
+    },
+  };
+  if (sitout) {
+    params.UpdateExpression += `, lineup[${pos}].#sitout = :so`;
+    params.ExpressionAttributeNames['#sitout'] = 'sitout';
+    params.ExpressionAttributeValues[':so'] = sitout;
+  }
+  return this.updateItem(params);
 };
 
+Db.prototype.emptySeat = function emptySeat(tableAddr, handId, pos, changed) {
+  const params = {
+    TableName: this.tableName,
+    Key: { tableAddr, handId },
+    UpdateExpression: `set lineup[${pos}] = :s, changed = :c`,
+    ExpressionAttributeValues: {
+      ':s': { address: '0x0000000000000000000000000000000000000000' },
+      ':c': changed,
+    },
+  };
+  return this.updateItem(params);
+};
+
+
 Db.prototype.setDealer = function setDealer(tableAddr, handId, changed, dealer) {
-  return new Promise((fulfill, reject) => {
-    const params = {
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-      UpdateExpression: 'set dealer = :d, changed = :c',
-      ExpressionAttributeValues: {
-        ':d': dealer,
-        ':c': changed,
-      },
-    };
-    this.dynamo.updateItem(params, (err, rsp) => {
-      if (err) {
-        return reject(err);
-      }
-      return fulfill(rsp.Item);
-    });
-  });
+  const params = {
+    TableName: this.tableName,
+    Key: { tableAddr, handId },
+    UpdateExpression: 'set dealer = :d, changed = :c',
+    ExpressionAttributeValues: {
+      ':d': dealer,
+      ':c': changed,
+    },
+  };
+  return this.updateItem(params);
 };
 
 module.exports = Db;
