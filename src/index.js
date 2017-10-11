@@ -521,78 +521,71 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
   });
 };
 
-TableManager.prototype.lineup = function lineup(tableAddr) {
-  let hand;
-  const lup = this.contract.getLineup(tableAddr);
-  const ddp = this.db.getLastHand(tableAddr);
-  const leavePos = [];
-  const joinPos = [];
-  return Promise.all([lup, ddp]).then((responses) => {
-    hand = responses[1];
-    const params = responses[0];
-    if (params.lastHandNetted > hand.handId) {
-      return Promise.reject(`contract handId ${params.lastHandNetted} ahead of table handId ${hand.handId}`);
-    }
-    if (!hand.lineup || hand.lineup.length !== params.lineup.length) {
-      return Promise.reject(`table lineup length ${hand.lineup.length} does not match contract.`);
-    }
-    for (let i = 0; i < hand.lineup.length; i += 1) {
-      // if seat is taken in table
-      if (hand.lineup[i].address &&
-        hand.lineup[i].address !== EMPTY_ADDR) {
-        // but empty in contract
-        if (!params.lineup[i].address ||
-          params.lineup[i].address === EMPTY_ADDR) {
-          // remember that seat to work on it
-          leavePos.push(i);
-        }
-      }
-      // if seat empty in table
-      if (!hand.lineup[i].address ||
-        hand.lineup[i].address === EMPTY_ADDR) {
-        // but filled in contract
-        if (params.lineup[i].address &&
-          params.lineup[i].address !== EMPTY_ADDR) {
-          // remember that seat to work on it
-          joinPos.push({ pos: i, addr: params.lineup[i].address });
-        }
-      }
-    }
-    if (leavePos.length === 0 && joinPos.length === 0) {
-      return Promise.resolve('no changes for lineup detected.');
-    }
-    const jobProms = [];
-    // now
-    const now = this.nowSeconds();
-    for (let i = 0; i < leavePos.length; i += 1) {
-      // we only update the seat, as not to affect the game
-      jobProms.push(this.db.emptySeat(tableAddr, hand.handId, leavePos[i], now));
-    }
-    const sitout = (hand.state !== 'waiting' && hand.state !== 'dealing') ? now : null;
-    for (let i = 0; i < joinPos.length; i += 1) {
-      // we only update the seat, as not to affect the game
-      jobProms.push(this.db.setSeat(tableAddr,
-        hand.handId, joinPos[i].pos, now, joinPos[i].addr, sitout));
-    }
-    if (hand.state === 'waiting' && !this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state)) {
-      // TODO: optimize this, when handstate waiting, we can update everything at once
-      let nextDealer = 0;
-      try {
-        nextDealer = this.helper.nextPlayer(hand.lineup, hand.dealer, 'active');
-      } catch (err) {
-        // do nothing
-      }
-      if (joinPos.length > 0) {
-        nextDealer = joinPos[0].pos;
-      }
-      jobProms.push(this.db.setDealer(tableAddr, hand.handId, now, nextDealer));
-    }
-    return Promise.all(jobProms);
-  }).then(() => {
-    this.logger.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
-      tags: { tableAddr, handId: hand.handId },
-    });
+function seatIsEmpty(seat) {
+  return !seat.address || seat.address === EMPTY_ADDR;
+}
+
+function getNextDealer(helper, hand) {
+  try {
+    return helper.nextPlayer(hand.lineup, hand.dealer, 'active');
+  } catch (err) {
+    return 0;
+  }
+}
+
+TableManager.prototype.lineup = async function (tableAddr) { // eslint-disable-line func-names
+  const [{ lastHandNetted, lineup }, hand] = await Promise.all([
+    this.contract.getLineup(tableAddr),
+    this.db.getLastHand(tableAddr),
+  ]);
+
+  if (lastHandNetted > hand.handId) {
+    return Promise.reject(`contract handId ${lastHandNetted} ahead of table handId ${hand.handId}`);
+  }
+  if (!hand.lineup || hand.lineup.length !== lineup.length) {
+    return Promise.reject(`table lineup length ${hand.lineup.length} does not match contract.`);
+  }
+
+  const joinPos = (
+    hand.lineup.map((_, i) => i)
+        .filter(i => seatIsEmpty(hand.lineup[i]) && !seatIsEmpty(lineup[i]))
+        .map(i => ({ pos: i, addr: lineup[i].address }))
+  );
+  const leavePos = (
+    hand.lineup.map((_, i) => i)
+        .filter(i => !seatIsEmpty(hand.lineup[i]) && seatIsEmpty(lineup[i]))
+  );
+
+  if (leavePos.length === 0 && joinPos.length === 0) {
+    return Promise.resolve('no changes for lineup detected.');
+  }
+
+  const now = this.nowSeconds();
+  const jobProms = [
+    ...leavePos.map(i => this.db.emptySeat(tableAddr, hand.handId, i, now)),
+    ...joinPos.map(seat => this.db.setSeat(
+      tableAddr,
+      hand.handId,
+      seat.pos,
+      now,
+      seat.addr,
+      (hand.state !== 'waiting' && hand.state !== 'dealing') ? now : null, // sitout
+    )),
+  ];
+
+  if (hand.state === 'waiting' && !this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state)) {
+    // TODO: optimize this, when handstate waiting, we can update everything at once
+    const nextDealer = joinPos.length > 0 ? joinPos[0].pos : getNextDealer(this.helper, hand);
+    jobProms.push(this.db.setDealer(tableAddr, hand.handId, now, nextDealer));
+  }
+
+  await Promise.all(jobProms);
+
+  this.logger.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
+    tags: { tableAddr, handId: hand.handId },
   });
+
+  return undefined;
 };
 
 module.exports = TableManager;
