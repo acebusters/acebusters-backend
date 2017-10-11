@@ -98,6 +98,18 @@ class ScanManager {
       }
     }
 
+    if (lastHand.handId >= lhn + 10 && lastHand.changed > tooOld) {
+      // if there are more than 10 hands not netted
+      // prepare netting in db
+      const subject = `TableNettingRequest::${tableAddr}`;
+      results.push(this.notify({
+        handId: lastHand.handId - 1,
+        tableAddr,
+      }, subject).then(() =>
+        this.log(subject, { tags: { tableAddr }, extra: { lhn, handId: lastHand.handId } })),
+      );
+    }
+
     return Promise.all(results);
   }
 
