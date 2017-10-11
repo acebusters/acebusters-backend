@@ -63,13 +63,13 @@ EventWorker.prototype.process = function process(msg) {
   const tasks = [];
 
   if (!msg.Subject || msg.Subject.split('::').length < 2) {
-    return [Promise.resolve(`unknown message type: ${msg.Subject}`)];
+    throw new Error(`unknown message type: ${msg.Subject}`);
   }
   let msgBody;
   try {
     msgBody = (msg.Message && msg.Message.length > 0) ? JSON.parse(msg.Message) : '';
   } catch (e) {
-    return [Promise.resolve(`json parse error: ${JSON.stringify(e)}`)];
+    throw new Error(`json parse error: ${JSON.stringify(e)}`);
   }
   const msgType = msg.Subject.split('::')[0];
 
@@ -213,7 +213,7 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
     const lineup = rsps[0].lineup;
     hand = rsps[1];
     if (typeof pos === 'undefined' || pos > hand.lineup.length) {
-      return Promise.reject(`pos ${pos} could not be found to kick.`);
+      throw new Error(`pos ${pos} could not be found to kick.`);
     }
     const addr = hand.lineup[pos].address;
     let found = false;
@@ -224,13 +224,13 @@ EventWorker.prototype.kickPlayer = function kickPlayer(tableAddr, pos) {
       }
     }
     if (!found) {
-      return Promise.reject(`player ${addr} not in lineup.`);
+      throw new Error(`player ${addr} not in lineup.`);
     }
     // check if on sitout for more than 5 minutes
     const old = now(-5 * 60);
     if (!hand.lineup[pos].sitout || typeof hand.lineup[pos].sitout !== 'number' ||
       hand.lineup[pos].sitout > old) {
-      return Promise.reject(`player ${addr} still got ${hand.lineup[pos].sitout - old} seconds to sit out, not yet to be kicked.`);
+      throw new Error(`player ${addr} still got ${hand.lineup[pos].sitout - old} seconds to sit out, not yet to be kicked.`);
     }
     handId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
     return this.submitLeave(tableAddr, addr, handId);
@@ -250,51 +250,43 @@ EventWorker.prototype.progressNetting = function progressNetting(tableAddr) {
   );
 };
 
-EventWorker.prototype.handleDispute = function handleDispute(tableAddr,
-  lastHandNetted, lastNettingRequest) {
-  const bets = [];
-  const dists = [];
-  const handProms = [];
-  let receipts = [];
-  for (let i = lastHandNetted + 1; i <= lastNettingRequest; i += 1) {
-    handProms.push(this.db.getHand(tableAddr, i));
-  }
-  return Promise.all(handProms).then((hands) => {
-    let i;
-    let pos;
-    // sum up previous hands
-    for (i = 0; i < hands.length; i += 1) {
-      for (pos = 0; pos < hands[i].lineup.length; pos += 1) {
-        if (hands[i].lineup[pos].last) {
-          bets.push(hands[i].lineup[pos].last);
-        }
-      }
-      if (hands[i].distribution) {
-        dists.push(hands[i].distribution);
-      }
-    }
-    for (i = 0; i < bets.length; i += 1) {
-      receipts = receipts.concat(Receipt.parseToParams(bets[i]));
-    }
-    for (i = 0; i < dists.length; i += 1) {
-      receipts = receipts.concat(Receipt.parseToParams(dists[i]));
-    }
+function range(s, e) {
+  return Array.from(new Array((e - s) + 1), (_, i) => i + s);
+}
 
-    return this.table.submit(tableAddr, receipts);
-  }).then(
-    (txHash) => {
-      this.logger.log('tx: table.submit()', {
-        tags: { tableAddr },
-        extra: { txHash, receipts },
-      });
-      return [txHash];
-    },
-    error => this.logger.log('tx: table.submit()', {
+function identity(a) {
+  return a;
+}
+
+EventWorker.prototype.handleDispute = async function handleDispute(
+  tableAddr,
+  lastHandNetted,
+  lastNettingRequest,
+) {
+  const hands = await Promise.all(
+    range(lastHandNetted + 1, lastNettingRequest)
+      .map(i => this.db.getHand(tableAddr, i)),
+  );
+
+  const bets = [].concat(
+    ...hands.map(hand => hand.lineup.map(seat => seat.last).filter(identity)),
+  );
+  const dists = hands.map(hand => hand.distribution).filter(identity);
+  const receipts = [].concat(...bets.concat(dists).map(r => Receipt.parseToParams(r)));
+
+  try {
+    await this.table.submit(tableAddr, receipts);
+    this.logger.log('tx: table.submit()', {
+      tags: { tableAddr },
+      extra: { receipts },
+    });
+  } catch (error) {
+    this.logger.log('tx: table.submit()', {
       tags: { tableAddr },
       level: 'error',
       extra: { error, receipts },
-    }),
-  );
+    });
+  }
 };
 
 EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {

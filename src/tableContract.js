@@ -28,7 +28,7 @@ export default class TableContract extends Contract {
 
     return this.call(contract.submit.call, receipts).then((writeCount) => {
       if (writeCount === 0) {
-        return Promise.reject('Already submitted');
+        throw new Error('Already submitted');
       }
       return this.sendTransaction(contract, 'submit', 1900000, [receipts]);
     });
