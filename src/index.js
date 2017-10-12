@@ -1,13 +1,15 @@
 import _ from 'lodash';
+import txIsReady from './txIsReady';
 
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 export default class ReserveSerivce {
 
-  constructor(table, pusher, db) {
+  constructor(table, pusher, db, web3) {
     this.table = table;
     this.pusher = pusher;
     this.db = db;
+    this.web3 = web3;
   }
 
   notify(tableAddr, event) {
@@ -68,7 +70,21 @@ export default class ReserveSerivce {
   }
 
   async cleanup(timeout) {
-    const deletedItems = await this.db.cleanupOutdated(timeout);
+    const items = await this.db.getReservations();
+    const now = Math.round(Date.now() / 1000);
+    const deletedItems = [];
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      if (
+        Number(item.created) + timeout < now ||
+        await txIsReady(this.web3, item.txHash) // eslint-disable-line no-await-in-loop
+      ) {
+        deletedItems.push(item);
+      }
+    }
+
+    await this.db.deleteItems(deletedItems);
+
     await Promise.all(_.map(_.groupBy(deletedItems, 'tableAddr'), (items, key) => this.notify(key, {
       type: 'seatsRelease',
       payload: items,

@@ -46,6 +46,7 @@ exports.handler = function handler(event, context, callback) {
       table,
       pusher,
       new Db(simpledb, tableName),
+      web3,
     );
 
     // handle request

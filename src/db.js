@@ -12,13 +12,19 @@ const transform = (data) => {
   } else {
     attributes = [];
     Object.keys(data).forEach((anAttributeName) => {
-      data[anAttributeName].forEach((aValue) => {
+      if (Array.isArray(data[anAttributeName])) {
+        data[anAttributeName].forEach((aValue) => {
+          attributes.push({
+            Name: anAttributeName,
+            Value: aValue,
+          });
+        });
+      } else {
         attributes.push({
           Name: anAttributeName,
-          Value: aValue,
-          Replace: true,
+          Value: data[anAttributeName],
         });
-      });
+      }
     });
   }
   return attributes;
@@ -74,18 +80,20 @@ export default class Db {
     }), {});
   }
 
-  async cleanupOutdated(timeout) {
+  async getReservations() {
     const { Items = [] } = await this.select({
-      SelectExpression: `select * from \`${this.tableName}\` where \`created\`<'${Math.round(Date.now() / 1000) - timeout}'`,
+      SelectExpression: `select * from \`${this.tableName}\``,
     });
 
-    await Promise.all(Items.map(item => this.deleteAttributes({
-      DomainName: this.tableName,
-      ItemName: item.Name,
-      Attributes: item.Attributes,
-    })));
-
     return Items.map(item => transform(item.Attributes));
+  }
+
+  async deleteItems(items) {
+    return items.map(item => this.deleteAttributes({
+      DomainName: this.tableName,
+      ItemName: `${item.tableAddr}-${item.pos}`,
+      Attributes: transform(item),
+    }));
   }
 
   method(name, params) {
