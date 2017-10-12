@@ -20,6 +20,7 @@ const web3 = {
     contract() {},
     at() {},
     getTransaction() {},
+    getTransactionReceipt() {},
   },
 };
 
@@ -285,8 +286,11 @@ describe('Reservation Service - cleanup', () => {
       new TableContract(web3),
       pusher,
       db,
+      web3,
     );
 
+    sinon.stub(web3.eth, 'getTransaction').yields(null, {});
+    sinon.stub(web3.eth, 'getTransactionReceipt').yields(null, {});
     sinon.stub(sdb, 'deleteAttributes').yields(null);
     sinon.stub(sdb, 'select').yields(null, {
       Items: [
@@ -321,15 +325,103 @@ describe('Reservation Service - cleanup', () => {
     expect(deletedItems[1].tableAddr).eq('0x111222333444');
   });
 
+  it('should not remove items if tx is not mined', async () => {
+    const db = new Db(sdb, 'tableName');
+    const service = new Service(
+      new TableContract(web3),
+      pusher,
+      db,
+      web3,
+    );
+
+    sinon.stub(web3.eth, 'getTransaction').yields(null, {});
+    sinon.stub(web3.eth, 'getTransactionReceipt').yields(null, null);
+    sinon.stub(sdb, 'deleteAttributes').yields(null);
+    sinon.stub(sdb, 'select').yields(null, {
+      Items: [
+        {
+          Name: `${TABLE_ADDR}-0`,
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: SIGNER_ADDR },
+            { Name: 'tableAddr', Value: TABLE_ADDR },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+        {
+          Name: '0x111222333444-0',
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: '0x00' },
+            { Name: 'tableAddr', Value: '0x111222333444' },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+      ],
+    });
+
+    const deletedItems = await service.cleanup(60);
+
+    expect(sdb.deleteAttributes).callCount(0);
+    expect(deletedItems).length(0);
+  });
+
+  it('should remove items if tx is not exists', async () => {
+    const db = new Db(sdb, 'tableName');
+    const service = new Service(
+      new TableContract(web3),
+      pusher,
+      db,
+      web3,
+    );
+
+    sinon.stub(web3.eth, 'getTransaction').yields(null, null);
+    sinon.stub(sdb, 'deleteAttributes').yields(null);
+    sinon.stub(sdb, 'select').yields(null, {
+      Items: [
+        {
+          Name: `${TABLE_ADDR}-0`,
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: SIGNER_ADDR },
+            { Name: 'tableAddr', Value: TABLE_ADDR },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+        {
+          Name: '0x111222333444-0',
+          Attributes: [
+            { Name: 'pos', Value: '0' },
+            { Name: 'signerAddr', Value: '0x00' },
+            { Name: 'tableAddr', Value: '0x111222333444' },
+            { Name: 'amount', Value: '10000' },
+            { Name: 'txHash', Value: TX_HASH },
+          ],
+        },
+      ],
+    });
+
+    const deletedItems = await service.cleanup(60);
+
+    expect(sdb.deleteAttributes).callCount(2);
+    expect(deletedItems).length(2);
+  });
+
   it('should notify about deleted items', async () => {
     const db = new Db(sdb, 'tableName');
     const service = new Service(
       new TableContract(web3),
       pusher,
       db,
+      web3,
     );
 
     sinon.stub(sdb, 'deleteAttributes').yields(null);
+    sinon.stub(web3.eth, 'getTransaction').yields(null, {});
+    sinon.stub(web3.eth, 'getTransactionReceipt').yields(null, {});
     sinon.stub(sdb, 'select').yields(null, {
       Items: [
         {
@@ -367,5 +459,6 @@ describe('Reservation Service - cleanup', () => {
     if (sdb.select.restore) sdb.select.restore();
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (web3.eth.getTransaction.restore) web3.eth.getTransaction.restore();
+    if (web3.eth.getTransactionReceipt.restore) web3.eth.getTransactionReceipt.restore();
   });
 });
