@@ -72,9 +72,12 @@ export default class StreamScanner {
 
     // check netting complete
     if (newHand.lineup && oldHand.netting && newHand.netting) {
-      const taken = ph.countActivePlayers(newHand.lineup, newHand.state);
-      const sigCount = Object.keys(newHand.netting).length;
-      if (sigCount > Object.keys(oldHand.netting).length && sigCount - 2 >= taken) {
+      const activePlayerCount = ph.countActivePlayers(newHand.lineup, newHand.state);
+      // netting has X + 2 keys, where X is the number of active player submitted netting receipt
+      // two other keys are "newBalances" and oracle signature
+      const signedPlayersCount = Object.keys(newHand.netting).length - 2;
+      const prevSignedPlayersCount = Object.keys(oldHand.netting).length - 2;
+      if (signedPlayersCount > prevSignedPlayersCount && signedPlayersCount >= activePlayerCount) {
         // send settle tx with complete netting to table
         tasks.push(this.notify(`TableNettingComplete::${keys.tableAddr}`, {
           tableAddr: keys.tableAddr,
