@@ -1080,6 +1080,7 @@ describe('Oracle pay', () => {
         sitout: 15,
       }, {
         address: P2_ADDR,
+        last: new Receipt(tableAddr).bet(13, babz(50)).sign(P2_PRIV),
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});

@@ -1,5 +1,6 @@
-import ethUtil from 'ethereumjs-util';
 import 'buffer-v6-polyfill';
+import request from 'request';
+import ethUtil from 'ethereumjs-util';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 
@@ -586,6 +587,36 @@ TableManager.prototype.lineup = async function (tableAddr) { // eslint-disable-l
   });
 
   return undefined;
+};
+
+TableManager.prototype.callOpponent = async function callOpponent(webhookUrl, tableAddr, template) {
+  try {
+    const req = await this.db.getOpponentCallRequest(tableAddr);
+    const fiveMinsAgo = Math.round(Date.now() / 1000) - 300;
+    if (!req || (req && (Number(req.created) < fiveMinsAgo))) {
+      await this.db.addOpponentCallRequest(tableAddr);
+      // send message to discord
+      return new Promise((resolve, reject) => {
+        request.post(webhookUrl, {
+          body: {
+            username: 'OppBot',
+            content: template.split('${tableAddr}').join(tableAddr), // eslint-disable-line no-template-curly-in-string
+          },
+          json: true,
+        }, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
+
+    return true;
+  } catch (err) {
+    return this.logger.exception(err);
+  }
 };
 
 module.exports = TableManager;
