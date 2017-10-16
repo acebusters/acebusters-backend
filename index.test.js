@@ -995,6 +995,7 @@ describe('Stream worker other events', () => {
     } });
     sinon.stub(contract.settle, 'getData').returns('0x123456');
     sinon.stub(contract.settle, 'estimateGas').yields(null, 100);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
@@ -1006,6 +1007,38 @@ describe('Stream worker other events', () => {
         tags: { tableAddr: '0x77aabb11ee00' },
         extra: { bals, sigs: '0x223344334455445566' },
       });
+      // expect hand is marked as netted in db
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':is_n', true)));
+      done();
+    }).catch(done);
+  });
+
+  // submit netting when netting complete.
+  it('should ignore TableNettingComplete event if hand is already netted.', (done) => {
+    const event = {
+      Subject: 'TableNettingComplete::0x1234',
+      Message: JSON.stringify({
+        tableAddr: '0x77aabb11ee00',
+        handId: 2,
+      }),
+    };
+    const bals = '0x11223311223311223311223311223311223311223311223311223311223311228899aabbccddeeff8899aabbccddeeff8899aabbccddeeff8899aabbccddeeff';
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
+      is_netted: true,
+      netting: {
+        newBalances: bals,
+        [ORACLE_ADDR]: '0x223344',
+        [P1_ADDR]: '0x334455',
+        [P2_ADDR]: '0x445566',
+      },
+    } });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), new Db(dynamo), null, logger);
+    Promise.all(worker.process(event)).then(() => {
+      expect(sentry.captureMessage).callCount(0);
       done();
     }).catch(done);
   });

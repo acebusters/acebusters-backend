@@ -305,28 +305,35 @@ EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
   });
 };
 
+EventWorker.prototype.settleTable = function settleTable(tableAddr, sigs, hand) {
+  return this.table.settle(tableAddr, sigs, hand.netting.newBalances)
+    .then(
+     () => {
+       this.logger.log('tx: table.settle()', {
+         tags: { tableAddr },
+         extra: { bals: hand.netting.newBalances, sigs },
+       });
+       return this.db.markHandAsNetted(tableAddr, hand.handId);
+     },
+     error => this.logger.log('tx: table.settle()', {
+       tags: { tableAddr },
+       level: 'error',
+       extra: { bals: hand.netting.newBalances, sigs, error },
+     }),
+    )
+};
+
 EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) {
-  let hand;
   let sigs = '0x';
-  return this.db.getHand(tableAddr, handId).then((_hand) => {
-    hand = _hand;
+  return this.db.getHand(tableAddr, handId).then((hand) => {
+    if (hand.is_netted) return Promise.resolve();
     Object.keys(hand.netting).forEach((addr) => {
       if (addr !== 'newBalances') {
         sigs += hand.netting[addr].replace('0x', '');
       }
     });
-    return this.table.settle(tableAddr, sigs, hand.netting.newBalances);
-  }).then(
-    () => this.logger.log('tx: table.settle()', {
-      tags: { tableAddr },
-      extra: { bals: hand.netting.newBalances, sigs },
-    }),
-    error => this.logger.log('tx: table.settle()', {
-      tags: { tableAddr },
-      level: 'error',
-      extra: { bals: hand.netting.newBalances, sigs, error },
-    }),
-  );
+    return this.settleTable(tableAddr, sigs, hand);
+  });
 };
 
 EventWorker.prototype.createNetting = function createNetting(tableAddr, handId) {

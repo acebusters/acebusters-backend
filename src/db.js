@@ -150,6 +150,19 @@ export default class Db {
     return rsp.Item;
   }
 
+  async markHandAsNetted(tableAddr, handId) {
+    const params = {
+      TableName: this.dynamoTableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: 'set is_netted = :is_n',
+      ExpressionAttributeValues: {
+        ':is_n': true,
+      },
+    };
+    const rsp = await this.updateItem(params);
+    return rsp.Item;
+  }
+
   async deleteHand(tableAddr, handId) {
     // avoid deleting unwanted entries
     if (!handId || !tableAddr) {
