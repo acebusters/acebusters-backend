@@ -2309,11 +2309,12 @@ describe('Oracle timing', () => {
     }).catch(done);
   });
 
-  it('should kick last player in lineup.', (done) => {
+  it('should NOT sitout the last player in lineup if he is inactive for less then 5 minutes.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 12,
       dealer: 0,
       state: 'waiting',
+      changed: Math.floor(Date.now() / 1000) - 4 * 60,
       lineup: [{
         address: EMPTY_ADDR,
       }, {
@@ -2324,13 +2325,36 @@ describe('Oracle timing', () => {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).then(() => {
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
-        address: P1_ADDR,
-        sitout: sinon.match.number,
-      })));
+      expect(dynamo.updateItem).callCount(0);
       done();
     }).catch(done);
   });
+
+  it('should sitout the last player in lineup if he is inactive for more then 5 minutes.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 12,
+      dealer: 0,
+      state: 'waiting',
+      changed: Math.floor(Date.now() / 1000) - 6 * 60,
+      lineup: [{
+        address: EMPTY_ADDR,
+      }, {
+        address: P1_ADDR,
+      }],
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    oracle.timeout(tableAddr).then(() => {
+      const seat = {
+        address: P1_ADDR,
+        sitout: sinon.match.number,
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      done();
+    }).catch(done);
+  });
+
 
   it('should not put empty seat into sitout.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{

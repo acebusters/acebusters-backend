@@ -492,10 +492,8 @@ TableManager.prototype.netting = function netting(tableAddr, handIdStr, nettingS
 };
 
 TableManager.prototype.timeout = function timeout(tableAddr) {
-  let hand;
   // get the latest hand to check on
-  return this.db.getLastHand(tableAddr).then((_hand) => {
-    hand = _hand;
+  return this.db.getLastHand(tableAddr).then((hand) => {
 
     let pos;
     try {
@@ -511,12 +509,21 @@ TableManager.prototype.timeout = function timeout(tableAddr) {
       }
     }
 
-
     const now = this.nowSeconds();
     const leftTime = (hand.changed + this.getTimeout(hand.state)) - now;
     if (leftTime > 0) {
       return Promise.resolve(`player ${pos} still got ${leftTime} seconds to act.`);
     }
+
+    // allow a single player to sit at the table
+    const activeCount = this.helper.countActivePlayers(hand.lineup, hand.state);
+
+    const fiveMinutesAgo = now - 60 * 5;
+    if (activeCount == 1 && hand.state == 'waiting' && hand.changed > fiveMinutesAgo) {
+      return Promise.resolve();
+    }
+
+    // several players at the table and player didn't act timely — put him in sit out
     hand.lineup[pos].sitout = now;
     return this.updateState(tableAddr, hand, pos);
   });
