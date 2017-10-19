@@ -5,5 +5,5 @@ event.json
 event-setup.json
 context.json
 node_modules
-artifact.zip
+lambda.zip
 dist
