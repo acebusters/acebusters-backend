@@ -7,12 +7,9 @@ env:
     - AWS_REGION=eu-west-1
     - AWS_FUNCTION_NAME=ab-contract-scanner
     - AWS_HANDLER=index.handler
-    - AWS_MEMORY_SIZE=256
-    - AWS_TIMEOUT=14
-    - AWS_RUNTIME=nodejs4.3
 
 node_js:
-  - "6.2.2"
+  - "6.10"
 
 install:
   - npm install -g node-lambda
