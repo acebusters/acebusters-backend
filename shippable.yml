@@ -7,9 +7,11 @@ env:
     - AWS_REGION=eu-west-1
     - AWS_FUNCTION_NAME=ab-seats-reservation
     - AWS_HANDLER=index.handler
+    - AWS_MEMORY_SIZE=128
+    - AWS_TIMEOUT=13
 
 node_js:
-  - "6.2.2"
+  - "6.10"
 
 install:
   - npm install -g node-lambda
