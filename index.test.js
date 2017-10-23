@@ -1116,14 +1116,9 @@ describe('Stream worker other events', () => {
 
     const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), null, logger);
     Promise.all(worker.process(event)).then(() => {
-      expect(dynamo.deleteItem).callCount(2);
+      expect(dynamo.deleteItem).callCount(1);
       expect(dynamo.deleteItem).calledWith({ Key: {
         handId: 2,
-        tableAddr: '0x77aabb11ee00',
-      },
-        TableName: 'sb_cashgame' });
-      expect(dynamo.deleteItem).calledWith({ Key: {
-        handId: 3,
         tableAddr: '0x77aabb11ee00',
       },
         TableName: 'sb_cashgame' });
@@ -1141,7 +1136,7 @@ describe('Stream worker other events', () => {
         args: {},
       }),
     };
-    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(3),
       [P1_ADDR, P2_ADDR],
       [new BigNumber(50000), new BigNumber(50000)],
       [new BigNumber(1), new BigNumber(2)],
