@@ -289,20 +289,22 @@ EventWorker.prototype.handleDispute = async function handleDispute(
   }
 };
 
-EventWorker.prototype.deleteHands = function deleteHands(tableAddr) {
-  return this.table.getLineup(tableAddr).then(rsp => Promise.all([
-    rsp.lastHandNetted,
+EventWorker.prototype.deleteHands = async function deleteHands(tableAddr) {
+  const [{ lastHandNetted: lhn }, hand] = await Promise.all([
+    this.table.getLineup(tableAddr),
     this.db.getLastHand(tableAddr, true),
-  ])).then(([lhn, hand]) => {
-    if (lhn < 2 || hand.handId > lhn) {
-      return Promise.resolve(`no work on range lhn: ${lhn} , handId: ${hand.handId}`);
-    }
-    const deletes = [];
-    for (let i = hand.handId; i <= lhn; i += 1) {
-      deletes.push(this.db.deleteHand(tableAddr, i));
-    }
-    return Promise.all(deletes);
-  });
+  ]);
+
+  if (lhn < 2 || hand.handId > lhn) {
+    return `no work on range lhn: ${lhn} , handId: ${hand.handId}`;
+  }
+
+  const deletes = [];
+  for (let i = hand.handId; i < lhn; i += 1) {
+    deletes.push(this.db.deleteHand(tableAddr, i));
+  }
+
+  return Promise.all(deletes);
 };
 
 EventWorker.prototype.settleTable = function settleTable(tableAddr, sigs, hand) {
@@ -320,7 +322,7 @@ EventWorker.prototype.settleTable = function settleTable(tableAddr, sigs, hand) 
        level: 'error',
        extra: { bals: hand.netting.newBalances, sigs, error },
      }),
-    )
+    );
 };
 
 EventWorker.prototype.submitNetting = function submitNetting(tableAddr, handId) {
