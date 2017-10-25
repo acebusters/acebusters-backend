@@ -74,6 +74,8 @@ exports.handler = function handler(event, context, callback) {
     const handId = event.params.path.handId;
     if (path.indexOf('pay') > -1) {
       handleRequest = manager.pay(tableAddr, event.params.header.Authorization);
+    } else if (path.indexOf('beat') > -1) {
+      handleRequest = manager.beat(tableAddr, event.params.header.Authorization);
     } else if (path.indexOf('info') > -1) {
       handleRequest = manager.info(tableAddr);
     } else if (path.indexOf('netting') > -1) {
@@ -93,7 +95,11 @@ exports.handler = function handler(event, context, callback) {
     } else if (path.indexOf('lineup') > -1) {
       handleRequest = manager.lineup(tableAddr);
     } else if (path.indexOf('callOpponent') > -1) {
-      handleRequest = manager.callOpponent(process.env.DISCORD_WEBHOOK_URL, tableAddr, process.env.DISCORD_OPPONENT_TEMPLATE);
+      handleRequest = manager.callOpponent(
+        tableAddr,
+        process.env.DISCORD_WEBHOOK_URL,
+        process.env.DISCORD_OPPONENT_TEMPLATE,
+      );
     } else {
       handleRequest = Promise.reject(`Error: unexpected path: ${path}`);
     }

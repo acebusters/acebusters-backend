@@ -8,6 +8,7 @@ import Oracle from './src/index';
 import Db from './src/db';
 import Logger from './src/logger';
 import TableContract from './src/tableContract';
+import { EMPTY_ADDR, now } from './src/utils';
 
 chai.use(sinonChai);
 
@@ -42,7 +43,6 @@ const P4_ADDR = '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f';
 const P4_PRIV = '0x94890218f2b0d04296f30aeafd13655eba4c5bbf1770273276fee52cbe3f2cb4';
 
 const tableAddr = '0x00112233445566778899aabbccddeeff00112233';
-const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 const deck = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
   11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25];
@@ -1656,6 +1656,72 @@ describe('Oracle pay', () => {
   });
 });
 
+describe('Oracle beat', () => {
+  it('should reject receipt with wrong type', async () => {
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    const bet = new Receipt(tableAddr).bet(0, babz(0)).sign(P1_PRIV);
+    try {
+      await oracle.beat(tableAddr, bet);
+    } catch (err) {
+      expect(err.message).to.contain('Wrong receipt type');
+    }
+  });
+
+  it('should reject receipt for wrong table', async () => {
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    const wait = new Receipt('0x00').wait().sign(P1_PRIV);
+    try {
+      await oracle.beat(tableAddr, wait);
+    } catch (err) {
+      expect(err.message).to.contain('Wrong table');
+    }
+  });
+
+  it('should reject too old receipt', async () => {
+    const oracle = new Oracle(new Db(dynamo), null, rc);
+    const wait = new Receipt(tableAddr).wait(now(-60 * 10)).sign(P1_PRIV);
+    try {
+      await oracle.beat(tableAddr, wait);
+    } catch (err) {
+      expect(err.message).to.contain('too old');
+    }
+  });
+
+  it('should reject receipt if player not in lineup', async () => {
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, EMPTY_ADDR], [new BigNumber(BALANCE), bn0], [0, 0]]);
+
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const wait = new Receipt(tableAddr).wait().sign(P2_PRIV);
+    try {
+      await oracle.beat(tableAddr, wait);
+    } catch (err) {
+      expect(err.message).to.contain('not in lineup');
+    }
+  });
+
+  it('should update changed time for hand', async () => {
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, EMPTY_ADDR], [new BigNumber(BALANCE), bn0], [0, 0]]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{ handId: 2 }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const wait = new Receipt(tableAddr).wait().sign(P1_PRIV);
+    await oracle.beat(tableAddr, wait);
+
+    expect(dynamo.updateItem).callCount(1);
+    expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':c', sinon.match.any)));
+  });
+
+  afterEach(() => {
+    if (contract.getLineup.call.restore) contract.getLineup.call.restore();
+    if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
+    if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.putItem.restore) dynamo.putItem.restore();
+    if (dynamo.updateItem.restore) dynamo.updateItem.restore();
+    if (dynamo.query.restore) dynamo.query.restore();
+  });
+});
+
 describe('Oracle info', () => {
   it('should allow to get uninitialized info.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [] });
@@ -2314,7 +2380,7 @@ describe('Oracle timing', () => {
       handId: 12,
       dealer: 0,
       state: 'waiting',
-      changed: Math.floor(Date.now() / 1000) - 4 * 60,
+      changed: Math.floor(Date.now() / 1000) - (4 * 60),
       lineup: [{
         address: EMPTY_ADDR,
       }, {
@@ -2335,7 +2401,7 @@ describe('Oracle timing', () => {
       handId: 12,
       dealer: 0,
       state: 'waiting',
-      changed: Math.floor(Date.now() / 1000) - 6 * 60,
+      changed: Math.floor(Date.now() / 1000) - (6 * 60),
       lineup: [{
         address: EMPTY_ADDR,
       }, {

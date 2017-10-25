@@ -160,6 +160,18 @@ export default class Db {
     return this.updateItem(params);
   }
 
+  updateChanged(tableAddr, handId, changed) {
+    const params = {
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: 'set changed = :c',
+      ExpressionAttributeValues: {
+        ':c': changed,
+      },
+    };
+    return this.updateItem(params);
+  }
+
   updateNetting(tableAddr, handId, signer, nettingSig) {
     const params = {
       TableName: this.tableName,
