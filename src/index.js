@@ -459,7 +459,7 @@ class TableManager {
 
     // set sitout if next hand started after leave receipt
     const exitHand = receipt.handId;
-    const sitout = exitHand < hand.handId ? 1 : undefined;
+    const sitout = 1;
     return this.db.updateLeave(tableAddr, hand.handId, pos, exitHand, sitout, now());
   }
 
