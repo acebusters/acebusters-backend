@@ -1,9 +1,8 @@
-// return after first leave detected
-// we don't expect more than one per db change
-export const leaveReceived = (oldHand, newHand) => (
-  newHand.lineup.findIndex(
-    (seat, i) => seat.exitHand && !oldHand.lineup[i].exitHand,
-  )
+// return all detected leaves
+export const leavesReceived = (oldHand, newHand) => (
+  newHand.lineup
+    .map((_, i) => i)
+    .filter(i => newHand.lineup[i].exitHand && !oldHand.lineup[i].exitHand)
 );
 
 export const lineupHasLeave = newHand => (
