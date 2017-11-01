@@ -2585,7 +2585,7 @@ describe('Oracle lineup', () => {
     oracle.lineup(tableAddr).then(() => {
       const seat = { address: EMPTY_ADDR };
       expect(dynamo.updateItem).callCount(1);
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s1', seat)));
       expect(sentry.captureMessage).calledWith(sinon.match('removed players [1], added players [] in db'), {
         level: 'info',
         server_name: 'oracle-cashgame',
@@ -2617,7 +2617,7 @@ describe('Oracle lineup', () => {
     const oracle = new Oracle(new Db(dynamo),
       new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':a', P2_ADDR)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s1', { address: P2_ADDR })));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
       done();
     }).catch(done);
@@ -2648,7 +2648,7 @@ describe('Oracle lineup', () => {
     const oracle = new Oracle(new Db(dynamo),
       new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':a', P2_ADDR)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s1', { address: P2_ADDR })));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
       done();
     }).catch(done);
@@ -2680,8 +2680,7 @@ describe('Oracle lineup', () => {
     const oracle = new Oracle(new Db(dynamo),
       new TableContract(web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':a', P3_ADDR)));
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', sinon.match.number)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s2', { address: P3_ADDR, sitout: sinon.match.number })));
       done();
     }).catch(done);
   });

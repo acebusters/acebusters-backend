@@ -533,7 +533,7 @@ class TableManager {
     return this.updateState(tableAddr, hand, pos);
   }
 
-  async lineup(tableAddr) { // eslint-disable-line func-names
+  async lineup(tableAddr) {
     const [{ lastHandNetted, lineup }, hand] = await Promise.all([
       this.contract.getLineup(tableAddr),
       this.db.getLastHand(tableAddr),
@@ -560,25 +560,30 @@ class TableManager {
       return 'no changes for lineup detected.';
     }
 
-    const jobProms = [
-      ...leavePos.map(i => this.db.emptySeat(tableAddr, hand.handId, i, now())),
-      ...joinPos.map(seat => this.db.setSeat(
-        tableAddr,
-        hand.handId,
-        seat.pos,
-        now(),
-        seat.addr,
-        (hand.state !== 'waiting' && hand.state !== 'dealing') ? now() : null, // sitout
-      )),
-    ];
-
+    const sitout = (hand.state !== 'waiting' && hand.state !== 'dealing') ? now() : undefined;
     if (hand.state === 'waiting' && !this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state)) {
       // TODO: optimize this, when handstate waiting, we can update everything at once
       const nextDealer = joinPos.length > 0 ? joinPos[0].pos : getNextDealer(this.helper, hand);
-      jobProms.push(this.db.setDealer(tableAddr, hand.handId, now(), nextDealer));
+      await this.db.updateSeats(
+        tableAddr,
+        hand.handId,
+        joinPos,
+        leavePos,
+        nextDealer,
+        sitout,
+        now(),
+      );
+    } else {
+      await this.db.updateSeats(
+        tableAddr,
+        hand.handId,
+        joinPos,
+        leavePos,
+        hand.dealer,
+        sitout,
+        now(),
+      );
     }
-
-    await Promise.all(jobProms);
 
     this.logger.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
       tags: { tableAddr, handId: hand.handId },

@@ -188,50 +188,32 @@ export default class Db {
     return this.updateItem(params);
   }
 
-  setSeat(tableAddr, handId, pos, changed, addr, sitout) {
-    const params = {
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}].#address = :a, changed = :c`,
-      ExpressionAttributeNames: {
-        '#address': 'address',
-      },
-      ExpressionAttributeValues: {
-        ':a': addr,
-        ':c': changed,
-      },
+  updateSeats(tableAddr, handId, joins, leaves, dealer, sitout, changed) {
+    const seats = {
+      ...leaves.reduce((attrs, i) => ({
+        ...attrs,
+        [i]: { address: '0x0000000000000000000000000000000000000000' },
+      }), {}),
+      ...joins.reduce((attrs, seat) => ({
+        ...attrs,
+        [seat.pos]: sitout ? { address: seat.addr, sitout } : { address: seat.addr },
+      }), {}),
     };
-    if (sitout) {
-      params.UpdateExpression += `, lineup[${pos}].#sitout = :so`;
-      params.ExpressionAttributeNames['#sitout'] = 'sitout';
-      params.ExpressionAttributeValues[':so'] = sitout;
-    }
-    return this.updateItem(params);
-  }
 
-  emptySeat(tableAddr, handId, pos, changed) {
+    const expression = Object.keys(seats).map(i => `lineup[${i}] = :s${i}`);
     const params = {
       TableName: this.tableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :s, changed = :c`,
-      ExpressionAttributeValues: {
-        ':s': { address: '0x0000000000000000000000000000000000000000' },
+      UpdateExpression: `set ${[...expression, 'changed = :c', 'dealer = :d'].join(', ')}`,
+      ExpressionAttributeValues: Object.keys(seats).reduce((attrs, pos) => ({
+        ...attrs,
+        [`:s${pos}`]: seats[pos],
+      }), {
         ':c': changed,
-      },
-    };
-    return this.updateItem(params);
-  }
-
-  setDealer(tableAddr, handId, changed, dealer) {
-    const params = {
-      TableName: this.tableName,
-      Key: { tableAddr, handId },
-      UpdateExpression: 'set dealer = :d, changed = :c',
-      ExpressionAttributeValues: {
         ':d': dealer,
-        ':c': changed,
-      },
+      }),
     };
+
     return this.updateItem(params);
   }
 
