@@ -328,7 +328,7 @@ describe('Account Manager - set Wallet ', () => {
 
     const receipt = new Receipt().createConf(ACCOUNT_ID).sign(SESS_PRIV);
     const wallet = `{ "address": "${SESS_ADDR}" }`;
-    manager.setWallet(receipt, wallet).then(() => {
+    manager.setWallet(receipt, wallet, undefined, '00000000').then(() => {
       expect(sdb.getAttributes).calledWith({ DomainName: 'ab-accounts', ItemName: ACCOUNT_ID });
       expect(sdb.putAttributes).calledWith({
         Attributes: [
@@ -349,7 +349,7 @@ describe('Account Manager - set Wallet ', () => {
       });
       expect(sns.publish).callCount(1);
       expect(sns.publish).calledWith({
-        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","signerAddr":"${SESS_ADDR}"}`,
+        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","proxyAddr":"${ADDR2}","signerAddr":"${SESS_ADDR}","referral":"00000000"}`,
         Subject: `WalletCreated::${SESS_ADDR}`,
         TopicArn: 'topicArn',
       });
@@ -369,7 +369,7 @@ describe('Account Manager - set Wallet ', () => {
 
     const receipt = new Receipt().createConf(ACCOUNT_ID).sign(SESS_PRIV);
     const wallet = `{ "address": "${SESS_ADDR}" }`;
-    manager.setWallet(receipt, wallet, ADDR1).then(() => {
+    manager.setWallet(receipt, wallet, ADDR1, '00000000').then(() => {
       expect(sdb.getAttributes).calledWith({ DomainName: 'ab-accounts', ItemName: ACCOUNT_ID });
       expect(sdb.putAttributes).callCount(3);
       expect(sdb.putAttributes).calledWith({
@@ -398,7 +398,7 @@ describe('Account Manager - set Wallet ', () => {
       });
       expect(sns.publish).callCount(1);
       expect(sns.publish).calledWith({
-        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","signerAddr":"${SESS_ADDR}"}`,
+        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","proxyAddr":"${ADDR1}","signerAddr":"${SESS_ADDR}","referral":"00000000"}`,
         Subject: `WalletCreated::${SESS_ADDR}`,
         TopicArn: 'topicArn',
       });
@@ -432,6 +432,7 @@ describe('Account Manager - reset Wallet', () => {
   it('should allow to reset Wallet.', (done) => {
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
+      { Name: 'id', Value: ACCOUNT_ID },
       { Name: 'wallet', Value: '{"address": "0x1234"}' },
       { Name: 'proxyAddr', Value: ADDR2 },
     ] });
@@ -451,6 +452,11 @@ describe('Account Manager - reset Wallet', () => {
         DomainName: 'ab-accounts',
         ItemName: ACCOUNT_ID,
       });
+      expect(sns.publish).calledWith({
+        Message: `{"accountId":"${ACCOUNT_ID}","signerAddr":"${SESS_ADDR}"}`,
+        Subject: `WalletUpdated::${SESS_ADDR}`,
+        TopicArn: 'topicArn',
+      });
       done();
     }).catch(done);
   });
@@ -466,8 +472,8 @@ describe('Account Manager - reset Wallet', () => {
   });
 });
 
-describe('Account Manager - congfirm email', () => {
-  it('should allow to confirm email.', (done) => {
+describe('Account Manager - confirm email', () => {
+  it('should allow to confirm email.', async () => {
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
       { Name: 'pendingEmail', Value: TEST_MAIL },
     ] });
@@ -477,34 +483,32 @@ describe('Account Manager - congfirm email', () => {
       null, null, sns, 'topicArn', SESS_PRIV, null, null);
 
     const receipt = new Receipt().createConf(ACCOUNT_ID).sign(SESS_PRIV);
-    manager.confirmEmail(receipt).then(() => {
-      expect(sdb.getAttributes).callCount(1);
-      expect(sdb.getAttributes).calledWith({ DomainName: 'ab-accounts', ItemName: ACCOUNT_ID });
-      expect(sdb.putAttributes).callCount(1);
-      expect(sdb.putAttributes).calledWith({
-        Attributes: [
-          { Name: 'email', Replace: true, Value: TEST_MAIL },
-        ],
-        DomainName: 'ab-accounts',
-        ItemName: ACCOUNT_ID,
-      });
-      expect(sdb.deleteAttributes).callCount(1);
-      expect(sdb.deleteAttributes).calledWith({
-        Attributes: [{ Name: 'pendingEmail' }],
-        DomainName: 'ab-accounts',
-        ItemName: ACCOUNT_ID,
-      });
-      done();
-    }).catch(done);
+    await manager.confirmEmail(receipt);
+    expect(sdb.getAttributes).callCount(1);
+    expect(sdb.getAttributes).calledWith({ DomainName: 'ab-accounts', ItemName: ACCOUNT_ID });
+    expect(sdb.putAttributes).callCount(1);
+    expect(sdb.putAttributes).calledWith({
+      Attributes: [
+        { Name: 'email', Replace: true, Value: TEST_MAIL },
+      ],
+      DomainName: 'ab-accounts',
+      ItemName: ACCOUNT_ID,
+    });
+    expect(sdb.deleteAttributes).callCount(1);
+    expect(sdb.deleteAttributes).calledWith({
+      Attributes: [{ Name: 'pendingEmail' }],
+      DomainName: 'ab-accounts',
+      ItemName: ACCOUNT_ID,
+    });
   });
 
-  it('should prevent confirming old email token.', () => {
+  it('should prevent confirming old email token.', async () => {
     const before3Hours = (Date.now() / 1000) - (60 * 60 * 3);
     const manager = new AccountManager(null, null, null, null, null, SESS_PRIV);
 
     const receipt = new Receipt().createConf(ACCOUNT_ID, before3Hours).sign(SESS_PRIV);
     try {
-      manager.confirmEmail(receipt);
+      await manager.confirmEmail(receipt);
     } catch (err) {
       expect(err.message).to.contain('Unauthorized: session expired since');
       return;
@@ -524,12 +528,12 @@ describe('Account Manager - congfirm email', () => {
     }).catch(done);
   });
 
-  it('should error on invalid email token.', () => {
+  it('should error on invalid email token.', async () => {
     const manager = new AccountManager();
 
     const token = '0:ZelQE6wpTumh-l5xLgF4pQ';
     try {
-      manager.confirmEmail(token);
+      await manager.confirmEmail(token);
     } catch (err) {
       expect(err.message).to.contain('Unauthorized: invalid session');
       return;
@@ -572,11 +576,11 @@ describe('Account Manager - referrals ', () => {
     }).catch(done);
   });
 
-  it('should return 400 when ref code invalid.', () => {
+  it('should return 400 when ref code invalid.', async () => {
     sinon.stub(sdb, 'getAttributes').yields(null, {});
     const manager = new AccountManager(new Db(sdb));
     try {
-      manager.getRef('----');
+      await manager.getRef('----');
     } catch (err) {
       expect(err.message).to.contain('Bad Request: ');
       return;

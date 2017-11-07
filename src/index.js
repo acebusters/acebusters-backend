@@ -102,52 +102,43 @@ function checkWallet(walletStr) {
   return wallet;
 }
 
-function AccountManager(db, email, recaptcha, sns, topicArn, sessionPriv, proxy, logger,
-  unlockPriv, slackAlert, minProxiesAlertThreshold) {
-  this.db = db;
-  this.email = email;
-  this.recaptcha = recaptcha;
-  this.sns = sns;
-  this.proxy = proxy;
-  this.topicArn = topicArn;
-  this.logger = logger;
-  this.unlockPriv = unlockPriv;
-  this.slackAlert = slackAlert;
-  this.minProxiesAlertThreshold = minProxiesAlertThreshold;
-  if (sessionPriv) {
-    this.sessionPriv = sessionPriv;
-    const priv = new Buffer(sessionPriv.replace('0x', ''), 'hex');
-    this.sessionAddr = `0x${ethUtil.privateToAddress(priv).toString('hex')}`;
+class AccountManager {
+  constructor(db, email, recaptcha, sns, topicArn, sessionPriv, proxy, logger,
+    unlockPriv, slackAlert, minProxiesAlertThreshold) {
+    this.db = db;
+    this.email = email;
+    this.recaptcha = recaptcha;
+    this.sns = sns;
+    this.proxy = proxy;
+    this.topicArn = topicArn;
+    this.logger = logger;
+    this.unlockPriv = unlockPriv;
+    this.slackAlert = slackAlert;
+    this.minProxiesAlertThreshold = minProxiesAlertThreshold;
+    if (sessionPriv) {
+      this.sessionPriv = sessionPriv;
+      const priv = new Buffer(sessionPriv.replace('0x', ''), 'hex');
+      this.sessionAddr = `0x${ethUtil.privateToAddress(priv).toString('hex')}`;
+    }
   }
-}
 
-AccountManager.prototype.getAccount = function getAccount(accountId) {
-  let account;
-  return this.db.getAccount(accountId).then((_account) => {
-    account = _account;
-    account.id = accountId;
-    return Promise.resolve(account);
-  });
-};
+  async getAccount(accountId) {
+    const account = await this.db.getAccount(accountId);
+    return { ...account, id: accountId };
+  }
 
-AccountManager.prototype.getRef = function getRef(refCode) {
-  const globalRef = '00000000';
-  // todo: check ref format
-  if (!refRegex.test(refCode)) {
-    // http 400
-    throw new BadRequest(`passed refCode ${refCode} not valid.`);
-  }
-  let refProm;
-  if (globalRef === refCode) {
-    // if request has global refCode, avoid db request
-    refProm = Promise.resolve({ allowance: 1 });
-  } else {
-    refProm = this.db.getRef(refCode);
-  }
-  const globProm = this.db.getRef(globalRef);
-  return Promise.all([refProm, globProm]).then((rsp) => {
-    const referral = rsp[0];
-    const glob = rsp[1];
+  async getRef(refCode) {
+    const globalRef = '00000000';
+    // todo: check ref format
+    if (!refRegex.test(refCode)) {
+      // http 400
+      throw new BadRequest(`passed refCode ${refCode} not valid.`);
+    }
+
+    const isGlob = globalRef === refCode;
+    const referral = isGlob ? { allowance: 1 } : await this.db.getRef(refCode);
+    const glob = await this.db.getRef(globalRef);
+
     if (glob.allowance < 1) {
       // 420 - global signup limit reached
       throw new EnhanceYourCalm('global limit reached');
@@ -159,293 +150,299 @@ AccountManager.prototype.getRef = function getRef(refCode) {
     if (uuidRegex.test(glob.account)) {
       // 200 - return global ref code
       // this will allow users without ref code to sign up
-      return Promise.resolve({ defaultRef: glob.account });
+      return { defaultRef: glob.account };
     }
     // 200 - do not provide default ref code
     // users without ref code will not be able to sign up
-    return Promise.resolve({});
-  });
-};
+    return {};
+  }
 
-AccountManager.prototype.forward = async function forward(forwardReceipt) {
-  try {
-    const { signer: signerAddr, destinationAddr, amount, data } = Receipt.parse(forwardReceipt);
-    const account = await this.db.getAccountBySignerAddr(signerAddr);
-    const [owner, isLocked] = await Promise.all([
-      this.proxy.getOwner(account.proxyAddr),
-      this.proxy.isLocked(account.proxyAddr),
+  async forward(forwardReceipt) {
+    try {
+      const { signer: signerAddr, destinationAddr, amount, data } = Receipt.parse(forwardReceipt);
+      const account = await this.db.getAccountBySignerAddr(signerAddr);
+      const [owner, isLocked] = await Promise.all([
+        this.proxy.getOwner(account.proxyAddr),
+        this.proxy.isLocked(account.proxyAddr),
+      ]);
+
+      if (!isLocked) {
+        throw new BadRequest(`${account.proxyAddr} is an unlocked account. send tx with ${owner}`);
+      }
+
+      if (owner !== this.proxy.senderAddr) {
+        throw new BadRequest(`wrong owner ${owner} found on proxy ${account.proxyAddr}`);
+      }
+
+      const response = await this.proxy.forward(
+        account.proxyAddr,
+        destinationAddr,
+        amount,
+        data,
+        signerAddr,
+      );
+
+      return response[0];
+    } catch (e) {
+      // console.log(e);
+      return Promise.reject(`Bad Request: ${e}`);
+    }
+  }
+
+  queryRefCodes(accountId) {
+    return this.db.getRefsByAccount(accountId);
+  }
+
+  async queryAccount(email) {
+    try {
+      const account = await this.db.getAccountByEmail(email);
+
+      return {
+        id: account.id,
+        proxyAddr: account.proxyAddr,
+        wallet: account.wallet,
+      };
+    } catch (err) {
+      return {
+        id: fakeId(email),
+        proxyAddr: `0x${ethUtil.sha3(`${email}${'proxyAddrobeqw4cq'}`).slice(0, 20).toString('hex')}`,
+        wallet: JSON.stringify({
+          address: `0x${ethUtil.sha3(`${email}${'addressawobeqw4cq'}`).slice(0, 20).toString('hex')}`,
+          Crypto: {
+            cipher: 'aes-128-ctr',
+            cipherparams: {
+              iv: ethUtil.sha3(`${email}${'cipherparamsivaic4w6b'}`).slice(0, 16).toString('hex'),
+            },
+            ciphertext: ethUtil.sha3(`${email}${'ciphertextaoc84noq354'}`).slice(0, 32).toString('hex'),
+            kdf: 'scrypt',
+            kdfparams: {
+              dklen: 32,
+              n: 65536,
+              r: 1,
+              p: 8,
+              salt: ethUtil.sha3(`${email}${'kdfparamssalta7c465oa754'}`).slice(0, 32).toString('hex'),
+            },
+            mac: ethUtil.sha3(`${email}${'maco8wb47q5496q38745'}`).slice(0, 32).toString('hex'),
+          },
+          version: 3,
+        }),
+      };
+    }
+  }
+
+  async queryUnlockReceipt(unlockRequest) {
+    try {
+      const unlockRequestReceipt = Receipt.parse(unlockRequest);
+      const secsFromCreated = Math.floor(Date.now() / 1000) - unlockRequestReceipt.created;
+      const account = await this.db.getAccountBySignerAddr(unlockRequestReceipt.signer);
+
+      if (secsFromCreated > 600) {
+        throw new BadRequest('Receipt is outdated');
+      }
+
+      if (account.proxyAddr !== '0x') {
+        const receipt = new Receipt(account.proxyAddr)
+                        .unlock(unlockRequestReceipt.newOwner)
+                        .sign(this.unlockPriv);
+        return receipt;
+      }
+
+      throw new BadRequest(`Account with signerAddr = ${unlockRequestReceipt.signer} doesn't exist`);
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  async addAccount(accountId,
+    email, recapResponse, origin, sourceIp, refCode) {
+    if (!uuidRegex.test(accountId)) {
+      throw new BadRequest(`passed accountId ${accountId} not uuid v4.`);
+    }
+    if (!emailRegex.test(email)) {
+      throw new BadRequest(`passed email ${email} has invalid format.`);
+    }
+    if (!refRegex.test(refCode)) {
+      throw new BadRequest(`passed refCode ${refCode} has invalid format.`);
+    }
+    const receipt = new Receipt().createConf(accountId).sign(this.sessionPriv);
+
+    const [referral] = await Promise.all([
+      this.db.getRef(refCode),
+      this.recaptcha.verify(recapResponse, sourceIp),
     ]);
 
-    if (!isLocked) {
-      throw new BadRequest(`${account.proxyAddr} is an unlocked account. send tx with ${owner}`);
+    const proxyAddr = await this.db.getProxy();
+
+    if (referral.allowance < 1) {
+      // 418 - invite limit for this code reached
+      throw new Teapot('referral invite limit reached.');
     }
 
-    if (owner !== this.proxy.senderAddr) {
-      throw new BadRequest(`wrong owner ${owner} found on proxy ${account.proxyAddr}`);
+    if (!uuidRegex.test(referral.account)) {
+      throw new BadRequest(`passed refCode ${refCode} can not be used for signup.`);
     }
 
-    const response = await this.proxy.forward(
-      account.proxyAddr,
-      destinationAddr,
-      amount,
-      data,
-      signerAddr,
-    );
+    await this.db.checkAccountConflict(accountId, email);
+    await Promise.all([
+      this.db.putAccount(
+        accountId,
+        email.toLowerCase(),
+        Array.isArray(referral.account) ? referral.account[0] : referral.account,
+        proxyAddr,
+      ),
+      this.db.deleteProxy(proxyAddr),
+      this.db.setRefAllowance(refCode, referral.allowance - 1),
+    ]);
 
-    return response[0];
-  } catch (e) {
-    // console.log(e);
-    return Promise.reject(`Bad Request: ${e}`);
-  }
-};
-
-AccountManager.prototype.queryRefCodes = function queryRefCodes(accountId) {
-  return this.db.getRefsByAccount(accountId);
-};
-
-AccountManager.prototype.queryAccount = function queryAccount(email) {
-  return this.db.getAccountByEmail(email).then(
-    account => ({
-      id: account.id,
-      proxyAddr: account.proxyAddr,
-      wallet: account.wallet,
-    }),
-    () => ({
-      id: fakeId(email),
-      proxyAddr: `0x${ethUtil.sha3(`${email}${'proxyAddrobeqw4cq'}`).slice(0, 20).toString('hex')}`,
-      wallet: JSON.stringify({
-        address: `0x${ethUtil.sha3(`${email}${'addressawobeqw4cq'}`).slice(0, 20).toString('hex')}`,
-        Crypto: {
-          cipher: 'aes-128-ctr',
-          cipherparams: {
-            iv: ethUtil.sha3(`${email}${'cipherparamsivaic4w6b'}`).slice(0, 16).toString('hex'),
-          },
-          ciphertext: ethUtil.sha3(`${email}${'ciphertextaoc84noq354'}`).slice(0, 32).toString('hex'),
-          kdf: 'scrypt',
-          kdfparams: {
-            dklen: 32,
-            n: 65536,
-            r: 1,
-            p: 8,
-            salt: ethUtil.sha3(`${email}${'kdfparamssalta7c465oa754'}`).slice(0, 32).toString('hex'),
-          },
-          mac: ethUtil.sha3(`${email}${'maco8wb47q5496q38745'}`).slice(0, 32).toString('hex'),
-        },
-        version: 3,
-      }),
-    }),
-  );
-};
-
-AccountManager.prototype.queryUnlockReceipt = async function queryUnlockReceipt(unlockRequest) {
-  try {
-    const unlockRequestReceipt = Receipt.parse(unlockRequest);
-    const secsFromCreated = Math.floor(Date.now() / 1000) - unlockRequestReceipt.created;
-    const account = await this.db.getAccountBySignerAddr(unlockRequestReceipt.signer);
-
-    if (secsFromCreated > 600) {
-      throw new BadRequest('Receipt is outdated');
+    // check we have enough proxies in the pool.
+    try {
+      await this.checkProxyPoolSize();
+    } catch (e) {
+      // Do nothing on failure - we don't want this to mess with the business logic
+      console.warn(`Proxy pool size check failed: ${e}`);
     }
 
-    if (account.proxyAddr !== '0x') {
-      const receipt = new Receipt(account.proxyAddr)
-                      .unlock(unlockRequestReceipt.newOwner)
-                      .sign(this.unlockPriv);
-      return receipt;
-    }
-
-    throw new BadRequest(`Account with signerAddr = ${unlockRequestReceipt.signer} doesn't exist`);
-  } catch (e) {
-    throw e;
-  }
-};
-
-AccountManager.prototype.addAccount = async function addAccount(accountId,
-  email, recapResponse, origin, sourceIp, refCode) {
-  if (!uuidRegex.test(accountId)) {
-    throw new BadRequest(`passed accountId ${accountId} not uuid v4.`);
-  }
-  if (!emailRegex.test(email)) {
-    throw new BadRequest(`passed email ${email} has invalid format.`);
-  }
-  if (!refRegex.test(refCode)) {
-    throw new BadRequest(`passed refCode ${refCode} has invalid format.`);
-  }
-  const receipt = new Receipt().createConf(accountId).sign(this.sessionPriv);
-
-  const [referral] = await Promise.all([
-    this.db.getRef(refCode),
-    this.recaptcha.verify(recapResponse, sourceIp),
-  ]);
-
-  const proxyAddr = await this.db.getProxy();
-
-  if (referral.allowance < 1) {
-    // 418 - invite limit for this code reached
-    throw new Teapot('referral invite limit reached.');
+    return this.email.sendConfirm(email, receipt, origin);
   }
 
-  if (!uuidRegex.test(referral.account)) {
-    throw new BadRequest(`passed refCode ${refCode} can not be used for signup.`);
-  }
+  async checkProxyPoolSize() {
+    if (this.slackAlert && this.minProxiesAlertThreshold) {
+      const proxiesCount = await this.db.getAvailableProxiesCount();
 
-  await this.db.checkAccountConflict(accountId, email);
-  await Promise.all([
-    this.db.putAccount(
-      accountId,
-      email.toLowerCase(),
-      Array.isArray(referral.account) ? referral.account[0] : referral.account,
-      proxyAddr,
-    ),
-    this.db.deleteProxy(proxyAddr),
-    this.db.setRefAllowance(refCode, referral.allowance - 1),
-  ]);
-
-  // check we have enough proxies in the pool.
-  try {
-    await this.checkProxyPoolSize();
-  } catch (e) {
-    // Do nothing on failure - we don't want this to mess with the business logic
-    console.warn(`Proxy pool size check failed: ${e}`);
-  }
-
-  return this.email.sendConfirm(email, receipt, origin);
-};
-
-AccountManager.prototype.checkProxyPoolSize = function checkProxyPoolSize() {
-  if (!this.slackAlert || !this.minProxiesAlertThreshold) return Promise.resolve();
-
-  return this.db.getAvailableProxiesCount()
-    .then((proxiesCount) => {
-      if (proxiesCount >= this.minProxiesAlertThreshold) return true;
+      if (proxiesCount >= this.minProxiesAlertThreshold) {
+        return true;
+      }
 
       const text = `Only ${proxiesCount} spare account proxies available.\n` +
-                 'Create some more to prevent failing signups.';
+                  'Create some more to prevent failing signups.';
       return this.slackAlert.sendAlert(text);
-    });
-};
+    }
 
-AccountManager.prototype.resetRequest = function resetRequest(email,
-  recapResponse, origin, sourceIp) {
-  const captchaProm = this.recaptcha.verify(recapResponse, sourceIp);
-  return captchaProm.then(
-    () => this.db.getAccountByEmail(email),
-    err => Promise.reject(err),
-  ).then(
-    (account) => {
+    return undefined;
+  }
+
+  async resetRequest(email, recapResponse, origin, sourceIp) {
+    try {
+      await this.recaptcha.verify(recapResponse, sourceIp);
+      const account = await this.db.getAccountByEmail(email);
       const wallet = JSON.parse(account.wallet);
       const receipt = new Receipt().resetConf(account.id, wallet.address).sign(this.sessionPriv);
-      return this.email.sendReset(email, receipt, origin)
-                .then(() => undefined); // do not send any data to client
-    },
-    () => Promise.resolve(),
-  );
-};
+      await this.email.sendReset(email, receipt, origin);
+    } finally {
+      return undefined; // eslint-disable-line
+    }
+  }
 
-AccountManager.prototype.setWallet = function setWallet(sessionReceipt, walletStr, proxyAddr) {
-  // check session
-  const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, 2);
-  // check data
-  const wallet = checkWallet(walletStr);
-  let account;
-  // check pending wallet exists
-  return this.db.getAccount(session.accountId).then((accountRsp) => {
-    account = accountRsp;
+  async setWallet(sessionReceipt, walletStr, proxyAddr, referral) {
+    const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, 2);
+    const wallet = checkWallet(walletStr);
+
+    // check pending wallet exists
+    const account = await this.getAccount(session.accountId);
     if (account.wallet) {
       throw new Conflict('wallet already set.');
     }
     // if the user brings a proxy, put reserved one back into pool
-    let reservedProxy;
-    if (proxyAddr) {
-      reservedProxy = account.proxyAddr;
-      account.proxyAddr = proxyAddr;
-    }
-    // set new wallet
-    const walletProm = this.db.setWallet(session.accountId,
-      walletStr, wallet.address, account.proxyAddr);
-    // create ref code
-    const refCode = Math.floor(Math.random() * 4294967295).toString(16);
-    const refProm = this.db.putRef(refCode, session.accountId, 3);
-    const promises = [walletProm, refProm];
+    const reservedProxy = proxyAddr && account.proxyAddr;
+    account.proxyAddr = proxyAddr || account.proxyAddr;
+
+    const refCode = referral || Math.floor(Math.random() * 4294967295).toString(16);
+    const promises = [
+      this.db.setWallet(session.accountId, walletStr, wallet.address, account.proxyAddr),
+      // create ref code
+      this.db.putRef(refCode, session.accountId, 3),
+    ];
+
     if (reservedProxy) {
       promises.push(this.db.addProxy(reservedProxy));
     }
-    return Promise.all(promises);
-  }).then(() => {
+
+    await Promise.all(promises);
+
     // notify worker to add account to email newsletter
-    this.notify(`WalletCreated::${wallet.address}`, {
+    console.log(JSON.stringify({
       accountId: account.id,
       email: account.email,
+      proxyAddr: account.proxyAddr,
       signerAddr: wallet.address,
+      referral: refCode,
+    }));
+    return this.notify(`WalletCreated::${wallet.address}`, {
+      accountId: account.id,
+      email: account.email,
+      proxyAddr: account.proxyAddr,
+      signerAddr: wallet.address,
+      referral: refCode,
     });
-  });
-};
+  }
 
-AccountManager.prototype.resetWallet = function resetWallet(sessionReceipt, walletStr) {
-  // check session
-  const session = checkSession(sessionReceipt, this.sessionAddr, Type.RESET_CONF, 2);
-  // check data
-  const wallet = checkWallet(walletStr);
-  // check existing wallet
-  let existing;
-  return this.db.getAccount(session.accountId).then((account) => {
-    if (!account.wallet) {
-      throw new Conflict('no existing wallet found.');
-    }
-    existing = JSON.parse(account.wallet);
+  async resetWallet(sessionReceipt, walletStr) {
+    const session = checkSession(sessionReceipt, this.sessionAddr, Type.RESET_CONF, 2);
+
+    const wallet = checkWallet(walletStr);
     if (!isAddress(wallet.address)) {
       throw new BadRequest(`invalid address ${wallet.address} in wallet.`);
     }
+
+    const account = await this.getAccount(session.accountId);
+    if (!account.wallet) {
+      throw new Conflict('no existing wallet found.');
+    }
+
+    const existing = JSON.parse(account.wallet);
     if (existing.address === wallet.address) {
       throw new Conflict('can not reset wallet with same address.');
     }
-    // reset wallet
-    return this.db.setWallet(session.accountId, walletStr, wallet.address, account.proxyAddr);
-  });
-};
 
-AccountManager.prototype.confirmEmail = function confirmEmail(sessionReceipt) {
-  // check session
-  const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, 2);
-  // handle email
-  return this.db.getAccount(session.accountId).then((account) => {
+    // save new wallet
+    await this.db.setWallet(session.accountId, walletStr, wallet.address, account.proxyAddr);
+
+    return this.notify(`WalletUpdated::${wallet.address}`, {
+      accountId: account.id,
+      signerAddr: wallet.address,
+    });
+  }
+
+  async confirmEmail(sessionReceipt) {
+    const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, 2);
+    const account = await this.getAccount(session.accountId);
+
+    // handle email
     if (!account.email) {
       return this.db.updateEmailComplete(session.accountId, account.pendingEmail);
     }
 
     return true;
-  });
-};
+  }
 
-AccountManager.prototype.resendEmail = function resendEmail(sessionReceipt, origin) {
-  // check session
-  const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, -2);
-  // handle email
+  async resendEmail(sessionReceipt, origin) {
+    const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, -2);
 
-  const receipt = new Receipt().createConf(session.accountId).sign(this.sessionPriv);
-  return this.db.getAccount(session.accountId).then((account) => {
+    // handle email
+    const account = await this.getAccount(session.accountId);
     if (!account.email) {
-      this.email.sendConfirm(account.pendingEmail, receipt, origin);
+      const receipt = new Receipt().createConf(session.accountId).sign(this.sessionPriv);
+      return this.email.sendConfirm(account.pendingEmail, receipt, origin);
     }
 
     return true;
-  });
-};
+  }
 
-AccountManager.prototype.notify = function notify(subject, event) {
-  return new Promise((fulfill, reject) => {
-    this.sns.publish({
-      Message: JSON.stringify(event),
-      Subject: subject,
-      TopicArn: this.topicArn,
-    }, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      fulfill({});
+  notify(subject, event) {
+    return new Promise((fulfill, reject) => {
+      this.sns.publish({
+        Message: JSON.stringify(event),
+        Subject: subject,
+        TopicArn: this.topicArn,
+      }, (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        fulfill({});
+      });
     });
-  });
-};
+  }
+}
 
 module.exports = AccountManager;
