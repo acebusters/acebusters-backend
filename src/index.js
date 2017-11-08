@@ -5,6 +5,21 @@ import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 import { EMPTY_ADDR, seatIsEmpty, getNextDealer, now } from './utils';
 
+const calcLeaveExitHand = (helper, hand, receipt) => {
+  if (hand.state !== 'waiting') {
+    const handWillComplete = helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
+    const distribution = (
+      handWillComplete &&
+      helper.calcDistribution(hand.lineup, hand.state, hand.cards, 0)
+    );
+    if (!distribution) {
+      return receipt.handId - 1;
+    }
+  }
+
+  return receipt.handId;
+};
+
 class TableManager {
   constructor(
     db,
@@ -458,9 +473,17 @@ class TableManager {
     }
 
     // set sitout if next hand started after leave receipt
-    const exitHand = receipt.handId;
-    const sitout = 1;
-    return this.db.updateLeave(tableAddr, hand.handId, pos, exitHand, sitout, now());
+    hand.lineup[pos].sitout = 1;
+
+    const exitHand = calcLeaveExitHand(this.helper, hand, receipt);
+    return this.db.updateLeave(
+      tableAddr,
+      hand.handId,
+      pos,
+      exitHand,
+      hand.lineup[pos].sitout,
+      now(),
+    );
   }
 
   netting(tableAddr, handIdStr, nettingSig) {
