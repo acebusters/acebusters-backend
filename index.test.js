@@ -332,6 +332,59 @@ describe('Stream worker HandComplete event', () => {
     }).catch(done);
   });
 
+  it('should reset hand if there is no distribution.', (done) => {
+    const tableAddr = '0xa2decf075b96c8e5858279b31f644501a140e8a7';
+    const event = {
+      Subject: `HandComplete::${tableAddr}`,
+      Message: JSON.stringify({ tableAddr, handId: 2 }),
+    };
+    sinon.stub(contract.getLineup, 'call').yields(null, [
+      new BigNumber(1),
+      [P1_ADDR, P2_ADDR],
+      [babz(500), babz(500)],
+      [babz(0), babz(0)],
+    ]);
+    sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 2,
+      lineup: [{
+        address: P1_ADDR,
+        last: new Receipt(tableAddr).fold(2, babz(200)).sign(P1_PRIV),
+      }, {
+        address: P2_ADDR,
+        last: new Receipt(tableAddr).sitOut(2, babz(500)).sign(P2_PRIV),
+        sitout: 1,
+      }],
+      state: 'turn',
+      deck,
+      dealer: 0,
+    }] });
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    sinon.stub(dynamo, 'putItem').yields(null, {});
+    sinon.stub(sentry, 'captureMessage').yields(null, {});
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, logger);
+    Promise.all(worker.process(event)).then(() => {
+      expect(dynamo.putItem).calledWith({ Item: {
+        tableAddr,
+        handId: 2,
+        deck: sinon.match.any,
+        state: 'waiting',
+        dealer: 0,
+        sb: babz(50).toNumber(),
+        lineup: [{
+          address: P1_ADDR,
+        }, {
+          address: P2_ADDR,
+          sitout: 1,
+        }],
+        changed: sinon.match.any,
+      },
+        TableName: 'sb_cashgame' });
+      done();
+    }).catch(done);
+  });
+
   it('should put broke players into sitout and active players back from sitout.', (done) => {
     const tableAddr = '0xa2decf075b96c8e5858279b31f644501a140e8a7';
     const event = {

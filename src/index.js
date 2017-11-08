@@ -472,6 +472,11 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
   const rakePerMil = 10;
   const winners = this.helper.calcDistribution(hand.lineup,
     hand.state, boardCards, rakePerMil, this.oracleAddr);
+
+  if (!winners) {
+    return null;
+  }
+
   // distribute pots
   const outs = [];
   for (let i = 0; i < hand.lineup.length; i += 1) {
@@ -499,42 +504,35 @@ EventWorker.prototype.calcDistribution = function calcDistribution(tableAddr, ha
   });
 };
 
-EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
-  let prevHand;
-  let lineup;
-  let smallBlind;
-  let balances;
-  const hand = this.db.getLastHand(tableAddr);
-  const table = this.table.getLineup(tableAddr);
-  const sb = this.table.getSmallBlind(tableAddr);
-  return Promise.all([hand, table, sb]).then((rsp) => {
-    prevHand = rsp[0];
-    lineup = rsp[1].lineup;
-    smallBlind = rsp[2];
-    let distProm;
-    if (!prevHand.distribution) {
-      distProm = this.calcDistribution(tableAddr, prevHand);
-    } else {
-      distProm = Promise.resolve(prevHand.distribution);
-    }
-    // return get all old hands
-    const balProm = this.getBalances(tableAddr, lineup, rsp[1].lastHandNetted, prevHand.handId);
-    return Promise.all([balProm, distProm]);
-  }).then((rsp) => {
-    balances = rsp[0];
-    prevHand.distribution = rsp[1];
+EventWorker.prototype.putNextHand = async function putNextHand(tableAddr) {
+  const [{ lineup, lastHandNetted }, smallBlind] = await Promise.all([
+    this.table.getLineup(tableAddr),
+    this.table.getSmallBlind(tableAddr),
+  ]);
 
-    // sum up previous hands
-    for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
-      const distribution = this.rc.get(prevHand.distribution);
-      const outs = distribution ? distribution.outs : [];
-      if (prevHand.lineup[pos].last) {
-        if (typeof outs[pos] === 'undefined') {
-          outs[pos] = new BigNumber(0);
+  try {
+    const prevHand = await this.db.getLastHand(tableAddr);
+
+    // return get all old hands
+    const balances = await this.getBalances(tableAddr, lineup, lastHandNetted, prevHand.handId);
+
+    prevHand.distribution = (
+      prevHand.distribution || await this.calcDistribution(tableAddr, prevHand)
+    );
+
+    if (prevHand.distribution) {
+      // sum up previous hands
+      for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
+        const distribution = this.rc.get(prevHand.distribution);
+        const outs = distribution ? distribution.outs : [];
+        if (prevHand.lineup[pos].last) {
+          if (typeof outs[pos] === 'undefined') {
+            outs[pos] = new BigNumber(0);
+          }
+          const value = this.rc.get(prevHand.lineup[pos].last).amount;
+          const bal = balances[prevHand.lineup[pos].address] || new BigNumber(0);
+          balances[prevHand.lineup[pos].address] = bal.add(outs[pos]).sub(value);
         }
-        const value = this.rc.get(prevHand.lineup[pos].last).amount;
-        const bal = balances[prevHand.lineup[pos].address] || new BigNumber(0);
-        balances[prevHand.lineup[pos].address] = bal.add(outs[pos]).sub(value);
       }
     }
 
@@ -571,48 +569,70 @@ EventWorker.prototype.putNextHand = function putNextHand(tableAddr) {
         }
       }
     }
-    const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
-    const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
-    const deck = shuffle();
-    const changed = now();
-    return this.db.putHand(tableAddr, prevHand.handId + 1,
-      lineup, newDealer, deck, smallBlind, changed);
-  }).then(() => this.logger.log(`NewHand: ${tableAddr}`, {
-    level: 'info',
-    tags: {
+
+    if (prevHand.distribution) {
+      const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
+      const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
+      await this.db.putHand(
+        tableAddr,
+        prevHand.handId + 1,
+        lineup,
+        newDealer,
+        shuffle(), // deck
+        smallBlind,
+        now(), // changed
+      );
+      return this.logger.log(`NewHand: ${tableAddr}`, {
+        level: 'info',
+        tags: {
+          tableAddr,
+          handId: prevHand.handId + 1,
+        },
+        extra: lineup,
+      });
+    }
+
+    await this.db.putHand(
       tableAddr,
-      handId: prevHand.handId + 1,
-    },
-    extra: lineup,
-  }))
-  .catch((error) => {
+      prevHand.handId,
+      lineup,
+      prevHand.dealer,
+      shuffle(), // deck
+      smallBlind,
+      now(), // changed
+    );
+    return this.logger.log(`NewHand: ${tableAddr}`, {
+      level: 'info',
+      tags: {
+        tableAddr,
+        handId: prevHand.handId,
+      },
+      extra: lineup,
+    });
+    }
+
+  } catch (error) {
     if (!error.indexOf || error.indexOf('Not Found') === -1) {
       throw error;
     }
-    const sbProm = this.table.getSmallBlind(tableAddr);
-    const lineupProm = this.table.getLineup(tableAddr);
-    let lastHandNetted;
-    return Promise.all([sbProm, lineupProm]).then((rsp) => {
-      smallBlind = rsp[0];
-      lineup = rsp[1].lineup;
-      lastHandNetted = rsp[1].lastHandNetted;
-      for (let i = 0; i < lineup.length; i += 1) {
-        delete lineup[i].amount;
-        delete lineup[i].exitHand;
-      }
-      const deck = shuffle();
-      const changed = now();
-      return this.db.putHand(tableAddr, rsp[1].lastHandNetted + 1,
-        lineup, 0, deck, smallBlind, changed);
-    }).then(() => this.logger.log(`NewHand: ${tableAddr}`, {
+
+    for (let i = 0; i < lineup.length; i += 1) {
+      delete lineup[i].amount;
+      delete lineup[i].exitHand;
+    }
+    const deck = shuffle();
+    const changed = now();
+    await this.db.putHand(tableAddr, lastHandNetted + 1, lineup, 0, deck, smallBlind, changed);
+
+    return this.logger.log(`NewHand: ${tableAddr}`, {
       level: 'info',
       tags: {
         tableAddr,
         handId: lastHandNetted + 1,
       },
       extra: lineup,
-    }));
-  });
+    });
+  }
 };
 
 module.exports = EventWorker;
