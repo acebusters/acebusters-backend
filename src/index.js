@@ -333,7 +333,7 @@ class AccountManager {
     }
   }
 
-  async setWallet(sessionReceipt, walletStr, proxyAddr, referral) {
+  async setWallet(sessionReceipt, walletStr, proxyAddr) {
     const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, 2);
     const wallet = checkWallet(walletStr);
 
@@ -346,11 +346,10 @@ class AccountManager {
     const reservedProxy = proxyAddr && account.proxyAddr;
     account.proxyAddr = proxyAddr || account.proxyAddr;
 
-    const refCode = referral || Math.floor(Math.random() * 4294967295).toString(16);
     const promises = [
       this.db.setWallet(session.accountId, walletStr, wallet.address, account.proxyAddr),
       // create ref code
-      this.db.putRef(refCode, session.accountId, 3),
+      this.db.putRef(Math.floor(Math.random() * 4294967295).toString(16), session.accountId, 3),
     ];
 
     if (reservedProxy) {
@@ -360,19 +359,12 @@ class AccountManager {
     await Promise.all(promises);
 
     // notify worker to add account to email newsletter
-    console.log(JSON.stringify({
-      accountId: account.id,
-      email: account.email,
-      proxyAddr: account.proxyAddr,
-      signerAddr: wallet.address,
-      referral: refCode,
-    }));
     return this.notify(`WalletCreated::${wallet.address}`, {
       accountId: account.id,
       email: account.email,
       proxyAddr: account.proxyAddr,
       signerAddr: wallet.address,
-      referral: refCode,
+      referral: account.referral,
     });
   }
 

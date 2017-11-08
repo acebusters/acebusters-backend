@@ -320,6 +320,7 @@ describe('Account Manager - set Wallet ', () => {
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
       { Name: 'id', Value: ACCOUNT_ID },
+      { Name: 'referral', Value: ACCOUNT_ID },
       { Name: 'email', Value: 'test@mail.com' },
       { Name: 'proxyAddr', Value: ADDR2 },
     ] });
@@ -328,7 +329,7 @@ describe('Account Manager - set Wallet ', () => {
 
     const receipt = new Receipt().createConf(ACCOUNT_ID).sign(SESS_PRIV);
     const wallet = `{ "address": "${SESS_ADDR}" }`;
-    manager.setWallet(receipt, wallet, undefined, '00000000').then(() => {
+    manager.setWallet(receipt, wallet, undefined).then(() => {
       expect(sdb.getAttributes).calledWith({ DomainName: 'ab-accounts', ItemName: ACCOUNT_ID });
       expect(sdb.putAttributes).calledWith({
         Attributes: [
@@ -349,7 +350,7 @@ describe('Account Manager - set Wallet ', () => {
       });
       expect(sns.publish).callCount(1);
       expect(sns.publish).calledWith({
-        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","proxyAddr":"${ADDR2}","signerAddr":"${SESS_ADDR}","referral":"00000000"}`,
+        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","proxyAddr":"${ADDR2}","signerAddr":"${SESS_ADDR}","referral":"${ACCOUNT_ID}"}`,
         Subject: `WalletCreated::${SESS_ADDR}`,
         TopicArn: 'topicArn',
       });
@@ -361,6 +362,7 @@ describe('Account Manager - set Wallet ', () => {
     sinon.stub(sns, 'publish').yields(null, {});
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
       { Name: 'id', Value: ACCOUNT_ID },
+      { Name: 'referral', Value: ACCOUNT_ID },
       { Name: 'email', Value: 'test@mail.com' },
       { Name: 'proxyAddr', Value: ADDR2 },
     ] });
@@ -398,7 +400,7 @@ describe('Account Manager - set Wallet ', () => {
       });
       expect(sns.publish).callCount(1);
       expect(sns.publish).calledWith({
-        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","proxyAddr":"${ADDR1}","signerAddr":"${SESS_ADDR}","referral":"00000000"}`,
+        Message: `{"accountId":"${ACCOUNT_ID}","email":"test@mail.com","proxyAddr":"${ADDR1}","signerAddr":"${SESS_ADDR}","referral":"${ACCOUNT_ID}"}`,
         Subject: `WalletCreated::${SESS_ADDR}`,
         TopicArn: 'topicArn',
       });
