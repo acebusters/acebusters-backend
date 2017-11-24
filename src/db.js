@@ -322,7 +322,7 @@ Db.prototype.getAvailableProxiesCount = function getAvailableProxiesCount() {
       if (err) {
         return reject(`Error: ${err}`);
       }
-      return fulfill(data.Items ? data.Items[0].Attributes[0].Value : 0);
+      return fulfill(data.Items ? parseInt(data.Items[0].Attributes[0].Value) : 0);
     });
   });
 };
