@@ -609,8 +609,6 @@ EventWorker.prototype.putNextHand = async function putNextHand(tableAddr) {
       },
       extra: lineup,
     });
-    }
-
   } catch (error) {
     if (!error.indexOf || error.indexOf('Not Found') === -1) {
       throw error;
