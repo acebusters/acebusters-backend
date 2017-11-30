@@ -8,12 +8,11 @@ import { EMPTY_ADDR, seatIsEmpty, getNextDealer, now } from './utils';
 const calcLeaveExitHand = (helper, hand, receipt) => {
   if (hand.state !== 'waiting') {
     const handWillComplete = helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
-    const distribution = (
-      handWillComplete &&
-      helper.calcDistribution(hand.lineup, hand.state, hand.cards, 0)
-    );
-    if (!distribution) {
-      return receipt.handId - 1;
+    if (handWillComplete) {
+      const distribution = helper.calcDistribution(hand.lineup, hand.state, hand.cards, 0);
+      if (!distribution) {
+        return receipt.handId - 1;
+      }
     }
   }
 
