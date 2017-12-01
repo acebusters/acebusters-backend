@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import BigNumber from 'bignumber.js';
 import { PokerHelper, Receipt, ReceiptCache } from 'poker-helper';
 
+const delay = (ms, arg) => new Promise(resolve => setTimeout(resolve, ms, arg));
+
 const EMPTY_ADDR = '0x0000000000000000000000000000000000000000';
 
 const NTZ_DECIMAL = new BigNumber(10).pow(12);
@@ -38,7 +40,9 @@ function EventWorker(
   mailer,
   oracle,
   pusher,
+  showdownDelay = 0,
 ) {
+  this.showdownDelay = showdownDelay;
   this.table = table;
   this.db = db;
   if (oraclePriv) {
@@ -512,6 +516,11 @@ EventWorker.prototype.putNextHand = async function putNextHand(tableAddr) {
 
   try {
     const prevHand = await this.db.getLastHand(tableAddr);
+
+    // giving more time for showdown
+    if (prevHand.state === 'showdown') {
+      await delay(this.showdownDelay);
+    }
 
     // return get all old hands
     const balances = await this.getBalances(tableAddr, lineup, lastHandNetted, prevHand.handId);

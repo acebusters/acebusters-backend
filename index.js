@@ -60,6 +60,7 @@ exports.handler = function handler(event, context, callback) {
       mailer,
       lambda,
       pusher,
+      2000,
     );
     for (let i = 0; i < event.Records.length; i += 1) {
       requests = requests.concat(worker.process(event.Records[i].Sns));
