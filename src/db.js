@@ -206,6 +206,30 @@ Db.prototype.getRef = function getRef(refCode) {
   });
 };
 
+Db.prototype.getRecentRefs = function getRecentRefs(accountId, since) {
+  return new Promise((fulfill, reject) => {
+    this.sdb.select({
+      SelectExpression: `select * from \`${this.domain}\` where referral = "${accountId}"`,
+    }, (err, data) => {
+      if (err) {
+        return reject(`Error: ${err}`);
+      }
+      const rsp = [];
+      for(let i = 0; i < data.Items.length; i++) {
+        let obj = transform(data.Items[i].Attributes);
+        if (Date.parse(obj.created) > since) {
+          obj.id = data.Items[i].Name;
+          obj.email = obj.email.substring(0, obj.email.indexOf('@') + 1);
+          delete obj.wallet;
+          delete obj.referral;
+          rsp.push(obj);
+        }
+      };
+      return fulfill(rsp);
+    });
+  });
+}
+
 Db.prototype.getRefsByAccount = function getRefsByAccount(accountId) {
   return new Promise((fulfill, reject) => {
     this.sdb.select({

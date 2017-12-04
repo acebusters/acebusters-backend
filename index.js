@@ -113,6 +113,8 @@ exports.handler = function handler(event, context, callback) {
       );
     } else if (path.indexOf('forward') > -1) {
       handleRequest = manager.forward(event.forwardReceipt, event.resetConfReceipt);
+    } else if (path.indexOf('recentRefs') > -1) {
+      handleRequest = manager.recentRefs(event.refCode);
     } else if (path.indexOf('resend') > -1) {
       handleRequest = manager.resendEmail(event.sessionReceipt, event.origin);
     }

@@ -420,6 +420,13 @@ class AccountManager {
     return true;
   }
 
+  async recentRefs(refCode) {
+    const lastSevenDays = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const ref = await this.db.getRef(refCode);
+    const list = await this.db.getRecentRefs(ref.account, lastSevenDays);
+    return list;
+  }
+
   notify(subject, event) {
     return new Promise((fulfill, reject) => {
       this.sns.publish({

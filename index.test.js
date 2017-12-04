@@ -1,4 +1,4 @@
-import chai, { expect } from 'chai';
+import chai, { expect, assert } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
 import { it, describe, afterEach } from 'mocha';
@@ -755,6 +755,68 @@ describe('Transaction forwarding', () => {
     if (contract.getOwner.call.restore) contract.getOwner.call.restore();
     if (contract.isLocked.call.restore) contract.isLocked.call.restore();
     if (sqs.sendMessage.restore) sqs.sendMessage.restore();
+    if (sdb.select.restore) sdb.select.restore();
+  });
+});
+
+
+describe('Account Manager - query recent referrals', () => {
+
+  it('should allow to query', (done) => {
+    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
+      { Name: 'account', Value: ACCOUNT_ID },
+    ] });
+    sinon.stub(sdb, 'select').yields(null, { Items: [{ Name: '2345',
+      Attributes: [
+        { Name: 'email', Value: TEST_MAIL },
+        { Name: 'created', Value: '2017-12-01T14:27:26.502Z' },
+        { Name: 'proxyAddr', Value: ADDR1 },
+        { Name: 'wallet', Value: `{ "address": "${SESS_ADDR}" }` },
+      ],
+    }, { Name: '1234',
+      Attributes: [
+        { Name: 'email', Value: TEST_MAIL },
+        { Name: 'created', Value: '2017-11-01T14:27:26.502Z' },
+        { Name: 'proxyAddr', Value: ADDR1 },
+        { Name: 'wallet', Value: `{ "address": "${SESS_ADDR}" }` },
+      ],
+    }] });
+    const manager = new AccountManager(new Db(sdb));
+
+    manager.recentRefs('12345678').then((rsp) => {
+      assert.lengthOf(rsp, 1, 'not all results returned');
+      done();
+    }).catch(done);
+  });
+
+  it('should not fail on empty set', (done) => {
+    sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
+      { Name: 'account', Value: ACCOUNT_ID },
+    ] });
+    sinon.stub(sdb, 'select').yields(null, { Items: [] });
+    const manager = new AccountManager(new Db(sdb));
+
+    manager.recentRefs('12345678').then((rsp) => {
+      assert.lengthOf(rsp, 0, 'empty array');
+      done();
+    }).catch(done);
+  });
+
+  it('should fail on non-existing account', async () => {
+    sinon.stub(sdb, 'getAttributes').yields(null, {});
+    const manager = new AccountManager(new Db(sdb));
+
+    try {
+      await manager.recentRefs('12345678');
+    } catch (err) {
+      expect(err.message).to.contain('Not Found: ');
+      return;
+    }
+    throw new Error('should have thrown');
+  });
+
+  afterEach(() => {
+    if (sdb.getAttributes.restore) sdb.getAttributes.restore();
     if (sdb.select.restore) sdb.select.restore();
   });
 });
