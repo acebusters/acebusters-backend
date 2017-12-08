@@ -20,16 +20,6 @@ export function now(secs = 0) {
 }
 
 export const calcLeaveExitHand = (helper, hand, receipt) => {
-  if (hand.state !== 'waiting') {
-    const handWillComplete = helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
-    if (handWillComplete) {
-      const distribution = helper.calcDistribution(hand.lineup, hand.state, hand.cards, 0);
-      if (!distribution) {
-        return receipt.handId - 1;
-      }
-    }
-  }
-
   return receipt.handId;
 };
 

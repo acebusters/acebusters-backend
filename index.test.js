@@ -2226,38 +2226,6 @@ describe('Oracle leave', () => {
     }).catch(done);
   });
 
-  it('should leave in previous hand, if this hand will end without distribution.', (done) => {
-    const leave = new Receipt(tableAddr).leave(3, P1_ADDR).sign(P1_PRIV);
-    const lineup = [{
-      address: P1_ADDR,
-      last: new Receipt(tableAddr).bet(0, babz(5)).sign(P1_PRIV),
-    }, {
-      address: P2_ADDR,
-      last: new Receipt(tableAddr).fold(0, babz(5)).sign(P2_PRIV),
-    }];
-
-    sinon.stub(dynamo, 'query').yields(null, { Items: [{
-      handId: 3,
-      state: 'flop',
-      lineup,
-    }] });
-    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
-
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, timeoutPeriod);
-
-    oracle.leave(tableAddr, leave).then(() => {
-      const seat = {
-        address: P1_ADDR,
-        exitHand: 2,
-        sitout: 1,
-      };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':eh', seat.exitHand)));
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', seat.sitout)));
-      done();
-    }).catch(done);
-  });
-
   afterEach(() => {
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();

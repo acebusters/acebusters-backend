@@ -52,7 +52,7 @@
     "buffer-v6-polyfill": "^1.0.3",
     "dynamodb-doc": "^1.0.0",
     "ethereumjs-util": "^4.5.0",
-    "poker-helper": "^0.6.10",
+    "poker-helper": "^7.1.0",
     "pusher": "^1.5.1",
     "raven": "^1.2.1",
     "request": "^2.83.0",
