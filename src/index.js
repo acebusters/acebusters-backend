@@ -3,21 +3,17 @@ import request from 'request';
 import ethUtil from 'ethereumjs-util';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
-import { EMPTY_ADDR, seatIsEmpty, getNextDealer, now } from './utils';
-
-const calcLeaveExitHand = (helper, hand, receipt) => {
-  if (hand.state !== 'waiting') {
-    const handWillComplete = helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
-    if (handWillComplete) {
-      const distribution = helper.calcDistribution(hand.lineup, hand.state, hand.cards, 0);
-      if (!distribution) {
-        return receipt.handId - 1;
-      }
-    }
-  }
-
-  return receipt.handId;
-};
+import {
+  EMPTY_ADDR,
+  seatIsEmpty,
+  getNextDealer,
+  now,
+  getPrevReceipt,
+  validateCheck,
+  getIsTurn,
+  calcLeaveExitHand,
+  checks,
+} from './utils';
 
 class TableManager {
   constructor(
@@ -139,163 +135,133 @@ class TableManager {
     return this.db.updateChanged(tableAddr, hand.handId, now());
   }
 
-  pay(tableAddr, receiptHash) {
+  async pay(tableAddr, receiptHash) {
     const receipt = this.rc.get(receiptHash);
     const { handId } = receipt;
-    let hand;
-    let turn;
-    let dist;
-    let deck;
-    let prevReceipt;
-    let pos;
-    return this.db.getLastHand(tableAddr).then((_hand) => {
-      hand = _hand;
-      deck = _hand.deck;
-      if (hand.handId !== handId) {
-        throw new BadRequest(`unknown handId ${handId}, currently playing ${hand.handId}`);
-      }
-      // check hand not finished yet
-      if (hand.distribution !== undefined) {
-        throw new BadRequest(`hand ${hand.handId} has distribution already.`);
-      }
-      // check signer in lineup
-      pos = this.helper.inLineup(receipt.signer, hand.lineup);
-      if (pos < 0) {
-        throw new Forbidden(`address ${receipt.signer} not in lineup.`);
-      }
-      // check signer not leaving
-      if (hand.lineup[pos].exitHand && hand.lineup[pos].exitHand < hand.handId) {
-        throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} exceeded.`);
-      }
-      // check receiptHash not reused
-      if (hand.lineup[pos].last === receiptHash) {
-        throw new Unauthorized('you can not reuse receipts.');
-      }
+    const hand = await this.db.getLastHand(tableAddr);
 
-      // are we ready to start dealing?
-      const activeCount = this.helper.countActivePlayers(hand.lineup, hand.state);
-      if (hand.state === 'waiting' && activeCount < 2) {
-        if ((activeCount === 0 || !hand.lineup[pos].sitout) && receipt.type !== Type.SIT_OUT) {
-          throw new BadRequest('not enough players to start game.');
+    if (hand.handId !== handId) {
+      throw new BadRequest(`unknown handId ${handId}, currently playing ${hand.handId}`);
+    }
+
+    // check hand not finished yet
+    if (hand.distribution !== undefined) {
+      throw new BadRequest(`hand ${hand.handId} has distribution already.`);
+    }
+
+    // check signer in lineup
+    const pos = this.helper.inLineup(receipt.signer, hand.lineup);
+    if (pos < 0) {
+      throw new Forbidden(`address ${receipt.signer} not in lineup.`);
+    }
+
+    // check signer not leaving
+    if (hand.lineup[pos].exitHand && hand.lineup[pos].exitHand < hand.handId) {
+      throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} exceeded.`);
+    }
+
+    // check receiptHash not reused
+    if (hand.lineup[pos].last === receiptHash) {
+      throw new Unauthorized('you can not reuse receipts.');
+    }
+
+    // are we ready to start dealing?
+    const activeCount = this.helper.countActivePlayers(hand.lineup, hand.state);
+    if (hand.state === 'waiting' && activeCount < 2) {
+      if ((activeCount === 0 || !hand.lineup[pos].sitout) && receipt.type !== Type.SIT_OUT) {
+        throw new BadRequest('not enough players to start game.');
+      }
+    }
+
+    // make sure to replace receipts in right order
+    const prevReceipt = getPrevReceipt(this.helper, this.rc, receipt, hand, pos);
+    if (prevReceipt) {
+      if (checks.indexOf(receipt.type) > -1 && !receipt.amount.eq(prevReceipt.amount)) {
+        throw new BadRequest('check should not raise.');
+      }
+    }
+
+    if (checks.indexOf(receipt.type) > -1) {
+      validateCheck(hand, receipt);
+    }
+
+    const turn = getIsTurn(this.helper, hand, receipt);
+    if (receipt.type === Type.SIT_OUT) {
+      if (hand.lineup[pos].sitout) {
+        if (hand.state === 'waiting' || receipt.amount.gt(0)) {
+          delete hand.lineup[pos].sitout;
+        } else {
+          throw new BadRequest('have to pay to return after waiting.');
+        }
+      } else {
+        hand.lineup[pos].sitout = now();
+      }
+    }
+
+    if (receipt.type === Type.BET) {
+      if (hand.state === 'waiting') {
+        if (!turn && activeCount > 1) {
+          throw new BadRequest('not your turn to pay small blind.');
+        }
+        // check if receipt is small blind?
+        if (!receipt.amount.eq(hand.sb)) {
+          throw new BadRequest('small blind not valid.');
         }
       }
+    }
 
-      // make sure to replace receipts in right order
-      if (hand.lineup[pos].last) {
-        prevReceipt = this.rc.get(hand.lineup[pos].last);
-        if (prevReceipt.type === Type.FOLD) {
-          throw new BadRequest('no bet after fold.');
-        }
-
-        if (prevReceipt.type === Type.SIT_OUT) {
-          if (hand.state !== 'waiting' && hand.state !== 'dealing') {
-            if (receipt.type === Type.SIT_OUT && typeof hand.lineup[pos].sitout === 'number') {
-              throw new BadRequest('can not toggle sitout in same hand.');
-            }
-            if (receipt.amount > 0 && prevReceipt.amount > 0) {
-              throw new BadRequest('wait for next hand.');
-            }
-          }
-        }
-
-        // ToDo: move it outside of the method
-        const checks = [
-          Type.CHECK_FLOP,
-          Type.CHECK_PRE,
-          Type.CHECK_RIVER,
-          Type.CHECK_TURN,
-        ];
-
-        if (checks.indexOf(receipt.type) > -1 && !receipt.amount.eq(prevReceipt.amount)) {
-          throw new BadRequest('check should not raise.');
-        }
-      }
-
-      if (receipt.type === Type.CHECK_PRE && hand.state !== 'preflop') {
-        throw new BadRequest('check only during preflop.');
-      }
-
-      if (receipt.type === Type.CHECK_FLOP && hand.state !== 'flop') {
-        throw new BadRequest('checkFlop only during flop.');
-      }
-
-      if (receipt.type === Type.CHECK_TURN && hand.state !== 'turn') {
-        throw new BadRequest('checkTurn only during turn.');
-      }
-
-      if (receipt.type === Type.CHECK_RIVER && hand.state !== 'river') {
-        throw new BadRequest('checkRiver only during river.');
-      }
-      try {
-        turn = this.helper.isTurn(
+    const recAmount = receipt.amount;
+    if (hand.state === 'dealing') {
+      // check if receipt is big blind?
+      if (turn && receipt.type === Type.BET) {
+        const bigBlindPos = this.helper.getBbPos(hand.lineup, hand.dealer, hand.state);
+        const nextToAct = this.helper.getWhosTurn(
           hand.lineup,
           hand.dealer,
           hand.state,
           hand.sb * 2,
-          receipt.signer,
         );
-      } catch (err) {
-        // we can not determine turn
-      }
-      if (receipt.type === Type.SIT_OUT) {
-        if (hand.lineup[pos].sitout) {
-          if (hand.state === 'waiting' || receipt.amount.gt(0)) {
-            delete hand.lineup[pos].sitout;
-          } else {
-            throw new BadRequest('have to pay to return after waiting.');
-          }
-        } else {
-          hand.lineup[pos].sitout = now();
-        }
-      }
-      if (receipt.type === Type.BET) {
-        if (hand.state === 'waiting') {
-          if (!turn && activeCount > 1) {
-            throw new BadRequest('not your turn to pay small blind.');
-          }
-          // check if receipt is small blind?
-          if (!receipt.amount.eq(hand.sb)) {
-            throw new BadRequest('small blind not valid.');
+        if (nextToAct === bigBlindPos) {
+          if (!recAmount.eq(hand.sb * 2)) {
+            throw new BadRequest('big blind not valid.');
           }
         }
       }
-      const recAmount = receipt.amount;
-      if (hand.state === 'dealing') {
-        // check if receipt is big blind?
-        if (turn && receipt.type === Type.BET) {
-          const bigBlindPos = this.helper.getBbPos(hand.lineup, hand.dealer, hand.state);
-          const nextToAct = this.helper.getWhosTurn(hand.lineup,
-            hand.dealer, hand.state, hand.sb * 2);
-          if (nextToAct === bigBlindPos) {
-            if (!recAmount.eq(hand.sb * 2)) {
-              throw new BadRequest('big blind not valid.');
-            }
-          }
-        }
-      }
-      if ((prevReceipt && prevReceipt.amount.lt(recAmount)) || (!prevReceipt && recAmount.gt(0))) {
-        // calc bal
-        return this.calcBalance(tableAddr, pos, receipt).then((balLeft) => {
-          hand.lineup[pos].last = receiptHash;
-          if (balLeft === 0) {
-            hand.lineup[pos].sitout = 'allin';
-          } else if (hand.state !== 'waiting' && hand.state !== 'dealing' &&
-              receipt.type === Type.BET) {
-            // check bet not too small
-            const max = this.helper.getMaxBet(hand.lineup, hand.state);
-            if (receipt.amount < max.amount) {
-              throw new Unauthorized(`you have to match or raise ${max.amount}`);
-            }
-          }
-          return this.updateState(tableAddr, hand, pos);
-        });
-      }
+    }
+
+    if ((prevReceipt && prevReceipt.amount.lt(recAmount)) || (!prevReceipt && recAmount.gt(0))) {
+      // calc bal
+      const balLeft = await this.calcBalance(tableAddr, pos, receipt);
       hand.lineup[pos].last = receiptHash;
-      return this.updateState(tableAddr, hand, pos);
-    }).then(() => {
-      const rsp = deck ? { cards: [deck[pos * 2], deck[(pos * 2) + 1]] } : {};
-      return dist ? { distribution: dist } : rsp;
-    });
+      if (balLeft === 0) {
+        hand.lineup[pos].sitout = 'allin';
+      } else if (
+        hand.state !== 'waiting' &&
+        hand.state !== 'dealing' &&
+        receipt.type === Type.BET
+      ) {
+        // check bet not too small
+        const max = this.helper.getMaxBet(hand.lineup, hand.state);
+        if (receipt.amount < max.amount) {
+          throw new Unauthorized(`you have to match or raise ${max.amount}`);
+        }
+      }
+      await this.updateState(tableAddr, hand, pos);
+    } else {
+      hand.lineup[pos].last = receiptHash;
+      await this.updateState(tableAddr, hand, pos);
+    }
+
+    const response = {};
+    if (hand.distribution) {
+      response.distribution = hand.distribution;
+    }
+
+    if (hand.deck) {
+      response.cards = [hand.deck[pos * 2], hand.deck[(pos * 2) + 1]];
+    }
+
+    return response;
   }
 
   updateState(tableAddr, handParam, pos) {
