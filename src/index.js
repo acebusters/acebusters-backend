@@ -579,33 +579,13 @@ EventWorker.prototype.putNextHand = async function putNextHand(tableAddr) {
       }
     }
 
-    if (prevHand.distribution) {
-      const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
-      const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
-      await this.db.putHand(
-        tableAddr,
-        prevHand.handId + 1,
-        lineup,
-        newDealer,
-        shuffle(), // deck
-        smallBlind,
-        now(), // changed
-      );
-      return this.logger.log(`NewHand: ${tableAddr}`, {
-        level: 'info',
-        tags: {
-          tableAddr,
-          handId: prevHand.handId + 1,
-        },
-        extra: lineup,
-      });
-    }
-
+    const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
+    const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
     await this.db.putHand(
       tableAddr,
-      prevHand.handId,
+      prevHand.handId + 1,
       lineup,
-      prevHand.dealer,
+      newDealer,
       shuffle(), // deck
       smallBlind,
       now(), // changed
@@ -614,7 +594,7 @@ EventWorker.prototype.putNextHand = async function putNextHand(tableAddr) {
       level: 'info',
       tags: {
         tableAddr,
-        handId: prevHand.handId,
+        handId: prevHand.handId + 1,
       },
       extra: lineup,
     });
