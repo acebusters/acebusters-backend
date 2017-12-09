@@ -769,14 +769,14 @@ describe('Account Manager - query recent referrals', () => {
     sinon.stub(sdb, 'select').yields(null, { Items: [{ Name: '2345',
       Attributes: [
         { Name: 'email', Value: TEST_MAIL },
-        { Name: 'created', Value: '2017-12-01T14:27:26.502Z' },
+        { Name: 'created', Value: new Date(Date.now() - (8 * 24 * 60 * 60 * 1000)).toString() },
         { Name: 'proxyAddr', Value: ADDR1 },
         { Name: 'wallet', Value: `{ "address": "${SESS_ADDR}" }` },
       ],
     }, { Name: '1234',
       Attributes: [
         { Name: 'email', Value: TEST_MAIL },
-        { Name: 'created', Value: '2017-11-01T14:27:26.502Z' },
+        { Name: 'created', Value: new Date(Date.now() - (1 * 24 * 60 * 60 * 1000)).toString() },
         { Name: 'proxyAddr', Value: ADDR1 },
         { Name: 'wallet', Value: `{ "address": "${SESS_ADDR}" }` },
       ],
