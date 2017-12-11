@@ -4,6 +4,7 @@ import Web3 from 'web3';
 import Raven from 'raven';
 
 import Dynamo from './src/dynamo';
+import Db from './src/db';
 import ScanManager from './src/scanner';
 import Table from './src/tableContract';
 import Factory from './src/factoryContract';
@@ -11,6 +12,8 @@ import Logger from './src/logger';
 
 
 let web3Provider;
+const simpledb = new AWS.SimpleDB();
+const cloudwatch = new AWS.CloudWatch();
 let dynamo;
 
 exports.handler = function handler(event, context, callback) {
@@ -32,6 +35,11 @@ exports.handler = function handler(event, context, callback) {
   const factoryAddr = process.env.FACTORY_ADDR;
   const topicArn = process.env.TOPIC_ARN;
   const tableName = process.env.TABLE_NAME;
+  const proxyTable = process.env.PROXIES_TABLE;
+  let wallets = process.env.WALLET_ADDR_LIST;
+  if (wallets) {
+    wallets = wallets.split(',');
+  }
 
   const manager = new ScanManager(
     new Factory(web3, factoryAddr),
@@ -40,9 +48,12 @@ exports.handler = function handler(event, context, callback) {
     new AWS.SNS(),
     logger,
     topicArn,
+    web3,
+    cloudwatch,
+    new Db(simpledb, proxyTable),
   );
 
-  manager.scan()
+  manager.scan(wallets)
     .then(data => callback(null, data))
     .catch(err => logger.exception(err).then(callback));
 };

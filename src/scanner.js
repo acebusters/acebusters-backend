@@ -1,22 +1,83 @@
 const P_EMPTY = '0x0000000000000000000000000000000000000000';
 
 class ScanManager {
-  constructor(factory, table, dynamo, sns, logger, topicArn) {
+  constructor(factory, table, dynamo, sns, logger, topicArn, web3, cloudwatch, sdb) {
     this.factory = factory;
     this.table = table;
     this.dynamo = dynamo;
     this.sns = sns;
     this.logger = logger;
     this.topicArn = topicArn;
+    this.web3 = web3;
+    this.cloudwatch = cloudwatch;
+    this.sdb = sdb;
   }
 
-  async scan() {
+  async scan(wallets) {
     const tables = await this.factory.getTables();
     if (!tables || tables.length === 0) {
       this.logger.log('no contracts to scan');
     }
 
-    return Promise.all(tables.map(this.handleTable.bind(this)));
+    const promises = tables.map(this.handleTable.bind(this));
+    // check proxy pool
+    if (this.sdb) {
+      promises.push(this.checkPool());
+    }
+    // check wallet balances
+    if (wallets) {
+      promises.push(wallets.map(this.checkBalance.bind(this)));
+    }
+    return Promise.all(promises);
+  }
+
+  checkPool() {
+    return new Promise((resolve, reject) => {
+      this.sdb.getAvailableProxiesCount().then((proxiesCount) => {
+        const metric = {
+          MetricData: [{
+            MetricName: this.sdb.getTableName(),
+            Dimensions: [{ Name: 'Proxies', Value: 'Count' }],
+            Timestamp: new Date(),
+            Unit: 'Count',
+            Value: proxiesCount,
+          }],
+          Namespace: 'Acebusters',
+        };
+        this.cloudwatch.putMetricData(metric, (error, data) => {
+          if (error) {
+            return reject(error);
+          }
+          return resolve(data);
+        });
+      });
+    });
+  }
+
+  async checkBalance(walletAddr) {
+    this.web3.eth.getBalance(walletAddr, (err, wei) => {
+      if (err) {
+        this.logger.log('balanceError', { tags: { walletAddr }, extra: err });
+      } else {
+        const metric = {
+          MetricData: [{
+            MetricName: walletAddr,
+            Dimensions: [{ Name: 'Wallet Balance', Value: 'Ether' }],
+            Timestamp: new Date(),
+            Unit: 'Count',
+            Value: this.web3.fromWei(wei, 'ether').toNumber(),
+          }],
+          Namespace: 'Acebusters',
+        };
+        this.cloudwatch.putMetricData(metric, (error, data) => {
+          if (err) {
+            this.logger.log('metricError', { tags: { walletAddr }, extra: error });
+            return error;
+          }
+          return data;
+        });
+      }
+    });
   }
 
   async handleTable(tableAddr) {

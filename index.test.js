@@ -6,6 +6,7 @@ import BigNumber from 'bignumber.js';
 
 import ScanManager from './src/scanner';
 import Dynamo from './src/dynamo';
+import Db from './src/db';
 import Table from './src/tableContract';
 import Logger from './src/logger';
 import Factory from './src/factoryContract';
@@ -22,8 +23,16 @@ const dynamo = {
   query() {},
 };
 
+const sdb = {
+  select() {},
+};
+
 const sns = {
   publish() {},
+};
+
+const cloudwatch = {
+  putMetricData() {},
 };
 
 const contract = {
@@ -37,7 +46,11 @@ const contract = {
 const web3 = { eth: {
   contract() {},
   at() {},
-} };
+  getBalance() {},
+},
+  fromWei(number) {
+    return number.dividedBy(1000000000000000000);
+  } };
 
 const sentry = {
   captureMessage() {},
@@ -64,6 +77,7 @@ describe('Interval Scanner', () => {
     sinon.stub(contract.lastNettingRequestHandId, 'call').yields(null, new BigNumber(10));
     sinon.stub(contract.lastNettingRequestTime, 'call').yields(null, new BigNumber(now));
     sinon.stub(sentry, 'captureMessage').yields(null, {});
+    sinon.stub(cloudwatch, 'putMetricData').yields(null, {});
 
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), null, sns, logger, topicArn);
@@ -108,8 +122,7 @@ describe('Interval Scanner', () => {
     const manager = new ScanManager(new Factory(web3, factoryAddr),
       new Table(web3), null, sns, logger, topicArn);
 
-    manager.scan().then((rsp) => {
-      expect(rsp.length).to.eql(2);
+    manager.scan().then(() => {
       expect(sentry.captureMessage).callCount(0);
       expect(sns.publish).callCount(0);
       done();
@@ -220,11 +233,61 @@ describe('Interval Scanner', () => {
     }).catch(done);
   });
 
+  it('should record proxy pool size', (done) => {
+    sinon.stub(contract.getTables, 'call').yields(null, []);
+    sinon.stub(sdb, 'select').yields(null, { Items: [{ Attributes: [{ Value: 3 }] }] });
+    sinon.stub(cloudwatch, 'putMetricData').yields(null, {});
+
+    const manager = new ScanManager(new Factory(web3, factoryAddr),
+      new Table(web3), null, sns, logger, topicArn, web3, cloudwatch, new Db(sdb, 'st-proxies'));
+
+    manager.scan().then(() => {
+      expect(cloudwatch.putMetricData).callCount(1);
+      expect(cloudwatch.putMetricData).calledWith({
+        MetricData: [{
+          MetricName: 'st-proxies',
+          Dimensions: [{ Name: 'Proxies', Value: 'Count' }],
+          Timestamp: sinon.match.any,
+          Unit: 'Count',
+          Value: 3,
+        }],
+        Namespace: 'Acebusters',
+      });
+      done();
+    }).catch(done);
+  });
+
+  it('should record wallet balance', (done) => {
+    const wallets = '0xf3beac30c498d9e26865f34fcaa57dbb935b0d74,0xe10f3d125e5f4c753a6456fc37123cf17c6900f2'.split(',');
+    sinon.stub(contract.getTables, 'call').yields(null, []);
+    sinon.stub(cloudwatch, 'putMetricData').yields(null, {});
+    sinon.stub(web3.eth, 'getBalance').yields(null, new BigNumber('5000000000000000000000'));
+
+    const manager = new ScanManager(new Factory(web3, factoryAddr),
+      new Table(web3), null, sns, logger, topicArn, web3, cloudwatch);
+
+    manager.scan(wallets).then(() => {
+      expect(cloudwatch.putMetricData).callCount(2);
+      expect(cloudwatch.putMetricData).calledWith({
+        MetricData: [{
+          MetricName: wallets[0],
+          Dimensions: [{ Name: 'Wallet Balance', Value: 'Ether' }],
+          Timestamp: sinon.match.any,
+          Unit: 'Count',
+          Value: 5000,
+        }],
+        Namespace: 'Acebusters',
+      });
+      done();
+    }).catch(done);
+  });
+
   afterEach(() => {
     if (sns.publish.restore) sns.publish.restore();
     if (contract.getTables.call.restore) contract.getTables.call.restore();
     if (contract.lastHandNetted.call.restore) { contract.lastHandNetted.call.restore(); }
     if (contract.getLineup.call.restore) { contract.getLineup.call.restore(); }
+    if (cloudwatch.putMetricData.restore) { cloudwatch.putMetricData.restore(); }
     if (contract.lastNettingRequestHandId.call.restore) {
       contract.lastNettingRequestHandId.call.restore();
     }
