@@ -41,7 +41,7 @@ exports.handler = function handler(event, context, callback) {
   const accountTable = process.env.ACCOUNT_TABLE;
   const refTable = process.env.REF_TABLE;
   const proxyTable = process.env.PROXIES_TABLE;
-  const minProxiesAlertThreshold = process.env.SLACK_ALERT_MIN_PROXIES_THRESHOLD ? parseInt(process.env.SLACK_ALERT_MIN_PROXIES_THRESHOLD) : 3;
+  const minProxiesAlertThreshold = Number(process.env.SLACK_ALERT_MIN_PROXIES_THRESHOLD || 3);
   const slackAlertUrl = process.env.SLACK_ALERT_URL;
   const slackAlertChannel = process.env.SLACK_ALERT_CHANNEL;
 
@@ -116,7 +116,7 @@ exports.handler = function handler(event, context, callback) {
     } else if (path.indexOf('recentRefs') > -1) {
       handleRequest = manager.recentRefs(event.refCode);
     } else if (path.indexOf('resend') > -1) {
-      handleRequest = manager.resendEmail(event.sessionReceipt, event.origin);
+      handleRequest = manager.resendEmail(event.email, event.origin);
     }
     if (typeof handleRequest === 'undefined') {
       handleRequest = Promise.reject(`Not Found: unexpected path: ${path}`);

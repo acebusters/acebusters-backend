@@ -231,6 +231,7 @@ describe('Account Manager - add account', () => {
         expect(sdb.putAttributes).calledWith({
           Attributes: [
             { Name: 'created', Value: sinon.match.any, Replace: true },
+            { Name: 'updated', Value: sinon.match.any, Replace: true },
             { Name: 'pendingEmail', Value: TEST_MAIL, Replace: true },
             { Name: 'referral', Value: ACCOUNT_ID, Replace: true },
             { Name: 'proxyAddr', Value: ADDR2, Replace: true },
@@ -335,6 +336,7 @@ describe('Account Manager - set Wallet ', () => {
         Attributes: [
           { Name: 'wallet', Replace: true, Value: wallet },
           { Name: 'signerAddr', Replace: true, Value: SESS_ADDR },
+          { Name: 'updated', Replace: true, Value: sinon.match.any },
           { Name: 'proxyAddr', Replace: true, Value: ADDR2 },
         ],
         DomainName: 'ab-accounts',
@@ -378,6 +380,7 @@ describe('Account Manager - set Wallet ', () => {
         Attributes: [
           { Name: 'wallet', Replace: true, Value: wallet },
           { Name: 'signerAddr', Replace: true, Value: SESS_ADDR },
+          { Name: 'updated', Replace: true, Value: sinon.match.any },
           { Name: 'proxyAddr', Replace: true, Value: ADDR1 },
         ],
         DomainName: 'ab-accounts',
@@ -449,6 +452,7 @@ describe('Account Manager - reset Wallet', () => {
         Attributes: [
           { Name: 'wallet', Replace: true, Value: wallet },
           { Name: 'signerAddr', Replace: true, Value: SESS_ADDR },
+          { Name: 'updated', Replace: true, Value: sinon.match.any },
           { Name: 'proxyAddr', Replace: true, Value: ADDR2 },
         ],
         DomainName: 'ab-accounts',
@@ -492,6 +496,7 @@ describe('Account Manager - confirm email', () => {
     expect(sdb.putAttributes).calledWith({
       Attributes: [
         { Name: 'email', Replace: true, Value: TEST_MAIL },
+        { Name: 'updated', Replace: true, Value: sinon.match.any },
       ],
       DomainName: 'ab-accounts',
       ItemName: ACCOUNT_ID,
@@ -761,7 +766,6 @@ describe('Transaction forwarding', () => {
 
 
 describe('Account Manager - query recent referrals', () => {
-
   it('should allow to query', (done) => {
     sinon.stub(sdb, 'getAttributes').yields(null, { Attributes: [
       { Name: 'account', Value: ACCOUNT_ID },

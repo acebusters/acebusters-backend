@@ -112,6 +112,10 @@ Db.prototype.getAccountByEmail = function getAccountByEmail(email) {
   return this.getAccountWithCondition(`email = "${email.toLowerCase()}"`);
 };
 
+Db.prototype.getAccountByPendingEmail = function getAccountByPendingEmail(email) {
+  return this.getAccountWithCondition(`pendingEmail = "${email.toLowerCase()}"`);
+};
+
 Db.prototype.getAccountBySignerAddr = function getAccountBySignerAddr(signerAddr) {
   return this.getAccountWithCondition(`signerAddr = "${signerAddr}"`);
 };
@@ -123,6 +127,7 @@ Db.prototype.putAccount = function putAccount(accountId, email, referral, proxyA
       ItemName: accountId,
       Attributes: [
         { Name: 'created', Value: new Date().toString(), Replace: true },
+        { Name: 'updated', Value: new Date().toString(), Replace: true },
         { Name: 'pendingEmail', Value: email, Replace: true },
         { Name: 'referral', Value: referral, Replace: true },
         { Name: 'proxyAddr', Value: proxyAddr, Replace: true },
@@ -144,6 +149,7 @@ Db.prototype.setWallet = function setWallet(accountId, wallet, signerAddr, proxy
       Attributes: [
         { Name: 'wallet', Value: wallet, Replace: true },
         { Name: 'signerAddr', Value: signerAddr, Replace: true },
+        { Name: 'updated', Value: new Date().toString(), Replace: true },
         { Name: 'proxyAddr', Value: proxyAddr, Replace: true },
       ],
     }, (err, data) => {
@@ -162,6 +168,7 @@ Db.prototype.updateEmailComplete = function updateEmailComplete(accountId, email
       ItemName: accountId,
       Attributes: [
         { Name: 'email', Value: email.toLowerCase(), Replace: true },
+        { Name: 'updated', Value: new Date().toString(), Replace: true },
       ],
     }, (err, data) => {
       if (err) {
@@ -185,6 +192,23 @@ Db.prototype.updateEmailComplete = function updateEmailComplete(accountId, email
     });
   });
   return Promise.all([put, del]);
+};
+
+Db.prototype.touchAccount = function updateEmailComplete(accountId) {
+  return new Promise((fulfill, reject) => {
+    this.sdb.putAttributes({
+      DomainName: this.domain,
+      ItemName: accountId,
+      Attributes: [
+        { Name: 'updated', Value: new Date().toString(), Replace: true },
+      ],
+    }, (err, data) => {
+      if (err) {
+        return reject(`Error: ${err}`);
+      }
+      return fulfill(data);
+    });
+  });
 };
 
 Db.prototype.getRef = function getRef(refCode) {
@@ -215,8 +239,8 @@ Db.prototype.getRecentRefs = function getRecentRefs(accountId, since) {
         return reject(`Error: ${err}`);
       }
       const rsp = [];
-      for(let i = 0; i < data.Items.length; i++) {
-        let obj = transform(data.Items[i].Attributes);
+      for (let i = 0; i < data.Items.length; i += 1) {
+        const obj = transform(data.Items[i].Attributes);
         if (Date.parse(obj.created) > since) {
           obj.id = data.Items[i].Name;
           obj.email = obj.email.substring(0, obj.email.indexOf('@') + 1);
@@ -224,11 +248,11 @@ Db.prototype.getRecentRefs = function getRecentRefs(accountId, since) {
           delete obj.referral;
           rsp.push(obj);
         }
-      };
+      }
       return fulfill(rsp);
     });
   });
-}
+};
 
 Db.prototype.getRefsByAccount = function getRefsByAccount(accountId) {
   return new Promise((fulfill, reject) => {
@@ -346,7 +370,7 @@ Db.prototype.getAvailableProxiesCount = function getAvailableProxiesCount() {
       if (err) {
         return reject(`Error: ${err}`);
       }
-      return fulfill(data.Items ? parseInt(data.Items[0].Attributes[0].Value) : 0);
+      return fulfill(data.Items ? Number(data.Items[0].Attributes[0].Value) : 0);
     });
   });
 };

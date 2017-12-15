@@ -407,15 +407,16 @@ class AccountManager {
     return true;
   }
 
-  async resendEmail(sessionReceipt, origin) {
-    const session = checkSession(sessionReceipt, this.sessionAddr, Type.CREATE_CONF, -2);
-
-    // handle email
-    const account = await this.getAccount(session.accountId);
-    if (!account.email) {
-      const receipt = new Receipt().createConf(session.accountId).sign(this.sessionPriv);
-      return this.email.sendConfirm(account.pendingEmail, receipt, origin);
-    }
+  async resendEmail(email, origin) {
+    const lastFiveMins = Date.now() - (5 * 60 * 1000);
+    try {
+      const account = await this.db.getAccountByPendingEmail(email);
+      if (new Date(account.updated).getTime() < lastFiveMins) {
+        const receipt = new Receipt().createConf(account.id).sign(this.sessionPriv);
+        await this.db.touchAccount(account.id);
+        return this.email.sendConfirm(account.pendingEmail, receipt, origin);
+      }
+    } catch (err) {} // eslint-disable-line
 
     return true;
   }
