@@ -69,7 +69,7 @@ class ScanManager {
     const results = [];
     // 1 hour
     const tooOld = Math.floor(Date.now() / 1000) - (60 * 60);
-    if (lastHand.lineup) {
+    if (lastHand.lineup && lastHand.type !== 'tournament') {
       // 5 minutes
       const old = Math.floor(Date.now() / 1000) - (5 * 60);
       const subject = `Kick::${tableAddr}`;
