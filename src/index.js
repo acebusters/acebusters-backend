@@ -161,12 +161,15 @@ class EventWorker {
   async submitLeave(tableAddr, leaverAddr, exitHand) {
     const leaveReceipt = new Receipt(tableAddr).leave(exitHand, leaverAddr).sign(this.oraclePriv);
     try {
-      const leaveHex = Receipt.parseToParams(leaveReceipt);
-      await this.table.leave(tableAddr, leaveHex);
-      this.logger.log('tx: table.leave()', {
-        tags: { tableAddr, handId: exitHand },
-        extra: { leaveReceipt },
-      });
+      const hand = await this.db.getLastHand(tableAddr);
+      if (hand.type !== 'tournament') {
+        const leaveHex = Receipt.parseToParams(leaveReceipt);
+        await this.table.leave(tableAddr, leaveHex);
+        this.logger.log('tx: table.leave()', {
+          tags: { tableAddr, handId: exitHand },
+          extra: { leaveReceipt },
+        });
+      }
     } catch (error) {
       this.logger.log('tx: table.leave()', {
         level: 'error',
@@ -181,9 +184,7 @@ class EventWorker {
       this.table.getLineup(tableAddr),
       this.db.getLastHand(tableAddr),
     ]);
-    this.logger.log('kickPlayer', {
-      extra: { tableAddr, pos, hand },
-    });
+
     if (typeof pos === 'undefined' || pos > hand.lineup.length) {
       throw new Error(`pos ${pos} could not be found to kick.`);
     }

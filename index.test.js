@@ -738,12 +738,22 @@ describe('Stream worker other events', () => {
       [new BigNumber(50000), new BigNumber(50000)],
       [babz(0), babz(0)],
     ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 2,
+      state: 'waiting',
+      lineup: [],
+    }] });
     sinon.stub(contract.leave, 'estimateGas').yields(null, 1000);
     sinon.stub(contract.leave, 'getData').returns('0x112233');
     sinon.stub(sentry, 'captureMessage').yields(null, 'sentry');
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, ORACLE_PRIV, logger);
+    const worker = new EventWorker(
+      new Table(web3, '0x1255', sqs, 'url'),
+      new Db(dynamo, 'sb_cashgame', sdb, 'promo'),
+      ORACLE_PRIV,
+      logger,
+    );
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
@@ -757,6 +767,47 @@ describe('Stream worker other events', () => {
         tags: { tableAddr, handId },
         extra: { leaveReceipt },
       });
+      done();
+    }).catch(done);
+  });
+
+  it('shouldn\'t send leave receipt to contract for tournament table on TableLeave event', (done) => {
+    const handId = 2;
+    const tableAddr = P2_ADDR;
+
+    const event = {
+      Subject: `TableLeave::${tableAddr}`,
+      Message: JSON.stringify({
+        tableAddr,
+        leaverAddr: P1_ADDR,
+        exitHand: handId,
+      }),
+    };
+    sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(handId - 1),
+      [P1_ADDR, P2_ADDR],
+      [new BigNumber(50000), new BigNumber(50000)],
+      [babz(0), babz(0)],
+    ]);
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 2,
+      type: 'tournament',
+      state: 'waiting',
+      lineup: [],
+    }] });
+    sinon.stub(contract.leave, 'estimateGas').yields(null, 1000);
+    sinon.stub(contract.leave, 'getData').returns('0x112233');
+    sinon.stub(sentry, 'captureMessage').yields(null, 'sentry');
+    sinon.stub(sqs, 'sendMessage').yields(null, {});
+
+    const worker = new EventWorker(
+      new Table(web3, '0x1255', sqs, 'url'),
+      new Db(dynamo, 'sb_cashgame', sdb, 'promo'),
+      ORACLE_PRIV,
+      logger,
+    );
+
+    Promise.all(worker.process(event)).then(() => {
+      expect(sqs.sendMessage).callCount(0);
       done();
     }).catch(done);
   });
@@ -825,7 +876,7 @@ describe('Stream worker other events', () => {
     }).catch(done);
   });
 
-  it('should handle TableLeave and Payout if netting not needed.', (done) => {
+  it('should handle TableLeave if netting not needed.', (done) => {
     const handId = 2;
     const tableAddr = P3_ADDR;
     const leaveReceipt = new Receipt(tableAddr).leave(handId, P1_ADDR).sign(ORACLE_PRIV);
@@ -838,6 +889,11 @@ describe('Stream worker other events', () => {
         exitHand: handId,
       }),
     };
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 2,
+      state: 'waiting',
+      lineup: [],
+    }] });
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(handId),
       [P1_ADDR, P2_ADDR],
       [new BigNumber(50000), new BigNumber(50000)],
@@ -845,16 +901,21 @@ describe('Stream worker other events', () => {
     ]);
     sinon.stub(contract.leave, 'getData').returns('0x112233');
     sinon.stub(contract.payoutFrom, 'getData').returns('0x445566');
-    // sinon.stub(contract.leave, 'estimateGas').yields(null, 100);
+    sinon.stub(contract.leave, 'estimateGas').yields(null, 100);
     sinon.stub(contract.payoutFrom, 'estimateGas').yields(null, 100);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(sqs, 'sendMessage').yields(null, {});
 
-    const worker = new EventWorker(new Table(web3, '0x1255', sqs, 'url'), null, ORACLE_PRIV, logger);
+    const worker = new EventWorker(
+      new Table(web3, '0x1255', sqs, 'url'),
+      new Db(dynamo, 'sb_cashgame', sdb, 'promo'),
+      ORACLE_PRIV,
+      logger,
+    );
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
-        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":1200,"data":"0x112233"}`,
+        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":120,"data":"0x112233"}`,
         MessageGroupId: 'someGroup',
         QueueUrl: 'url',
       }, sinon.match.any);
@@ -896,6 +957,7 @@ describe('Stream worker other events', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.leave, 'getData').returns('0x112233');
+    sinon.stub(contract.leave, 'estimateGas').yields(null, 1000);
     sinon.stub(sentry, 'captureMessage').yields(null, {});
     sinon.stub(contract.payoutFrom, 'getData').returns('0x445566');
     sinon.stub(sqs, 'sendMessage').yields(null, {});
@@ -1278,6 +1340,7 @@ describe('Stream worker other events', () => {
 
   afterEach(() => {
     if (contract.leave.getData.restore) contract.leave.getData.restore();
+    if (contract.leave.estimateGas.restore) contract.leave.estimateGas.restore();
     if (contract.settle.getData.restore) contract.settle.getData.restore();
     if (contract.payoutFrom.getData.restore) contract.payoutFrom.getData.restore();
     if (contract.net.getData.restore) contract.net.getData.restore();
