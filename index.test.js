@@ -2250,6 +2250,35 @@ describe('Oracle leave', () => {
     }).catch(done);
   });
 
+  it('should disallow to leave for tournament tables', (done) => {
+    const leave = new Receipt(tableAddr).leave(2, P1_ADDR).sign(P1_PRIV);
+    const lineup = [{ address: P1_ADDR }, { address: P2_ADDR }];
+
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'waiting',
+      type: 'tournament',
+      lineup,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, timeoutPeriod);
+
+    oracle.leave(tableAddr, leave).then(() => {
+      const seat = {
+        address: P1_ADDR,
+        sitout: 1,
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has(
+        'ExpressionAttributeValues',
+        sinon.match(s => !s.hasOwnProperty(':eh'), 'hasNotExitHand'), // eslint-disable-line
+      ));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', seat.sitout)));
+      done();
+    }).catch(done);
+  });
+
   afterEach(() => {
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
@@ -2625,7 +2654,6 @@ describe('Oracle lineup', () => {
       done();
     }).catch(done);
   });
-
 
   it('should handle Table join as first player.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),

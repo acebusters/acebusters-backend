@@ -427,33 +427,54 @@ class TableManager {
 
   async leave(tableAddr, receiptString) {
     const receipt = this.rc.get(receiptString);
-    const { handId, leaverAddr } = receipt;
+    const { leaverAddr } = receipt;
     // check if this hand exists
     const hand = await this.db.getLastHand(tableAddr);
-    const minHandId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
-    if (handId < minHandId) {
-      throw new BadRequest(`forbidden to exit at handId ${handId}`);
+
+    if (hand.type !== 'tournament') {
+      const minHandId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
+      if (receipt.handId < minHandId) {
+        throw new BadRequest(`forbidden to exit at handId ${receipt.handId}`);
+      }
     }
+
     // check signer in lineup
     const { lineup } = await this.contract.getLineup(tableAddr);
     const pos = lineup.findIndex(seat => seat.address === leaverAddr);
     if (pos < 0 || !hand.lineup[pos]) {
       throw new Forbidden(`address ${leaverAddr} not in lineup.`);
     }
-    // check signer not submitting another leave receipt
-    if (hand.lineup[pos].exitHand) {
-      throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} already set.`);
-    }
 
     // set sitout if next hand started after leave receipt
     hand.lineup[pos].sitout = 1;
 
-    const exitHand = calcLeaveExitHand(this.helper, hand, receipt);
+    if (hand.type !== 'tournament') {
+      const minHandId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
+      if (receipt.handId < minHandId) {
+        throw new BadRequest(`forbidden to exit at handId ${receipt.handId}`);
+      }
+
+      // check signer not submitting another leave receipt
+      if (hand.lineup[pos].exitHand) {
+        throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} already set.`);
+      }
+
+      const exitHand = calcLeaveExitHand(this.helper, hand, receipt);
+      return this.db.updateLeave(
+        tableAddr,
+        hand.handId,
+        pos,
+        exitHand,
+        hand.lineup[pos].sitout,
+        now(),
+      );
+    }
+
     return this.db.updateLeave(
       tableAddr,
       hand.handId,
       pos,
-      exitHand,
+      undefined, // exitHand
       hand.lineup[pos].sitout,
       now(),
     );

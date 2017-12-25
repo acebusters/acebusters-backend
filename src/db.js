@@ -163,15 +163,18 @@ export default class Db {
     const params = {
       TableName: this.tableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}].#exitHand = :eh, changed = :c`,
-      ExpressionAttributeNames: {
-        '#exitHand': 'exitHand',
-      },
+      UpdateExpression: 'set changed = :c',
+      ExpressionAttributeNames: {},
       ExpressionAttributeValues: {
-        ':eh': exitHand,
         ':c': changed,
       },
     };
+
+    if (exitHand) {
+      params.UpdateExpression += `, lineup[${pos}].#exitHand = :eh`;
+      params.ExpressionAttributeNames['#exitHand'] = 'exitHand';
+      params.ExpressionAttributeValues[':eh'] = exitHand;
+    }
 
     if (sitout) {
       params.UpdateExpression += `, lineup[${pos}].#sitout = :so`;
