@@ -207,6 +207,7 @@ describe('Stream worker HandComplete event', () => {
       handId: 2,
       dealer: 0,
       state: 'preflop',
+      type: 'cashgame',
       lineup: [{
         address: EMPTY_ADDR,
       }, {
@@ -229,6 +230,7 @@ describe('Stream worker HandComplete event', () => {
         handId: 3,
         deck: sinon.match.any,
         state: 'waiting',
+        type: 'cashgame',
         dealer: 1,
         sb: babz(50).toNumber(),
         lineup: [{ address: EMPTY_ADDR }, { address: P1_ADDR }, { address: P2_ADDR }],
@@ -268,6 +270,7 @@ describe('Stream worker HandComplete event', () => {
       handId: 2,
       dealer: 3,
       state: 'showdown',
+      type: 'cashgame',
       lineup: [{
         address: P1_ADDR,
         last: new Receipt(EMPTY_ADDR).fold(2, babz(350)).sign(P1_PRIV),
@@ -298,6 +301,7 @@ describe('Stream worker HandComplete event', () => {
         handId: 3,
         deck: sinon.match.any,
         state: 'waiting',
+        type: 'cashgame',
         dealer: 0,
         sb: babz(50).toNumber(),
         lineup: [{
@@ -349,6 +353,7 @@ describe('Stream worker HandComplete event', () => {
         sitout: 'allin',
       }],
       state: 'turn',
+      type: 'cashgame',
       deck,
       dealer: 0,
     }] });
@@ -366,6 +371,7 @@ describe('Stream worker HandComplete event', () => {
         handId: 3,
         deck: sinon.match.any,
         state: 'waiting',
+        type: 'cashgame',
         dealer: 1,
         sb: babz(50).toNumber(),
         lineup: [{
@@ -395,6 +401,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'showdown',
+      type: 'cashgame',
       lineup: [{
         address: P1_ADDR,
         last: new Receipt(EMPTY_ADDR).show(3, babz(1000)).sign(P1_PRIV),
@@ -424,6 +431,7 @@ describe('Stream worker HandComplete event', () => {
         handId: 4,
         deck: sinon.match.any,
         state: 'waiting',
+        type: 'cashgame',
         dealer: 0,
         sb: babz(50).toNumber(),
         lineup: [{
@@ -457,6 +465,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'showdown',
+      type: 'cashgame',
       lineup: [{
         address: P1_ADDR,
         last: new Receipt(EMPTY_ADDR).show(3, babz(1000)).sign(P1_PRIV),
@@ -483,6 +492,7 @@ describe('Stream worker HandComplete event', () => {
         handId: 4,
         deck: sinon.match.any,
         state: 'waiting',
+        type: 'cashgame',
         dealer: 1,
         sb: babz(50).toNumber(),
         lineup: [{
@@ -515,6 +525,7 @@ describe('Stream worker HandComplete event', () => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       state: 'showdown',
+      type: 'cashgame',
       lineup: [{
         address: P1_ADDR,
         last: new Receipt(EMPTY_ADDR).show(3, babz(1000)).sign(P1_PRIV),
@@ -542,6 +553,7 @@ describe('Stream worker HandComplete event', () => {
         handId: 4,
         deck: sinon.match.any,
         state: 'waiting',
+        type: 'cashgame',
         dealer: 1,
         sb: babz(50).toNumber(),
         lineup: [{
@@ -631,6 +643,7 @@ describe('Stream worker HandComplete event', () => {
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 4,
+      type: 'cashgame',
       lineup: [{
         address: P1_ADDR,
         last: new Receipt(EMPTY_ADDR).bet(4, babz(500)).sign(P1_PRIV),
@@ -652,6 +665,7 @@ describe('Stream worker HandComplete event', () => {
         handId: 5,
         deck: sinon.match.any,
         state: 'waiting',
+        type: 'cashgame',
         dealer: 0,
         sb: 50,
         lineup: [{
@@ -998,6 +1012,7 @@ describe('Stream worker other events', () => {
     Promise.all(worker.process(event)).then(() => {
       expect(dynamo.putItem).calledWith({ Item: {
         tableAddr: '0xa2de',
+        type: 'cashgame',
         handId: 1,
         deck: sinon.match.any,
         state: 'waiting',

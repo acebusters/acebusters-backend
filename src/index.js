@@ -488,18 +488,12 @@ class EventWorker {
 
       if (prevHand.distribution) {
         // sum up previous hands
-        for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
-          const distribution = this.rc.get(prevHand.distribution);
-          const outs = distribution ? distribution.outs : [];
-          if (prevHand.lineup[pos].last) {
-            if (typeof outs[pos] === 'undefined') {
-              outs[pos] = new BigNumber(0);
-            }
-            const value = this.rc.get(prevHand.lineup[pos].last).amount;
-            const bal = balances[prevHand.lineup[pos].address] || new BigNumber(0);
-            balances[prevHand.lineup[pos].address] = bal.add(outs[pos]).sub(value);
-          }
-        }
+        const distribution = this.rc.get(prevHand.distribution);
+        const { outs } = distribution;
+        prevHand.lineup.filter(not(isEmpty)).forEach(({ address, last }, pos) => {
+          const out = outs[pos] || new BigNumber(0);
+          balances[address] = balances[address].add(out).sub(this.rc.get(last).amount);
+        });
       }
 
       // create new lineup
@@ -539,6 +533,7 @@ class EventWorker {
       const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
       await this.db.putHand(
         tableAddr,
+        prevHand.type,
         prevHand.handId + 1,
         lineup,
         newDealer,
@@ -564,10 +559,20 @@ class EventWorker {
         delete lineup[i].amount;
         delete lineup[i].exitHand;
       }
+      const tableType = await this.table.tableType(tableAddr);
       const deck = shuffle();
       const changed = now();
       const smallBlind = await this.table.getSmallBlind(tableAddr, 0);
-      await this.db.putHand(tableAddr, lastHandNetted + 1, lineup, 0, deck, smallBlind, changed);
+      await this.db.putHand(
+        tableAddr,
+        tableType,
+        lastHandNetted + 1,
+        lineup,
+        0,
+        deck,
+        smallBlind,
+        changed,
+      );
 
       return this.logger.log(`NewHand: ${tableAddr}`, {
         level: 'info',
