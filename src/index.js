@@ -530,7 +530,12 @@ class EventWorker {
       }
 
       const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
-      const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
+      const newDealer = this.helper.nextPlayer(
+        lineup,
+        prevDealer,
+        prevHand.type === 'tournament' ? 'busy' : 'involved',
+        'waiting',
+      );
       await this.db.putHand(
         tableAddr,
         prevHand.type,
