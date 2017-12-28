@@ -1,6 +1,7 @@
 import 'buffer-v6-polyfill';
 import request from 'request';
 import ethUtil from 'ethereumjs-util';
+import BigNumber from 'bignumber.js';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 import {
@@ -38,6 +39,7 @@ class TableManager {
     pusher,
     providerUrl,
     logger,
+    privKey,
   ) {
     this.db = db;
     this.rc = receiptCache;
@@ -45,6 +47,7 @@ class TableManager {
     this.contract = contract;
     this.pusher = pusher;
     this.providerUrl = providerUrl;
+    this.privKey = privKey;
 
     if (typeof timeout !== 'function') {
       this.getTimeout = () => timeout || 60;
@@ -279,22 +282,22 @@ class TableManager {
 
   async updateState(tableAddr, oldHand, pos) {
     const hand = { ...oldHand };
-    const { lineup, dealer, state, sb } = hand;
+    const { handId, lineup, dealer, sb, type } = hand;
     const posForUpdate = [pos];
     const bettingComplete = degrade(
-      () => this.helper.isBettingDone(lineup, dealer, state, sb * 2),
+      () => this.helper.isBettingDone(lineup, dealer, hand.state, sb * 2),
       false,
     );
-    const handComplete = this.helper.isHandComplete(lineup, dealer, state);
+    const handComplete = this.helper.isHandComplete(lineup, dealer, hand.state);
 
     const streetMaxBet = (
       bettingComplete && !handComplete
-      ? this.helper.getMaxBet(lineup, state).amount.toString()
+      ? this.helper.getMaxBet(lineup, hand.state).amount.toString()
       : undefined
     );
 
     if (bettingComplete && !handComplete) {
-      hand.state = nextState(state);
+      hand.state = nextState(hand.state);
     }
 
     // take care of all-in
@@ -311,8 +314,24 @@ class TableManager {
       }
     }
 
-    if (oldHand.state === 'dealing' && state === 'preflop') {
-      // ToDo: auto blind for sb/bb pos at sitout
+    if (oldHand.state === 'dealing' && hand.state === 'preflop' && type === 'tournament') {
+      const sbPos = this.helper.getSbPos(lineup, dealer, hand.state, type);
+      if (lineup[sbPos].sitout && !lineup[sbPos].last) {
+        lineup[sbPos].last = new Receipt(tableAddr).bet(
+          handId,
+          new BigNumber(sb),
+        ).sign(this.privKey);
+        posForUpdate.push(sbPos);
+      }
+
+      const bbPos = this.helper.getBbPos(lineup, dealer, hand.state, type);
+      if (lineup[bbPos].sitout && !lineup[bbPos].last) {
+        lineup[bbPos].last = new Receipt(tableAddr).bet(
+          handId,
+          new BigNumber(sb * 2),
+        ).sign(this.privKey);
+        posForUpdate.push(bbPos);
+      }
     }
 
     // update db
@@ -535,7 +554,7 @@ class TableManager {
         // lineup, startPos, type, state) {
         pos = this.helper.nextPlayer(hand.lineup, 0, 'involved', hand.state);
       }
-      if (typeof pos === 'undefined' || hand.lineup[pos].address === EMPTY_ADDR ||
+      if (typeof pos === 'undefined' || pos === -1 || hand.lineup[pos].address === EMPTY_ADDR ||
         typeof hand.lineup[pos].sitout === 'number') {
         return `could not find next player to act in hand ${hand.handId}`;
       }

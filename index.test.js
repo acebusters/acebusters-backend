@@ -399,6 +399,82 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
+  it('should set state preflop after last 0 receipts and pay small blind for sitout at tournament.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
+      dealer: 3,
+      handId: 1,
+      type: 'tournament',
+      state: 'dealing',
+      sb: babz(1).toNumber(),
+      lineup: [{
+        address: P1_ADDR,
+        sitout: 1,
+      }, {
+        address: EMPTY_ADDR,
+      }, {
+        address: P3_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P3_PRIV),
+      }, {
+        address: P4_ADDR,
+      }],
+      deck,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, 0, null, '', null, P4_PRIV);
+
+    const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
+    oracle.pay(tableAddr, bet4).then((rsp) => {
+      expect(rsp.cards.length).to.eql(2);
+      const seat = {
+        address: P1_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(1)).sign(P4_PRIV),
+        sitout: 1,
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat0', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('should set state preflop after last 0 receipts and pay big blind for sitout at tournament.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
+      dealer: 3,
+      handId: 1,
+      type: 'tournament',
+      state: 'dealing',
+      sb: babz(1).toNumber(),
+      lineup: [{
+        address: P1_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P3_PRIV),
+      }, {
+        address: EMPTY_ADDR,
+      }, {
+        address: P3_ADDR,
+        sitout: 1,
+      }, {
+        address: P4_ADDR,
+      }],
+      deck,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, 0, null, '', null, P4_PRIV);
+
+    const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
+    oracle.pay(tableAddr, bet4).then((rsp) => {
+      expect(rsp.cards.length).to.eql(2);
+      const seat = {
+        address: P3_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(2)).sign(P4_PRIV),
+        sitout: 1,
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
+      done();
+    }).catch(done);
+  });
+
   it('should prevent big blind from not in lineup.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       handId: 1,

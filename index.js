@@ -68,6 +68,7 @@ exports.handler = function handler(event, context, callback) {
       pusher,
       providerUrl,
       logger,
+      process.env.ORACLE_PRIV,
     );
     const path = event.context['resource-path'];
     const tableAddr = event.params.path.tableAddr;
