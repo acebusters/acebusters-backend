@@ -16,6 +16,19 @@ import {
 } from './utils';
 import { emulateSeatsUpdate } from './db';
 
+const degrade = (fn, fallbackValue) => {
+  try { return fn(); } catch (e) { return fallbackValue; }
+};
+
+const states = ['waiting', 'dealing', 'preflop', 'flop', 'turn', 'river', 'showdown'];
+const nextState = (state) => {
+  const i = states.indexOf(state);
+  if (i >= states.length - 1 || i === -1) {
+    throw new Error(`Wrong state: ${state}`);
+  }
+  return states[i + 1];
+};
+
 class TableManager {
   constructor(
     db,
@@ -264,41 +277,24 @@ class TableManager {
     return response;
   }
 
-  updateState(tableAddr, handParam, pos) {
-    const hand = handParam;
-    const changed = now();
-    let bettingComplete = false;
-    try {
-      bettingComplete = this.helper.isBettingDone(hand.lineup,
-      hand.dealer, hand.state, hand.sb * 2);
-    } catch (err) {
-      this.logger.log('\'is betting done\' error', {
-        tags: { tableAddr, handId: hand.handId },
-      });
-    }
-    const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
-    let streetMaxBet;
-    const prevState = hand.state;
+  async updateState(tableAddr, oldHand, pos) {
+    const hand = { ...oldHand };
+    const { lineup, dealer, state, sb } = hand;
+    const posForUpdate = [pos];
+    const bettingComplete = degrade(
+      () => this.helper.isBettingDone(lineup, dealer, state, sb * 2),
+      false,
+    );
+    const handComplete = this.helper.isHandComplete(lineup, dealer, state);
+
+    const streetMaxBet = (
+      bettingComplete && !handComplete
+      ? this.helper.getMaxBet(lineup, state).amount.toString()
+      : undefined
+    );
+
     if (bettingComplete && !handComplete) {
-      if (hand.state === 'river') {
-        hand.state = 'showdown';
-      }
-      if (hand.state === 'turn') {
-        hand.state = 'river';
-      }
-      if (hand.state === 'flop') {
-        hand.state = 'turn';
-      }
-      if (hand.state === 'preflop') {
-        hand.state = 'flop';
-      }
-      if (hand.state === 'dealing') {
-        hand.state = 'preflop';
-      }
-      if (hand.state === 'waiting') {
-        hand.state = 'dealing';
-      }
-      streetMaxBet = this.helper.getMaxBet(hand.lineup, hand.state).amount.toString();
+      hand.state = nextState(state);
     }
 
     // take care of all-in
@@ -311,12 +307,25 @@ class TableManager {
       } else if (activePlayerCount === 0 && allInPlayerCount < 2) {
         // when there are no active players and only one all-in player,
         // then we should just finish hand
-        hand.state = prevState;
+        hand.state = oldHand.state;
       }
     }
+
+    if (oldHand.state === 'dealing' && state === 'preflop') {
+      // ToDo: auto blind for sb/bb pos at sitout
+    }
+
     // update db
-    return this.db.updateSeat(tableAddr,
-      hand.handId, hand.lineup[pos], pos, hand.state, changed, streetMaxBet);
+    return this.db.updateSeatsWithState(
+      tableAddr,
+      hand.handId,
+      posForUpdate.reduce((seats, i) => ({
+        ...seats,
+        [i]: hand.lineup[i],
+      }), {}),
+      hand.state,
+      streetMaxBet,
+    );
   }
 
   async calcBalance(tableAddr, pos, receipt) {
@@ -598,14 +607,6 @@ class TableManager {
     const isStart = hand.state === 'waiting' && activeCount < 2 && nextActiveCount >= 2;
     const isEnd = hand.state === 'waiting' && nextActiveCount < 2;
 
-    console.log('lineup sb', {
-      extra: {
-        isEnd,
-        sb: isEnd ? defaultSmallBlind : hand.sb,
-        defaultSmallBlind,
-        handSb: hand.sb,
-      },
-    });
     await this.db.updateSeats(
       tableAddr,
       hand.handId,

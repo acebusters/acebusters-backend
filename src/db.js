@@ -1,4 +1,5 @@
 import { NotFound } from './errors';
+import { now } from './utils';
 
 const performSeatsUpdate = (joins, leaves, sitout) => {
   const seats = {
@@ -185,36 +186,51 @@ export default class Db {
     return this.updateItem(params);
   }
 
-  updateSeat(tableAddr,
-    handId, seat, pos, state, changed, streetMaxBet) {
+  updateSeat(tableAddr, handId, seat, pos) {
     const params = {
       TableName: this.tableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set lineup[${pos}] = :l, #hand_state = :s, changed = :c`,
+      UpdateExpression: `set lineup[${pos}] = :l, changed = :c`,
       ExpressionAttributeValues: {
         ':l': seat,
+        ':c': now(),
+      },
+    };
+    return this.updateItem(params);
+  }
+
+  updateSeatsWithState(tableAddr, handId, seats, state, streetMaxBet) {
+    const params = {
+      TableName: this.tableName,
+      Key: { tableAddr, handId },
+      UpdateExpression: 'set #hand_state = :s, changed = :c',
+      ExpressionAttributeValues: {
         ':s': state,
-        ':c': changed,
+        ':c': now(),
       },
       ExpressionAttributeNames: {
         '#hand_state': 'state',
       },
     };
+
     if (streetMaxBet && streetMaxBet > 0) {
-      let attribute = 'preMaxBet';
-      if (state === 'showdown') {
-        attribute = 'riverMaxBet';
-      }
-      if (state === 'river') {
-        attribute = 'turnMaxBet';
-      }
-      if (state === 'turn') {
-        attribute = 'flopMaxBet';
-      }
-      params.UpdateExpression += `, ${attribute} = :m`;
+      const betAttrs = {
+        showdown: 'riverMaxBet',
+        river: 'turnMaxBet',
+        turn: 'flopMaxBet',
+      };
+      params.UpdateExpression += `, ${betAttrs[state] || 'preMaxBet'} = :m`;
       params.ExpressionAttributeValues[':m'] = streetMaxBet;
     }
-    return this.updateItem(params);
+
+    return this.updateItem(Object.keys(seats).reduce((memo, pos) => ({
+      ...memo,
+      UpdateExpression: `${memo.UpdateExpression}, lineup[${pos}] = :seat${pos}`,
+      ExpressionAttributeValues: {
+        ...memo.ExpressionAttributeValues,
+        [`:seat${pos}`]: seats[pos],
+      },
+    }), params));
   }
 
   updateChanged(tableAddr, handId, changed) {
