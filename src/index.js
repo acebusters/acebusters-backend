@@ -317,20 +317,30 @@ class TableManager {
     if (oldHand.state === 'dealing' && hand.state === 'preflop' && type === 'tournament') {
       const sbPos = this.helper.getSbPos(lineup, dealer, hand.state, type);
       if (lineup[sbPos].sitout && !lineup[sbPos].last) {
-        lineup[sbPos].last = new Receipt(tableAddr).bet(
+        const receipt = new Receipt(tableAddr).bet(
           handId,
           new BigNumber(sb),
         ).sign(this.privKey);
-        posForUpdate.push(sbPos);
+        const sbBal = await this.calcBalance(tableAddr, sbPos, this.rc.get(receipt));
+
+        if (sbBal >= 0) { // check balance > 0 after bet
+          lineup[sbPos].last = receipt;
+          posForUpdate.push(sbPos);
+        }
       }
 
       const bbPos = this.helper.getBbPos(lineup, dealer, hand.state, type);
       if (lineup[bbPos].sitout && !lineup[bbPos].last) {
-        lineup[bbPos].last = new Receipt(tableAddr).bet(
+        const receipt = new Receipt(tableAddr).bet(
           handId,
           new BigNumber(sb * 2),
         ).sign(this.privKey);
-        posForUpdate.push(bbPos);
+        const bbBal = await this.calcBalance(tableAddr, sbPos, this.rc.get(receipt));
+
+        if (bbBal >= 0) { // check balance > 0 after bet
+          lineup[bbPos].last = receipt;
+          posForUpdate.push(bbPos);
+        }
       }
     }
 
