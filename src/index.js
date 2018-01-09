@@ -248,6 +248,9 @@ class TableManager {
     if ((prevReceipt && prevReceipt.amount.lt(recAmount)) || (!prevReceipt && recAmount.gt(0))) {
       // calc bal
       const balLeft = await this.calcBalance(tableAddr, pos, receipt);
+      if (balLeft < 0) {
+        throw new Forbidden(`can not bet more than balance (${recAmount}).`);
+      }
       hand.lineup[pos].last = receiptHash;
       if (balLeft === 0) {
         hand.lineup[pos].sitout = 'allin';
@@ -335,7 +338,7 @@ class TableManager {
           handId,
           new BigNumber(sb * 2),
         ).sign(this.privKey);
-        const bbBal = await this.calcBalance(tableAddr, sbPos, this.rc.get(receipt));
+        const bbBal = await this.calcBalance(tableAddr, bbPos, this.rc.get(receipt));
 
         if (bbBal >= 0) { // check balance > 0 after bet
           lineup[bbPos].last = receipt;

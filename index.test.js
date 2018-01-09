@@ -18,6 +18,8 @@ function babz(ntz) {
 }
 const BALANCE = babz(50000);
 
+const matchHasNot = property => sinon.match(s => !s.hasOwnProperty(property), `has not ${property}`); // eslint-disable-line no-prototype-builtins
+
 // BET can replace lower bet
 // BET can replace SIT_OUT during dealing state
 // FOLD can replace all but SIT_OUT, and SHOW, given same amount
@@ -399,7 +401,7 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
-  it('should set state preflop after last 0 receipts and pay small blind for sitout at tournament.', (done) => {
+  it('should set state preflop after last 0 receipts and post small blind for sitout at tournament.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       dealer: 3,
       handId: 1,
@@ -437,7 +439,7 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
-  it('should set state preflop after last 0 receipts and pay big blind for sitout at tournament.', (done) => {
+  it('should set state preflop after last 0 receipts and post big blind for sitout at tournament.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
       dealer: 3,
       handId: 1,
@@ -446,7 +448,7 @@ describe('Oracle pay', () => {
       sb: babz(1).toNumber(),
       lineup: [{
         address: P1_ADDR,
-        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P3_PRIV),
+        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P1_PRIV),
       }, {
         address: EMPTY_ADDR,
       }, {
@@ -471,6 +473,47 @@ describe('Oracle pay', () => {
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('shouldn\'t post blind for broke players at tournament.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
+      dealer: 3,
+      handId: 1,
+      type: 'tournament',
+      state: 'dealing',
+      sb: babz(1).toNumber(),
+      lineup: [{
+        address: P1_ADDR,
+        sitout: 1,
+      }, {
+        address: P2_ADDR,
+        sitout: 1,
+      }, {
+        address: P3_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P3_PRIV),
+      }, {
+        address: P4_ADDR,
+      }],
+      deck,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [babz(0), babz(0), BALANCE, BALANCE], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, 0, null, '', null, P4_PRIV);
+
+    const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
+    oracle.pay(tableAddr, bet4).then((rsp) => {
+      expect(rsp.cards.length).to.eql(2);
+      const seat = {
+        address: P4_ADDR,
+        last: bet4,
+      };
+      expect(dynamo.updateItem).callCount(1);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat3', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', matchHasNot(':seat0')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', matchHasNot(':seat1')));
       done();
     }).catch(done);
   });
@@ -2348,7 +2391,7 @@ describe('Oracle leave', () => {
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has(
         'ExpressionAttributeValues',
-        sinon.match(s => !s.hasOwnProperty(':eh'), 'hasNotExitHand'), // eslint-disable-line
+        matchHasNot(':eh'), // eslint-disable-line
       ));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', seat.sitout)));
       done();
