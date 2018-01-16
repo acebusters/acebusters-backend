@@ -7,11 +7,25 @@ const ABIs = {
 };
 
 export default class TableContract extends Contract {
-  async tableType(tableAddr) { // eslint-disable-line
-    /**
-     * ToDo: check contract type here and return 'tournament'|'cashgame'
-     */
-    return 'cashgame';
+
+  constructor(
+    factory,
+    web3,
+    senderAddr,
+    sqs,
+    queueUrl,
+  ) {
+    super(web3, senderAddr, sqs, queueUrl);
+    this.factory = factory;
+    this.cashgameTables = null;
+  }
+
+  async tableType(tableAddr) {
+    if (!this.cashgameTables) {
+      this.cashgameTables = await this.factory.getTables();
+    }
+
+    return this.cashgameTables.indexOf(tableAddr) > -1 ? 'cashgame' : 'tournament';
   }
 
   async contract(tableAddr) {
