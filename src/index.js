@@ -35,7 +35,7 @@ export default class ReserveSerivce {
         throw new Error('Transaction does not exist');
       }
 
-      if (transaction.input.slice(298, 338) !== tableAddr.replace('0x', '')) {
+      if (transaction.input.indexOf(tableAddr.replace('0x', '')) === -1) {
         throw new Error('Wrong tableAddr or txHash');
       }
 
@@ -85,9 +85,9 @@ export default class ReserveSerivce {
 
     await this.db.deleteItems(deletedItems);
 
-    await Promise.all(_.map(_.groupBy(deletedItems, 'tableAddr'), (items, key) => this.notify(key, {
+    await Promise.all(_.map(_.groupBy(deletedItems, 'tableAddr'), (payload, key) => this.notify(key, {
       type: 'seatsRelease',
-      payload: items,
+      payload,
     })));
 
     return deletedItems;
