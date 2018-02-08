@@ -5,6 +5,7 @@ import Db from './src/db';
 import Email from './src/email';
 import Recaptcha from './src/recaptcha';
 import ProxyContr from './src/proxyContract';
+import NutzContr from './src/nutzContract';
 import AccountManager from './src/index';
 import Logger from './src/logger';
 import SlackAlert from './src/slackAlert';
@@ -37,6 +38,13 @@ exports.handler = function handler(event, context, callback) {
   const sessionPriv = process.env.SESSION_PRIV;
   const unlockPriv = process.env.RECOVERY_PRIV;
   const proxy = new ProxyContr(web3, process.env.SENDER_ADDR, new AWS.SQS(), process.env.QUEUE_URL);
+  const nutz = new NutzContr(
+    web3,
+    process.env.SENDER_ADDR,
+    new AWS.SQS(),
+    process.env.QUEUE_URL,
+    process.env.NTZ_ADDR,
+  );
   const fromEmail = process.env.FROM_EMAIL;
   const accountTable = process.env.ACCOUNT_TABLE;
   const refTable = process.env.REF_TABLE;
@@ -60,6 +68,7 @@ exports.handler = function handler(event, context, callback) {
     topicArn,
     sessionPriv,
     proxy,
+    nutz,
     logger,
     unlockPriv,
     slackAlert,
@@ -113,6 +122,8 @@ exports.handler = function handler(event, context, callback) {
       );
     } else if (path.indexOf('forward') > -1) {
       handleRequest = manager.forward(event.forwardReceipt, event.resetConfReceipt);
+    } else if (path.indexOf('fund') > -1) {
+      handleRequest = manager.requestFunds(event.address);
     } else if (path.indexOf('recentRefs') > -1) {
       handleRequest = manager.recentRefs(event.refCode);
     } else if (path.indexOf('resend') > -1) {

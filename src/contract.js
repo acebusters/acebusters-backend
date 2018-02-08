@@ -7,6 +7,27 @@ export default class Contract {
     this.queueUrl = queueUrl;
   }
 
+  sendEth(to, amount) {
+    return new Promise((resolve, reject) => {
+      this.sqs.sendMessage({
+        MessageBody: JSON.stringify({
+          from: this.senderAddr,
+          to,
+          gas: 30000,
+          value: amount,
+        }),
+        QueueUrl: this.queueUrl,
+        MessageGroupId: 'someGroup',
+      }, (err, data) => {
+        if (err) {
+          reject(`sqs error: ${err}`);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+  }
+
   sendTransaction(
     contractInstance,
     methodName,
@@ -54,6 +75,10 @@ export default class Contract {
         return resolve(val);
       });
     });
+  }
+
+  weiBalance(...args) {
+    return this.call(this.web3.eth.getBalance, ...args);
   }
 
 }
