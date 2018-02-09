@@ -59,7 +59,6 @@ exports.handler = function handler(event, context, callback) {
     slackAlert = new SlackAlert(slackAlertUrl, slackAlertChannel, env);
   }
 
-  let handleRequest;
   const manager = new AccountManager(
     new Db(simpledb, accountTable, refTable, proxyTable),
     new Email(ses, fromEmail),
@@ -74,40 +73,39 @@ exports.handler = function handler(event, context, callback) {
     slackAlert,
     minProxiesAlertThreshold,
   );
-
-  try {
+  const getRequestHandler = () => {
     if (path.indexOf('confirm') > -1) {
-      handleRequest = manager.confirmEmail(event.sessionReceipt);
+      return manager.confirmEmail(event.sessionReceipt);
     } else if (path.indexOf('reset') > -1) {
-      handleRequest = manager.resetRequest(
+      return manager.resetRequest(
         event.email,
         event.recapResponse,
         event.origin,
         event.context['source-ip'],
       );
     } else if (path.indexOf('query') > -1) {
-      handleRequest = manager.queryAccount(event.email);
+      return manager.queryAccount(event.email);
     } else if (path.indexOf('wallet') > -1) {
       if (method === 'POST') {
-        handleRequest = manager.setWallet(
+        return manager.setWallet(
           event.sessionReceipt,
           event.wallet,
           event.proxyAddr,
         );
       }
       if (method === 'PUT') {
-        handleRequest = manager.resetWallet(event.sessionReceipt, event.wallet);
+        return manager.resetWallet(event.sessionReceipt, event.wallet);
       }
     } else if (path.indexOf('referral') > -1) {
-      handleRequest = manager.getRef(event.params.path.refCode);
+      return manager.getRef(event.params.path.refCode);
     } else if (path.indexOf('refs') > -1) {
-      handleRequest = manager.queryRefCodes(event.params.path.accountId);
+      return manager.queryRefCodes(event.params.path.accountId);
     } else if (path.indexOf('account') > -1) {
       if (method === 'GET') {
-        handleRequest = manager.getAccount(event.params.path.accountId);
+        return manager.getAccount(event.params.path.accountId);
       }
       if (method === 'POST') {
-        handleRequest = manager.addAccount(
+        return manager.addAccount(
           event.params.path.accountId,
           event.email,
           event.recapResponse,
@@ -117,28 +115,25 @@ exports.handler = function handler(event, context, callback) {
         );
       }
     } else if (path.indexOf('unlock') > -1) {
-      handleRequest = manager.queryUnlockReceipt(
+      return manager.queryUnlockReceipt(
         decodeURIComponent(event.params.path.unlockRequest),
       );
     } else if (path.indexOf('forward') > -1) {
-      handleRequest = manager.forward(event.forwardReceipt, event.resetConfReceipt);
-    } else if (path.indexOf('fund') > -1) {
-      handleRequest = manager.requestFunds(event.address);
+      return manager.forward(event.forwardReceipt, event.resetConfReceipt);
     } else if (path.indexOf('recentRefs') > -1) {
-      handleRequest = manager.recentRefs(event.refCode);
+      return manager.recentRefs(event.refCode);
     } else if (path.indexOf('resend') > -1) {
-      handleRequest = manager.resendEmail(event.email, event.origin);
+      return manager.resendEmail(event.email, event.origin);
     }
-    if (typeof handleRequest === 'undefined') {
-      handleRequest = Promise.reject(`Not Found: unexpected path: ${path}`);
-    }
+
+    return Promise.reject(`Not Found: unexpected path: ${path}`);
+  };
+
+  try {
+    getRequestHandler()
+      .then(data => callback(null, data))
+      .catch(err => handleError(err, logger, callback));
   } catch (err) {
     handleError(err, logger, callback);
-    return;
   }
-  handleRequest.then((data) => {
-    callback(null, data);
-  }).catch((err) => {
-    handleError(err, logger, callback);
-  });
 };
