@@ -12,7 +12,7 @@ const handleError = function handleError(err, logger, callback) {
 exports.handler = function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL).install();
 
-  const logger = new Logger(Raven, context.functionName, 'account-service');
+  const logger = new Logger(Raven, context.functionName, 'accountless-faucet');
   const web3 = new Web3();
   web3.setProvider(new web3.providers.HttpProvider(process.env.PROVIDER_URL));
 
