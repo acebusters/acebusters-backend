@@ -24,7 +24,12 @@ exports.handler = function handler(event, context, callback) {
     process.env.NTZ_ADDR,
   );
 
-  const faucet = new Faucet(nutz, logger);
+  const faucet = new Faucet(
+    nutz,
+    logger,
+    process.env.NTZ_THRESHOLD,
+    process.env.ETH_THRESHOLD,
+  );
 
   const getRequestHandler = () => {
     const path = event.context['resource-path'];
