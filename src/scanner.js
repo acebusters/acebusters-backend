@@ -1,11 +1,12 @@
 
 class ScanManager {
-  constructor(db, table, sns, factory, topicArn) {
+  constructor(db, table, sns, factory, topicArn, logger) {
     this.db = db;
     this.factory = factory;
     this.table = table;
     this.sns = sns;
     this.topicArn = topicArn;
+    this.logger = logger;
   }
 
   async scan(setId) {

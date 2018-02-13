@@ -21,8 +21,14 @@ exports.handler = function handler(event, context, callback) {
 
   web3.setProvider(new web3.providers.HttpProvider(providerUrl));
 
-  const manager = new ScanManager(new Db(simpledb, tableName),
-    new Table(web3), new AWS.SNS(), new Factory(web3, factoryAddr), topicArn);
+  const manager = new ScanManager(
+    new Db(simpledb, tableName),
+    new Table(web3),
+    new AWS.SNS(),
+    new Factory(web3, factoryAddr),
+    topicArn,
+    logger,
+  );
 
   manager.scan(event.contractSet).then((data) => {
     callback(null, data);
