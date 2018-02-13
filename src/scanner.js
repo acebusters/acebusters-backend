@@ -1,73 +1,64 @@
 
-function ScanManager(db, table, sns, factory, topicArn) {
-  this.db = db;
-  this.factory = factory;
-  this.table = table;
-  this.sns = sns;
-  this.topicArn = topicArn;
+class ScanManager {
+  constructor(db, table, sns, factory, topicArn) {
+    this.db = db;
+    this.factory = factory;
+    this.table = table;
+    this.sns = sns;
+    this.topicArn = topicArn;
+  }
+
+  async scan(setId) {
+    try {
+      const [{ lastBlock }, set] = await Promise.all([
+        this.db.getContractSet(setId),
+        this.factory.getTables(),
+      ]);
+
+      if (!set || set.length === 0) {
+        throw 'no contracts to scan'; // eslint-disable-line no-throw-literal
+      }
+
+      const blockNumber = await this.table.getBlockNumber();
+      if (blockNumber <= lastBlock) {
+        throw 'no new blocks'; // eslint-disable-line no-throw-literal
+      }
+
+      const events = await Promise.all(set.map(
+        addr => this.table.filterContract(lastBlock, blockNumber, addr),
+      ));
+
+      await Promise.all(
+        events
+          .reduce((m, event) => m.concat(event), [])
+          .filter(e => e)
+          .map(event => this.notify(event, `ContractEvent::${event.address}`)),
+      );
+
+      return this.db.updateBlockNumber(setId, blockNumber);
+    } catch (err) {
+      if (err === 'no new blocks' || err === 'no contracts to scan') {
+        return { status: err };
+      }
+      throw err;
+    }
+  }
+
+  notify(event, subject) {
+    return new Promise((fulfill, reject) => {
+      this.sns.publish({
+        Message: JSON.stringify(event),
+        Subject: subject,
+        TopicArn: this.topicArn,
+      }, (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        fulfill({});
+      });
+    });
+  }
 }
-
-ScanManager.prototype.scan = function scan(setId) {
-  const dbProm = this.db.getContractSet(setId);
-  const tfProm = this.factory.getTables();
-  let set;
-  let lastBlock;
-  let blockNumber;
-  return Promise.all([dbProm, tfProm]).then((rsp) => {
-    lastBlock = rsp[0].lastBlock;
-    set = rsp[1];
-    if (!set || set.length === 0) {
-      return Promise.reject('no contracts to scan');
-    }
-    return this.table.getBlockNumber();
-  }).then((_blockNumber) => {
-    const actions = [];
-    blockNumber = _blockNumber;
-    if (blockNumber <= lastBlock) {
-      return Promise.reject('no new blocks');
-    }
-    set.forEach((addr) => {
-      actions.push(this.table.filterContract(lastBlock,
-        blockNumber, addr));
-    });
-    return Promise.all(actions);
-  }).then((events) => {
-    let all = [];
-    events.forEach((event) => {
-      all = all.concat(event);
-    });
-    const dispatches = [];
-    all.forEach((event) => {
-      if (event) {
-        const subj = `ContractEvent::${event.address}`;
-        dispatches.push(this.notify(event, subj));
-      }
-    });
-    return Promise.all(dispatches);
-  })
-  .then(() => this.db.updateBlockNumber(setId, blockNumber))
-  .catch((err) => {
-    if (err === 'no new blocks' || err === 'no contracts to scan') {
-      return Promise.resolve({ status: err });
-    }
-    return Promise.reject(err);
-  });
-};
-
-ScanManager.prototype.notify = function notify(event, subject) {
-  return new Promise((fulfill, reject) => {
-    this.sns.publish({
-      Message: JSON.stringify(event),
-      Subject: subject,
-      TopicArn: this.topicArn,
-    }, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      fulfill({});
-    });
-  });
-};
 
 module.exports = ScanManager;
