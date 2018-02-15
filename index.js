@@ -8,7 +8,6 @@ import Pusher from 'pusher';
 import Db from './src/db';
 import EventWorker from './src/index';
 import Table from './src/tableContract';
-import TableFactory from './src/tableFactoryContract';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
 import Logger from './src/logger';
@@ -40,8 +39,7 @@ exports.handler = function handler(event, context, callback) {
     }
     web3 = new Web3(web3Provider);
     const contractArgs = [web3, process.env.SENDER_ADDR, new AWS.SQS(), process.env.QUEUE_URL];
-    const tableFactory = new TableFactory(process.env.FACTORY_ADDR, ...contractArgs);
-    const table = new Table(tableFactory, ...contractArgs);
+    const table = new Table(process.env.FACTORY_ADDR, ...contractArgs);
     const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
     const lambda = new Lambda(new AWS.Lambda(), process.env.ORACLE_FUNC_NAME);
 
