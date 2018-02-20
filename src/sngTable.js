@@ -14,4 +14,9 @@ export default class SnGTable extends Table {
     return this.call(contract.getBlindStructure.call).then(val => val.map(Number));
   }
 
+  async blindLevelDuration(tableAddr) {
+    const contract = this.contract(tableAddr);
+    return this.call(contract.blindLevelDuration.call).then(val => val.map(Number));
+  }
+
 }

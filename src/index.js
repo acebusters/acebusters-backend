@@ -463,7 +463,8 @@ class EventWorker {
   }
 
   async putNextHand(tableAddr) {
-    const { lineup, lastHandNetted } = await this.table.getLineup(tableAddr);
+    const table = this.factory.getTable(tableAddr);
+    const { lineup, lastHandNetted } = await table.getLineup(tableAddr);
 
     try {
       const prevHand = await this.db.getLastHand(tableAddr);
