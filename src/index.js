@@ -16,7 +16,7 @@ import {
 
 class EventWorker {
   constructor(
-    table,
+    tableFactory,
     db,
     oraclePriv,
     logger,
@@ -27,7 +27,7 @@ class EventWorker {
     showdownDelay = 0,
   ) {
     this.showdownDelay = showdownDelay;
-    this.table = table;
+    this.factory = tableFactory;
     this.db = db;
     if (oraclePriv) {
       this.oraclePriv = oraclePriv;
@@ -164,7 +164,7 @@ class EventWorker {
       const hand = await this.db.getLastHand(tableAddr);
       if (hand.type !== 'tournament') {
         const leaveHex = Receipt.parseToParams(leaveReceipt);
-        await this.table.leave(tableAddr, leaveHex);
+        await this.factory.getTable(tableAddr).leave(tableAddr, leaveHex);
         this.logger.log('tx: table.leave()', {
           tags: { tableAddr, handId: exitHand },
           extra: { leaveReceipt },
@@ -181,7 +181,7 @@ class EventWorker {
 
   async kickPlayer(tableAddr, pos) {
     const [{ lineup }, hand] = await Promise.all([
-      this.table.getLineup(tableAddr),
+      this.factory.getTable(tableAddr).getLineup(tableAddr),
       this.db.getLastHand(tableAddr),
     ]);
 
@@ -216,7 +216,7 @@ class EventWorker {
 
   async progressNetting(tableAddr) {
     try {
-      await this.table.net(tableAddr);
+      await this.factory.getTable(tableAddr).net(tableAddr);
       this.logger.log('tx: table.net()', {
         tags: { tableAddr },
       });
@@ -246,7 +246,7 @@ class EventWorker {
     const receipts = [].concat(...bets.concat(dists).map(r => Receipt.parseToParams(r)));
 
     try {
-      await this.table.submit(tableAddr, receipts);
+      await this.factory.getTable(tableAddr).submit(tableAddr, receipts);
       this.logger.log('tx: table.submit()', {
         tags: { tableAddr },
         extra: { receipts },
@@ -262,7 +262,7 @@ class EventWorker {
 
   async deleteHands(tableAddr) {
     const [{ lastHandNetted: lhn }, hand] = await Promise.all([
-      this.table.getLineup(tableAddr),
+      this.factory.getTable(tableAddr).getLineup(tableAddr),
       this.db.getLastHand(tableAddr, true),
     ]);
 
@@ -278,7 +278,7 @@ class EventWorker {
 
   async settleTable(tableAddr, sigs, hand) {
     try {
-      await this.table.settle(tableAddr, sigs, hand.netting.newBalances);
+      await this.factory.getTable(tableAddr).settle(tableAddr, sigs, hand.netting.newBalances);
       await this.logger.log('tx: table.settle()', {
         tags: { tableAddr },
         extra: { bals: hand.netting.newBalances, sigs },
@@ -311,7 +311,7 @@ class EventWorker {
     const old = [];
     const bal = [];
     let lhn;
-    return this.table.getLineup(tableAddr).then((rsp) => {
+    return this.factory.getTable(tableAddr).getLineup(tableAddr).then((rsp) => {
       for (let pos = 0; pos < rsp.lineup.length; pos += 1) {
         if (rsp.lineup[pos].address && rsp.lineup[pos].address !== EMPTY_ADDR) {
           bal[pos] = rsp.lineup[pos].amount;
@@ -365,7 +365,7 @@ class EventWorker {
   }
 
   async toggleTable(tableAddr) {
-    const lhn = await this.table.getLastHandNetted(tableAddr);
+    const lhn = await this.factory.getTable(tableAddr).getLastHandNetted(tableAddr);
     const priv = new Buffer(this.oraclePriv.replace('0x', ''), 'hex');
     const callDest = new Buffer(tableAddr.replace('0x', ''), 'hex');
     const hand = Buffer.alloc(4);
@@ -378,7 +378,7 @@ class EventWorker {
     sig.r.copy(activeReceipt, 24);
     sig.s.copy(activeReceipt, 56);
     activeReceipt.writeInt8(sig.v, 88);
-    return this.table.toggleTable(tableAddr, `0x${activeReceipt.toString('hex')}`);
+    return this.factory.getTable(tableAddr).toggleTable(tableAddr, `0x${activeReceipt.toString('hex')}`);
   }
 
   addPlayer(tableAddr) {
@@ -564,7 +564,7 @@ class EventWorker {
         delete lineup[i].amount;
         delete lineup[i].exitHand;
       }
-      const tableType = await this.table.tableType(tableAddr);
+      const tableType = await this.factory.getTable(tableAddr).type;
       const deck = shuffle();
       const changed = now();
       const smallBlind = await this.table.getSmallBlind(tableAddr, 0);

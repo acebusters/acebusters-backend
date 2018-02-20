@@ -7,7 +7,7 @@ import Pusher from 'pusher';
 
 import Db from './src/db';
 import EventWorker from './src/index';
-import Table from './src/tableContract';
+import TableFactory from './src/tableFactory';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
 import Logger from './src/logger';
@@ -17,7 +17,7 @@ let pusher;
 let dynamo;
 let sdb;
 
-exports.handler = function handler(event, context, callback) {
+exports.handler = async function handler(event, context, callback) {
   Raven.config(process.env.SENTRY_URL).install();
   const logger = new Logger(Raven, context.functionName, 'event-worker');
 
@@ -39,7 +39,7 @@ exports.handler = function handler(event, context, callback) {
     }
     web3 = new Web3(web3Provider);
     const contractArgs = [web3, process.env.SENDER_ADDR, new AWS.SQS(), process.env.QUEUE_URL];
-    const table = new Table(process.env.FACTORY_ADDR, ...contractArgs);
+    const tableFactory = new TableFactory(process.env.FACTORY_ADDR, ...contractArgs);
     const mailer = new MailerLite(request, process.env.ML_KEY, process.env.ML_GROUP);
     const lambda = new Lambda(new AWS.Lambda(), process.env.ORACLE_FUNC_NAME);
 
@@ -51,9 +51,11 @@ exports.handler = function handler(event, context, callback) {
       sdb = new AWS.SimpleDB();
     }
 
+    await tableFactory.init();
+
     let requests = [];
     const worker = new EventWorker(
-      table,
+      tableFactory,
       new Db(dynamo, process.env.DYNAMO_TABLE_NAME, sdb, process.env.SDB_TABLE_NAME),
       process.env.ORACLE_PRIV,
       logger,
