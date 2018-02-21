@@ -404,7 +404,7 @@ class EventWorker {
             .sub(this.rc.get(seat.last).amount)
         ),
       }), bals);
-    });
+    }, balances);
   }
 
   async calcDistribution(tableAddr, hand) {

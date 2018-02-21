@@ -146,6 +146,49 @@ sinon.stub(web3.eth, 'contract').returns(web3.eth);
 sinon.stub(web3.eth, 'at', address => ({ ...contract, address }));
 
 describe('Stream worker HandComplete event', () => {
+  it('should calc balances', async () => {
+    const tableAddr = '0xa2decf075b96c8e5858279b31f644501a140e8a7';
+    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
+      handId: 2,
+      dealer: 0,
+      state: 'preflop',
+      lineup: [{
+        address: P1_ADDR,
+      }, {
+        address: P2_ADDR,
+        last: new Receipt(EMPTY_ADDR).bet(2, babz(30)).sign(P2_PRIV),
+      }, {
+        address: P3_ADDR,
+        last: new Receipt(EMPTY_ADDR).bet(2, babz(50)).sign(P3_PRIV),
+      }],
+      deck,
+    } });
+
+    const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, logger);
+    const balances = await worker.getBalances(
+      tableAddr,
+      [
+        {
+          address: P1_ADDR,
+          amount: babz(100),
+        },
+        {
+          address: P2_ADDR,
+          amount: babz(400),
+        },
+        {
+          address: P3_ADDR,
+          amount: babz(300),
+        },
+      ],
+      2,
+      4,
+    );
+    expect(balances[P1_ADDR].toString()).eq(babz(100).toString());
+    expect(balances[P2_ADDR].toString()).eq(babz(340).toString());
+    expect(balances[P3_ADDR].toString()).eq(babz(200).toString());
+  });
+
   it('should handle HandComplete event.', (done) => {
     const tableAddr = '0xa2decf075b96c8e5858279b31f644501a140e8a7';
     const event = {
