@@ -426,7 +426,7 @@ describe('Stream worker HandComplete event', () => {
           address: P3_ADDR,
         }, {
           address: P2_ADDR,
-          sitout: 234,
+          sitout: sinon.match.any,
         }],
         changed: sinon.match.any,
       },
@@ -647,7 +647,7 @@ describe('Stream worker HandComplete event', () => {
           address: P1_ADDR,
         }, {
           address: P2_ADDR,
-          sitout: 123,
+          sitout: sinon.match.any,
         }],
         changed: sinon.match.any,
       },

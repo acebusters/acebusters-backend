@@ -502,10 +502,9 @@ class EventWorker {
             lineup[i].sitout = 1;
           }
           // if player broke, put into sitout
-          // at timestamp of last hand, so he has some time
-          // to rebuy
+          // at now(), so he has some time to rebuy
           if (balances[lineup[i].address] < smallBlind * 2) {
-            lineup[i].sitout = prevHand.changed;
+            lineup[i].sitout = now();
           }
         }
       }
