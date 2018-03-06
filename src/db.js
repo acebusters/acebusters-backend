@@ -26,7 +26,7 @@ const transform = (data) => {
 };
 
 export default class Db {
-  constructor(dynamo, tableName, sdb, sdbTableName) {
+  constructor(dynamo, tableName = 'tables', sdb, sdbTableName = 'requests') {
     this.dynamo = dynamo;
     this.tableName = tableName;
     this.sdb = sdb;
@@ -102,6 +102,32 @@ export default class Db {
           return fulfill(data.Item);
         });
       }
+    });
+  }
+
+  getHands(tableAddr, fromHandId, toHandId) {
+    if (fromHandId >= toHandId) {
+      return Promise.resolve([]);
+    }
+    return new Promise((resolve, reject) => {
+      const Keys = [];
+      for (let i = fromHandId; i < toHandId; i += 1) {
+        Keys.push({ tableAddr, handId: i });
+      }
+      this.dynamo.batchGetItem({
+        RequestItems: {
+          [this.tableName]: { Keys },
+        },
+      }, (err, data) => {
+        if (err) {
+          return reject(err);
+        }
+
+        if (!data.Responses || !data.Responses[this.tableName]) {
+          return reject(new NotFound(`ho hands ${fromHandId}-${toHandId} found.`));
+        }
+        return resolve(data.Responses[this.tableName]);
+      });
     });
   }
 

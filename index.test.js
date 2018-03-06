@@ -51,6 +51,7 @@ const timeoutPeriod = 120;
 
 const dynamo = {
   getItem() {},
+  batchGetItem() {},
   putItem() {},
   updateItem() {},
   query() {},
@@ -500,15 +501,19 @@ describe('Oracle pay', () => {
   });
 
   it('should allow to pay big blind.', (done) => {
-    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
-      handId: 2,
-      lineup: [{
-        address: P1_ADDR,
-      }, {
-        address: P2_ADDR,
-        last: new Receipt(tableAddr).bet(2, babz(10000)).sign(P2_PRIV),
-      }],
-      distribution: new Receipt(tableAddr).dist(2, 0, [babz(2000)]).sign(P1_PRIV),
+    sinon.stub(dynamo, 'batchGetItem').yields(null, { Responses: {
+      tables: [
+        {
+          handId: 2,
+          lineup: [{
+            address: P1_ADDR,
+          }, {
+            address: P2_ADDR,
+            last: new Receipt(tableAddr).bet(2, babz(10000)).sign(P2_PRIV),
+          }],
+          distribution: new Receipt(tableAddr).dist(2, 0, [babz(2000)]).sign(P1_PRIV),
+        },
+      ],
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
@@ -537,7 +542,7 @@ describe('Oracle pay', () => {
     }).catch(done);
   });
 
-  it('should prevent betting more than balance.', (done) => {
+  it('should prevent betting more than balance.', async () => {
     sinon.stub(dynamo, 'getItem').yields(null, { Item: {
       lineup: [{
         address: P1_ADDR,
@@ -548,6 +553,19 @@ describe('Oracle pay', () => {
       distribution: new Receipt(tableAddr).dist(1, 0, [
         babz(20000),
       ]).sign(P1_PRIV),
+    } });
+    sinon.stub(dynamo, 'batchGetItem').yields(null, { Responses: {
+      tables: [{
+        lineup: [{
+          address: P1_ADDR,
+        }, {
+          address: P2_ADDR,
+          last: new Receipt(tableAddr).bet(2, babz(10000)).sign(P2_PRIV),
+        }],
+        distribution: new Receipt(tableAddr).dist(1, 0, [
+          babz(20000),
+        ]).sign(P1_PRIV),
+      }],
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
@@ -567,13 +585,15 @@ describe('Oracle pay', () => {
       [new BigNumber(BALANCE), babz(25000)],
       [0, 0],
     ]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
     const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
 
     const bet = new Receipt(tableAddr).bet(3, babz(10000)).sign(P2_PRIV);
-    oracle.pay(tableAddr, bet).catch((err) => {
+    try {
+      await oracle.pay(tableAddr, bet);
+    } catch (err) {
       expect(err.message).to.contain('can not bet more than balance');
-      done();
-    }).catch(done);
+    }
   });
 
   it('should prevent betting more than balance in same hand.', (done) => {
@@ -1650,6 +1670,7 @@ describe('Oracle pay', () => {
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.batchGetItem.restore) dynamo.batchGetItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
@@ -1716,6 +1737,7 @@ describe('Oracle beat', () => {
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.batchGetItem.restore) dynamo.batchGetItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
@@ -1931,6 +1953,7 @@ describe('Oracle get Hand', () => {
 
   afterEach(() => {
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.batchGetItem.restore) dynamo.batchGetItem.restore();
   });
 });
 
@@ -2147,6 +2170,7 @@ describe('Oracle show', () => {
 
   afterEach(() => {
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.batchGetItem.restore) dynamo.batchGetItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
   });
 });
@@ -2259,6 +2283,7 @@ describe('Oracle netting', () => {
 
   afterEach(() => {
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.batchGetItem.restore) dynamo.batchGetItem.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
   });
 });

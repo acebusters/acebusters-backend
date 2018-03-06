@@ -319,8 +319,7 @@ class TableManager {
       hand.handId, hand.lineup[pos], pos, hand.state, changed, streetMaxBet);
   }
 
-  calcBalance(tableAddr, pos, receipt) {
-    let amount;
+  async calcBalance(tableAddr, pos, receipt) {
     if (receipt.amount.gt(0)) {
       // check if balance sufficient
       // 1. get balance at last netted
@@ -328,32 +327,41 @@ class TableManager {
         // substract all bets
         // add all winnings
       // 3. check if amount - bet > 0
-      return this.contract.getLineup(tableAddr).then((rsp) => {
-        amount = rsp.lineup[pos].amount.toNumber();
-        // return get all old hands
-        const hands = [];
-        for (let i = rsp.lastHandNetted.toNumber() + 1; i < receipt.handId; i += 1) {
-          hands.push(this.db.getHand(tableAddr, i));
+      const { lineup, lastHandNetted } = await this.contract.getLineup(tableAddr);
+      // get all old hands
+      const hands = await this.db.getHands(
+        tableAddr,
+        lastHandNetted.toNumber() + 1,
+        receipt.handId,
+      );
+
+      const subLast = (hand, amount) => (
+        hand.lineup && hand.lineup[pos].last
+        ? amount - this.rc.get(hand.lineup[pos].last).amount.toNumber()
+        : amount
+      );
+      const addOut = (hand, amount) => {
+        const { outs } = this.rc.get(hand.distribution);
+        if (outs[pos] && hand.lineup[pos].address === receipt.signer) {
+          return amount + outs[pos].toNumber();
         }
-        return Promise.all(hands);
-      }).then((hands) => {
-        for (let i = 0; i < hands.length; i += 1) {
-          if (hands[i].lineup[pos].last) {
-            amount -= this.rc.get(hands[i].lineup[pos].last).amount.toNumber();
-          }
-          const outs = this.rc.get(hands[i].distribution).outs;
-          if (outs[pos] && hands[i].lineup[pos].address === receipt.signer) {
-            amount += outs[pos].toNumber();
-          }
-        }
-        const balLeft = amount - receipt.amount.toNumber();
-        if (balLeft >= 0) {
-          return Promise.resolve(balLeft);
-        }
-        throw new Forbidden(`can not bet more than balance (${amount}).`);
-      }, err => Promise.reject(err));
+
+        return amount;
+      };
+
+      const amount = hands.reduce(
+        (mem, hand) => addOut(hand, subLast(hand, mem)),
+        lineup[pos].amount.toNumber(),
+      );
+
+      const balLeft = amount - receipt.amount.toNumber();
+      if (balLeft >= 0) {
+        return balLeft;
+      }
+      throw new Forbidden(`can not bet more than balance (${amount}).`);
     }
-    return Promise.resolve();
+
+    return undefined;
   }
 
   show(tableAddr, receiptString, cards) {
