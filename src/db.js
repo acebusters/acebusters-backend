@@ -1,4 +1,4 @@
-import { dbMethod, transform } from './utils';
+import { dbMethod, transform, range } from './utils';
 
 export default class Db {
 
@@ -53,6 +53,22 @@ export default class Db {
     }
 
     return data.Item;
+  }
+
+  async getHandsRange(tableAddr, fromHand, toHand) {
+    const { Responses } = await this.batchGetItem({
+      RequestItems: {
+        [this.dynamoTableName]: {
+          Keys: range(fromHand, toHand).map(handId => ({ handId, tableAddr })),
+        },
+      },
+    });
+
+    if (!Responses || !Responses[this.dynamoTableName]) {
+      throw new Error(`ho hands ${fromHand}-${toHand} found.`);
+    }
+
+    return Responses[this.dynamoTableName];
   }
 
   async getLastHand(tableAddr, scanForward = false) {
@@ -191,6 +207,10 @@ export default class Db {
 
   getItem(params) {
     return dbMethod(this.dynamo, 'getItem', params);
+  }
+
+  batchGetItem(params) {
+    return dbMethod(this.dynamo, 'batchGetItem', params);
   }
 
   updateItem(params) {

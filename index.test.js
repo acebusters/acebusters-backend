@@ -114,6 +114,7 @@ const web3 = { eth: {
 
 const dynamo = {
   getItem() {},
+  batchGetItem() {},
   putItem() {},
   query() {},
   updateItem() {},
@@ -148,20 +149,22 @@ sinon.stub(web3.eth, 'at', address => ({ ...contract, address }));
 describe('Stream worker HandComplete event', () => {
   it('should calc balances', async () => {
     const tableAddr = '0xa2decf075b96c8e5858279b31f644501a140e8a7';
-    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
-      handId: 2,
-      dealer: 0,
-      state: 'preflop',
-      lineup: [{
-        address: P1_ADDR,
-      }, {
-        address: P2_ADDR,
-        last: new Receipt(EMPTY_ADDR).bet(2, babz(30)).sign(P2_PRIV),
-      }, {
-        address: P3_ADDR,
-        last: new Receipt(EMPTY_ADDR).bet(2, babz(50)).sign(P3_PRIV),
+    sinon.stub(dynamo, 'batchGetItem').yields(null, { Responses: {
+      sb_cashgame: [{
+        handId: 2,
+        dealer: 0,
+        state: 'preflop',
+        lineup: [{
+          address: P1_ADDR,
+        }, {
+          address: P2_ADDR,
+          last: new Receipt(EMPTY_ADDR).bet(2, babz(30)).sign(P2_PRIV),
+        }, {
+          address: P3_ADDR,
+          last: new Receipt(EMPTY_ADDR).bet(2, babz(50)).sign(P3_PRIV),
+        }],
+        deck,
       }],
-      deck,
     } });
 
     const worker = new EventWorker(new Table(web3, '0x1255'), new Db(dynamo), ORACLE_PRIV, logger);
@@ -185,8 +188,8 @@ describe('Stream worker HandComplete event', () => {
       4,
     );
     expect(balances[P1_ADDR].toString()).eq(babz(100).toString());
-    expect(balances[P2_ADDR].toString()).eq(babz(340).toString());
-    expect(balances[P3_ADDR].toString()).eq(babz(200).toString());
+    expect(balances[P2_ADDR].toString()).eq(babz(370).toString());
+    expect(balances[P3_ADDR].toString()).eq(babz(250).toString());
   });
 
   it('should handle HandComplete event.', (done) => {
@@ -607,16 +610,18 @@ describe('Stream worker HandComplete event', () => {
       [babz(0), babz(0)],
     ]);
     sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(50));
-    sinon.stub(dynamo, 'getItem').yields(null, { Item: {
-      handId: 3,
-      lineup: [{
-        address: P1_ADDR,
-        last: new Receipt(EMPTY_ADDR).bet(3, babz(500)).sign(P1_PRIV),
-      }, {
-        address: P2_ADDR,
-        last: new Receipt(EMPTY_ADDR).bet(3, babz(1000)).sign(P2_PRIV),
+    sinon.stub(dynamo, 'batchGetItem').yields(null, { Responses: {
+      sb_cashgame: [{
+        handId: 3,
+        lineup: [{
+          address: P1_ADDR,
+          last: new Receipt(EMPTY_ADDR).bet(3, babz(500)).sign(P1_PRIV),
+        }, {
+          address: P2_ADDR,
+          last: new Receipt(EMPTY_ADDR).bet(3, babz(1000)).sign(P2_PRIV),
+        }],
+        distribution: new Receipt(EMPTY_ADDR).dist(3, 0, [babz(1500)]).sign(ORACLE_PRIV),
       }],
-      distribution: new Receipt(EMPTY_ADDR).dist(3, 0, [babz(1500)]).sign(ORACLE_PRIV),
     } });
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 4,
@@ -666,6 +671,7 @@ describe('Stream worker HandComplete event', () => {
     if (contract.getLineup.call.restore) contract.getLineup.call.restore();
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.batchGetItem.restore) dynamo.batchGetItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();
@@ -1272,6 +1278,7 @@ describe('Stream worker other events', () => {
     if (contract.smallBlind.call.restore) contract.smallBlind.call.restore();
     if (sqs.sendMessage.restore) sqs.sendMessage.restore();
     if (dynamo.getItem.restore) dynamo.getItem.restore();
+    if (dynamo.batchGetItem.restore) dynamo.batchGetItem.restore();
     if (dynamo.putItem.restore) dynamo.putItem.restore();
     if (dynamo.query.restore) dynamo.query.restore();
     if (dynamo.updateItem.restore) dynamo.updateItem.restore();

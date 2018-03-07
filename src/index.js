@@ -391,7 +391,7 @@ class EventWorker {
       return balances;
     }
 
-    const hands = await Promise.all(range(lhn + 1, handId).map(i => this.db.getHand(tableAddr, i)));
+    const hands = await this.db.getHandsRange(tableAddr, lhn + 1, handId);
     const zero = new BigNumber(0);
     return hands.reduce((bals, hand) => {
       const distribution = this.rc.get(hand.distribution);
