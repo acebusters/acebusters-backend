@@ -159,7 +159,7 @@ class ScanManager {
       }
     }
 
-    if (lastHand.handId >= lhn + 10 && lastHand.changed > tooOld) {
+    if (lastHand.handId >= lhn + 10) {
       // if there are more than 10 hands not netted
       // prepare netting in db
       const subject = `TableNettingRequest::${tableAddr}`;
