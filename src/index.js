@@ -188,7 +188,7 @@ class EventWorker {
     const { address, sitout } = hand.lineup[pos];
 
     if (!lineup.some(seat => seat.address === address)) {
-      throw new Error(`player ${address} not in lineup.`);
+      throw new Error(`player ${address} not in lineup of table ${tableAddr}`);
     }
 
     // check if on sitout for more than 5 minutes
