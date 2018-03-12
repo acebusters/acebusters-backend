@@ -9,7 +9,6 @@ import {
   identity,
   not,
   isEmpty,
-  hasReceipt,
   delay,
   shuffle,
   EMPTY_ADDR,
@@ -392,18 +391,23 @@ class EventWorker {
     }
 
     const hands = await this.db.getHandsRange(tableAddr, lhn + 1, handId);
-    const zero = new BigNumber(0);
     return hands.reduce((bals, hand) => {
       const distribution = this.rc.get(hand.distribution);
       const outs = distribution ? distribution.outs : [];
-      return hand.lineup.filter(hasReceipt).reduce((memo, seat, pos) => ({
-        ...memo,
-        [seat.address]: (
-          (memo[seat.address] || zero)
-            .add(outs[pos] || 0)
-            .sub(this.rc.get(seat.last).amount)
-        ),
-      }), bals);
+      return hand.lineup.reduce((memo, seat, pos) => {
+        if (!seat.last) {
+          return memo;
+        }
+
+        return {
+          ...memo,
+          [seat.address]: (
+            memo[seat.address]
+              .add(outs[pos] || 0)
+              .sub(this.rc.get(seat.last).amount)
+          ),
+        };
+      }, bals);
     }, balances);
   }
 
@@ -454,7 +458,12 @@ class EventWorker {
       }
 
       // return get all old hands
-      const balances = await this.getBalances(tableAddr, lineup, lastHandNetted, prevHand.handId);
+      const balances = await this.getBalances(
+        tableAddr,
+        lineup,
+        lastHandNetted,
+        prevHand.handId - 1,
+      );
 
       prevHand.distribution = (
         prevHand.distribution || await this.calcDistribution(tableAddr, prevHand)
