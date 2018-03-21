@@ -12,7 +12,7 @@ export default class Logger {
   }
 
   log(message, context) {
-    return new Promise((fulfill, reject) => {
+    return new Promise((resolve) => {
       const now = Math.floor(Date.now() / 1000);
       this.sentry.captureMessage(
         `${now} - ${message}`,
@@ -23,10 +23,12 @@ export default class Logger {
         },
         (error, eventId) => {
           if (error) {
-            reject(error);
+            // not able to captureMessage, use just console.log
+            console.log(message, context);
+            resolve(error);
             return;
           }
-          fulfill(eventId);
+          resolve(eventId);
         },
       );
     });
@@ -38,7 +40,7 @@ export default class Logger {
         server_name: this.serverName,
       }, (sendErr) => {
         if (sendErr) {
-          console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
+          console.log(sendErr); // eslint-disable-line no-console
           return resolve(sendErr);
         }
         return resolve(e);
