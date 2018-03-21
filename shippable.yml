@@ -2,7 +2,10 @@ language: node_js
 
 env:
   global:
-    - secure: 3cx8DG39I9ChfHCBiVfDxIVmoLeOt9zy0ooQkUajUaE5UXI9IkZw7cNaOaxkQVjO9u969hLJHjXdwY1Sk3SZdSWEnMNeW6d5FNyjnpKLliRNj31mOOcNYBxulLmfEPyleayRQgMbqi3OF0tV7CWj9vAaD9Iam6caqfivKPNu9vATuYprCdz2ZyKMgjWMZnGmFNx4D85/9gorKGYdIfcBTr3WtTW6U/7gUuypqZI8PpE/FOZm4uDJlRtL8d60h/7ahVrAcMAtplunrNrXzCGdSHdap5m/Nas0Kb03+xJ6VlkfPZKfsnAJ8X/73JJCkPL3uAwcim4lovrSS7LB+IBtDg==
+    # AWS_SANDBOX_KEY_ID, AWS_SANDBOX_KEY, AWS_STAGING_KEY_ID, AWS_STAGING_KEY
+    - secure: aOyXpLzu1ZqqbpWVaryjjvib7t0toV6J91za3M71i6g3o9j252xqEYueTP7OuyeadHPdbRLh0aYwDukS5INXkzFb+yfKVlJPi18InzGA1nJJqr+BZWoKdHsQ+csbVxAvPCnp4dZPDX64zeBhxvKLmDvAD+/PfVNTym3JDzrHXJk9aYcLlndGdng7B1nt7gGChTB2sA6NWMabzrdZAG1b7p+JjdBoP9AQfWx9SQI+ThzGRMo6ZsjR+OiE2AWZQK2ku1RpTi3PpOIWkmYcOleBXRn5/84+rBXfCjD6E47FVwqQhG0ECqHMo+ySE0TPve4VDhlLcWIyT4Da3N0AoSxwcA==
+    - BUILDS_BUCKET=s3://builds.acebusters
+    # Lambda settings
     - AWS_ROLE_ARN=arn:aws:iam::105751009136:role/lambda_api_dynamo
     - AWS_REGION=eu-west-1
     - AWS_FUNCTION_NAME=ab-contract-scanner
@@ -27,8 +30,8 @@ build:
 
   on_success:
     - npm run package
-    - if [ "$BRANCH" == "master" ]; then echo "Publishing to Production"; node-lambda deploy -a $AWS_ACCESS_KEY_ID -s $AWS_SECRET_ACCESS_KEY -o $AWS_ROLE_ARN -r $AWS_REGION -n $AWS_FUNCTION_NAME -H $AWS_HANDLER -m $AWS_MEMORY_SIZE -t $AWS_TIMEOUT -u $AWS_RUNTIME -z lambda.zip; fi
-    - if [ "$BRANCH" == "develop" ]; then echo "Deploying to Development"; node-lambda deploy -a $AWS_ACCESS_KEY_ID -s $AWS_SECRET_ACCESS_KEY -o $AWS_ROLE_ARN -r $AWS_REGION -n $AWS_FUNCTION_NAME -H $AWS_HANDLER -m $AWS_MEMORY_SIZE -t $AWS_TIMEOUT -u $AWS_RUNTIME -z lambda.zip; fi
+    - AWS_ACCESS_KEY_ID=$AWS_STAGING_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_STAGING_KEY aws s3 cp lambda.zip $BUILDS_BUCKET/sandbox/contract-scanner.zip
+    - if [ "$BRANCH" == "develop" ]; then echo "Deploying to Sandbox"; node-lambda deploy -a $AWS_SANDBOX_KEY_ID -s $AWS_SANDBOX_KEY -o $AWS_ROLE_ARN -r $AWS_REGION -n $AWS_FUNCTION_NAME -H $AWS_HANDLER -m $AWS_MEMORY_SIZE -t $AWS_TIMEOUT -u $AWS_RUNTIME -z lambda.zip; fi
 
 integrations:
 
