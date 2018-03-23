@@ -27,7 +27,10 @@ export default class StreamScanner {
       newHand.sb, newHand.state, newHand.changed, newHand.deck, newHand.preMaxBet,
       newHand.flopMaxBet, newHand.turnMaxBet, newHand.riverMaxBet,
       newHand.distribution, newHand.netting);
-    await this.publishUpdate(keys.tableAddr, msg);
+    await this.publishUpdate(keys.tableAddr, {
+      ...msg,
+      started: newHand.started,
+    });
 
     const tasks = [];
     if (record.eventName !== 'INSERT') {
