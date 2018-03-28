@@ -21,4 +21,6 @@ TableContract.prototype.getLineup = contractMethod('getLineup', (lineup) => {
   };
 });
 
+TableContract.prototype.getSmallBlind = contractMethod('smallBlind', val => val.toNumber());
+
 module.exports = TableContract;

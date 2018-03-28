@@ -1,5 +1,20 @@
 import { NotFound } from './errors';
 
+const performSeatsUpdate = (joins, leaves, sitout) => {
+  const seats = {
+    ...leaves.reduce((attrs, i) => ({
+      ...attrs,
+      [i]: { address: '0x0000000000000000000000000000000000000000' },
+    }), {}),
+    ...joins.reduce((attrs, seat) => ({
+      ...attrs,
+      [seat.pos]: sitout ? { address: seat.addr, sitout } : { address: seat.addr },
+    }), {}),
+  };
+
+  return seats;
+};
+
 const transform = (data) => {
   let attributes;
   if (data && data.forEach) {
@@ -23,6 +38,19 @@ const transform = (data) => {
     });
   }
   return attributes;
+};
+
+export const emulateSeatsUpdate = (hand, joins, leaves, dealer, sitout, changed) => {
+  const seats = performSeatsUpdate(joins, leaves, sitout);
+  return {
+    ...hand,
+    lineup: Object.keys(seats).reduce((lineup, pos) => {
+      lineup[pos] = seats[pos]; // eslint-disable-line
+      return lineup;
+    }, [...hand.lineup]),
+    dealer,
+    changed,
+  };
 };
 
 export default class Db {
@@ -214,28 +242,31 @@ export default class Db {
     return this.updateItem(params);
   }
 
-  updateSeats(tableAddr, handId, joins, leaves, dealer, sitout, changed) {
-    const seats = {
-      ...leaves.reduce((attrs, i) => ({
-        ...attrs,
-        [i]: { address: '0x0000000000000000000000000000000000000000' },
-      }), {}),
-      ...joins.reduce((attrs, seat) => ({
-        ...attrs,
-        [seat.pos]: sitout ? { address: seat.addr, sitout } : { address: seat.addr },
-      }), {}),
-    };
+  updateSeats(
+    tableAddr,
+    handId,
+    joins,
+    leaves,
+    dealer,
+    sb,
+    sitout,
+    changed,
+    started,
+  ) {
+    const seats = performSeatsUpdate(joins, leaves, sitout);
 
     const expression = Object.keys(seats).map(i => `lineup[${i}] = :s${i}`);
     const params = {
       TableName: this.tableName,
       Key: { tableAddr, handId },
-      UpdateExpression: `set ${[...expression, 'changed = :c', 'dealer = :d'].join(', ')}`,
+      UpdateExpression: `set ${[...expression, 'changed = :c', 'started = :s', 'dealer = :d', 'sb = :sb'].join(', ')}`,
       ExpressionAttributeValues: Object.keys(seats).reduce((attrs, pos) => ({
         ...attrs,
         [`:s${pos}`]: seats[pos],
       }), {
         ':c': changed,
+        ':sb': sb,
+        ':s': started,
         ':d': dealer,
       }),
     };

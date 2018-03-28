@@ -14,6 +14,7 @@ import {
   calcLeaveExitHand,
   checks,
 } from './utils';
+import { emulateSeatsUpdate } from './db';
 
 class TableManager {
   constructor(
@@ -61,27 +62,26 @@ class TableManager {
     };
   }
 
-  info(tableAddr, tableContracts) {
-    return this.db.getLastHand(tableAddr).then(hand => Promise.resolve(
-      this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
+  async info(tableAddr, tableContracts) {
+    try {
+      const hand = await this.db.getLastHand(tableAddr);
+      const info = this.helper.renderHand(hand.handId, hand.lineup, hand.dealer, hand.sb,
         hand.state, hand.changed, hand.deck, hand.preMaxBet, hand.flopMaxBet,
         hand.turnMaxBet, hand.riverMaxBet, hand.distribution, hand.netting,
-      )), (err) => {
-      let tables = [];
-      if (tableContracts) {
-        tables = tableContracts.split(',');
-      }
-      if (err && err.errName === 'NotFound' &&
-        tables.indexOf(tableAddr) > -1) {
-        return Promise.resolve({
+      );
+      return { ...info, started: hand.started };
+    } catch (err) {
+      const tables = tableContracts ? tableContracts.split(',') : [];
+      if (err && err.errName === 'NotFound' && tables.indexOf(tableAddr) > -1) {
+        return {
           handId: 0,
           dealer: 0,
           state: 'showdown',
           distribution: '0x1234',
-        });
+        };
       }
       throw err;
-    });
+    }
   }
 
   getHand(tableAddr, handId) {
@@ -530,8 +530,9 @@ class TableManager {
   }
 
   async lineup(tableAddr) {
-    const [{ lastHandNetted, lineup }, hand] = await Promise.all([
+    const [{ lastHandNetted, lineup }, defaultSmallBlind, hand] = await Promise.all([
       this.contract.getLineup(tableAddr),
+      this.contract.getSmallBlind(tableAddr, 0),
       this.db.getLastHand(tableAddr),
     ]);
 
@@ -556,30 +557,45 @@ class TableManager {
       return 'no changes for lineup detected.';
     }
 
-    const sitout = (hand.state !== 'waiting' && hand.state !== 'dealing') ? now() : undefined;
-    if (hand.state === 'waiting' && !this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state)) {
-      // TODO: optimize this, when handstate waiting, we can update everything at once
-      const nextDealer = joinPos.length > 0 ? joinPos[0].pos : getNextDealer(this.helper, hand);
-      await this.db.updateSeats(
-        tableAddr,
-        hand.handId,
-        joinPos,
-        leavePos,
-        nextDealer,
-        sitout,
-        now(),
-      );
-    } else {
-      await this.db.updateSeats(
-        tableAddr,
-        hand.handId,
-        joinPos,
-        leavePos,
-        hand.dealer,
-        sitout,
-        now(),
-      );
-    }
+    const getDealer = () => {
+      if (hand.state === 'waiting' && !this.helper.isActivePlayer(hand.lineup, hand.dealer, hand.state)) {
+        return joinPos.length > 0 ? joinPos[0].pos : getNextDealer(this.helper, hand);
+      }
+
+      return hand.dealer;
+    };
+
+    const sitout = ( // put new players at sitout if the hand in progress
+      (hand.state !== 'waiting' && hand.state !== 'dealing')
+      ? now()
+      : undefined
+    );
+    const dealer = getDealer();
+    const updatedHand = emulateSeatsUpdate(hand, joinPos, leavePos, dealer, sitout, now());
+    const activeCount = this.helper.countActivePlayers(hand.lineup, hand.state);
+    const nextActiveCount = this.helper.countActivePlayers(updatedHand.lineup, updatedHand.state);
+    const isStart = hand.state === 'waiting' && activeCount < 2 && nextActiveCount >= 2;
+    const isEnd = hand.state === 'waiting' && nextActiveCount < 2;
+
+    console.log('lineup sb', {
+      extra: {
+        isEnd,
+        sb: isEnd ? defaultSmallBlind : hand.sb,
+        defaultSmallBlind,
+        handSb: hand.sb,
+      },
+    });
+    await this.db.updateSeats(
+      tableAddr,
+      hand.handId,
+      joinPos,
+      leavePos,
+      dealer,
+      isEnd ? defaultSmallBlind : hand.sb,
+      sitout,
+      now(), // changed
+      isStart ? now() : hand.started, // started
+    );
 
     this.logger.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
       tags: { tableAddr, handId: hand.handId },
