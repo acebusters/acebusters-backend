@@ -87,7 +87,7 @@ export default class Db {
     return rsp.Items[0];
   }
 
-  async updateSeatLeave(tableAddr, handId, pos, time) {
+  async updateSeatLeave(tableAddr, handId, exitHand, pos, time) {
     const params = {
       TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
@@ -97,7 +97,7 @@ export default class Db {
       },
       ExpressionAttributeValues: {
         ':t': time,
-        ':h': handId,
+        ':h': exitHand,
       },
     };
 

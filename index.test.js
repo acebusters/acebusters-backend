@@ -233,6 +233,7 @@ describe('Stream worker HandComplete event', () => {
         sb: babz(50).toNumber(),
         lineup: [{ address: EMPTY_ADDR }, { address: P1_ADDR }, { address: P2_ADDR }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       const distHand2 = new Receipt(tableAddr).dist(
@@ -311,6 +312,7 @@ describe('Stream worker HandComplete event', () => {
           address: EMPTY_ADDR,
         }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       const distHand2 = new Receipt(tableAddr).dist(
@@ -372,6 +374,7 @@ describe('Stream worker HandComplete event', () => {
           address: P2_ADDR,
         }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       done();
@@ -432,6 +435,7 @@ describe('Stream worker HandComplete event', () => {
           sitout: sinon.match.any,
         }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       done();
@@ -489,6 +493,7 @@ describe('Stream worker HandComplete event', () => {
           address: P2_ADDR,
         }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       done();
@@ -547,6 +552,7 @@ describe('Stream worker HandComplete event', () => {
           address: P2_ADDR,
         }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       done();
@@ -655,6 +661,7 @@ describe('Stream worker HandComplete event', () => {
           sitout: sinon.match.any,
         }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       done();
@@ -903,7 +910,7 @@ describe('Stream worker other events', () => {
         tags: { tableAddr, handId: 2 },
         extra: { leaveReceipt },
       });
-      expect(dynamo.updateItem).callCount(1);
+      expect(dynamo.updateItem).callCount(2);
       expect(dynamo.updateItem).calledWith(
           sinon.match.has('ExpressionAttributeValues',
             sinon.match.has(':h', 2),
@@ -936,6 +943,7 @@ describe('Stream worker other events', () => {
         sb: 50,
         lineup: [{ address: EMPTY_ADDR }, { address: EMPTY_ADDR }],
         changed: sinon.match.any,
+        started: sinon.match.any,
       },
         TableName: 'sb_cashgame' });
       done();

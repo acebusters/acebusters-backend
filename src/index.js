@@ -181,6 +181,9 @@ class EventWorker {
       this.table.getLineup(tableAddr),
       this.db.getLastHand(tableAddr),
     ]);
+    this.logger.log('kickPlayer', {
+      extra: { tableAddr, pos, hand },
+    });
     if (typeof pos === 'undefined' || pos > hand.lineup.length) {
       throw new Error(`pos ${pos} could not be found to kick.`);
     }
@@ -195,10 +198,19 @@ class EventWorker {
       throw new Error(`player ${address} still got ${sitout - now(-5 * 60)} seconds to sit out, not yet to be kicked.`);
     }
 
-    const handId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
-    await this.submitLeave(tableAddr, address, handId);
+    const exitHand = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
+    await this.submitLeave(tableAddr, address, exitHand);
 
-    return this.db.updateSeatLeave(tableAddr, handId, pos, now());
+    return Promise.all(
+      range(exitHand, hand.handId)
+        .map(handId => this.db.updateSeatLeave(
+          tableAddr,
+          handId,
+          exitHand,
+          pos,
+          now(),
+        )),
+    );
   }
 
   async progressNetting(tableAddr) {
