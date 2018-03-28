@@ -415,7 +415,13 @@ class EventWorker {
     if (!hand.deck) {
       throw new Error(`hand ${hand} at table ${tableAddr} invalid.`);
     }
-
+    this.logger.log('calcDistribution', {
+      extra: {
+        lineup: hand.lineup,
+        state: hand.state,
+        boardCards: hand.deck.slice(20, 25), // board cards
+      },
+    });
     const winners = this.helper.calcDistribution(
       hand.lineup,
       hand.state,
@@ -444,13 +450,11 @@ class EventWorker {
   }
 
   async putNextHand(tableAddr) {
-    const [{ lineup, lastHandNetted }, smallBlind] = await Promise.all([
-      this.table.getLineup(tableAddr),
-      this.table.getSmallBlind(tableAddr),
-    ]);
+    const { lineup, lastHandNetted } = await this.table.getLineup(tableAddr);
 
     try {
       const prevHand = await this.db.getLastHand(tableAddr);
+      const smallBlind = await this.table.getSmallBlind(tableAddr, now() - prevHand.started);
 
       // giving more time for showdown
       if (prevHand.state === 'showdown') {
@@ -528,6 +532,7 @@ class EventWorker {
         shuffle(), // deck
         smallBlind,
         now(), // changed
+        prevHand.started,
       );
       return this.logger.log(`NewHand: ${tableAddr}`, {
         level: 'info',
@@ -548,6 +553,7 @@ class EventWorker {
       }
       const deck = shuffle();
       const changed = now();
+      const smallBlind = await this.table.getSmallBlind(tableAddr, 0);
       await this.db.putHand(tableAddr, lastHandNetted + 1, lineup, 0, deck, smallBlind, changed);
 
       return this.logger.log(`NewHand: ${tableAddr}`, {
