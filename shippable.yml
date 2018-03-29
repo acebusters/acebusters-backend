@@ -1,0 +1,49 @@
+language: node_js
+
+env:
+  global:
+    # AWS_SANDBOX_KEY_ID, AWS_SANDBOX_KEY, AWS_STAGING_KEY_ID, AWS_STAGING_KEY
+    - secure: aOyXpLzu1ZqqbpWVaryjjvib7t0toV6J91za3M71i6g3o9j252xqEYueTP7OuyeadHPdbRLh0aYwDukS5INXkzFb+yfKVlJPi18InzGA1nJJqr+BZWoKdHsQ+csbVxAvPCnp4dZPDX64zeBhxvKLmDvAD+/PfVNTym3JDzrHXJk9aYcLlndGdng7B1nt7gGChTB2sA6NWMabzrdZAG1b7p+JjdBoP9AQfWx9SQI+ThzGRMo6ZsjR+OiE2AWZQK2ku1RpTi3PpOIWkmYcOleBXRn5/84+rBXfCjD6E47FVwqQhG0ECqHMo+ySE0TPve4VDhlLcWIyT4Da3N0AoSxwcA==
+    - BUILDS_BUCKET=s3://builds.acebusters
+    # Lambda settings
+    - AWS_ROLE_ARN=arn:aws:iam::105751009136:role/lambda_api_dynamo
+    - AWS_REGION=eu-west-1
+    - AWS_FUNCTION_NAME=ab-contract-scanner
+    - AWS_HANDLER=index.handler
+    - AWS_MEMORY_SIZE=128
+    - AWS_TIMEOUT=30
+    - AWS_RUNTIME=nodejs6.10
+
+node_js:
+  - "6.10"
+
+install:
+  - npm install -g node-lambda
+  - sudo apt-get install zip
+
+build:
+  ci:
+    - echo $BUILD_URL
+    - npm --version
+    - npm install
+    - npm test
+
+  on_success:
+    - npm run package
+    - AWS_ACCESS_KEY_ID=$AWS_STAGING_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_STAGING_KEY aws s3 cp lambda.zip $BUILDS_BUCKET/sandbox/contract-scanner.zip
+    - if [ "$BRANCH" == "develop" ]; then echo "Deploying to Sandbox"; node-lambda deploy -a $AWS_SANDBOX_KEY_ID -s $AWS_SANDBOX_KEY -o $AWS_ROLE_ARN -r $AWS_REGION -n $AWS_FUNCTION_NAME -H $AWS_HANDLER -m $AWS_MEMORY_SIZE -t $AWS_TIMEOUT -u $AWS_RUNTIME -z lambda.zip; fi
+
+integrations:
+
+  notifications:
+    - integrationName: slack_chainfish
+      type: slack
+      recipients:
+        - "#ci"
+      branches:
+        only:
+          - master
+          - develop
+      on_success: change
+      on_failure: always
+      on_start: never
