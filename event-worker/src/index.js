@@ -16,7 +16,7 @@ import {
 
 class EventWorker {
   constructor(
-    table,
+    tableFactory,
     db,
     oraclePriv,
     logger,
@@ -27,7 +27,7 @@ class EventWorker {
     showdownDelay = 0,
   ) {
     this.showdownDelay = showdownDelay;
-    this.table = table;
+    this.factory = tableFactory;
     this.db = db;
     if (oraclePriv) {
       this.oraclePriv = oraclePriv;
@@ -161,12 +161,15 @@ class EventWorker {
   async submitLeave(tableAddr, leaverAddr, exitHand) {
     const leaveReceipt = new Receipt(tableAddr).leave(exitHand, leaverAddr).sign(this.oraclePriv);
     try {
-      const leaveHex = Receipt.parseToParams(leaveReceipt);
-      await this.table.leave(tableAddr, leaveHex);
-      this.logger.log('tx: table.leave()', {
-        tags: { tableAddr, handId: exitHand },
-        extra: { leaveReceipt },
-      });
+      const hand = await this.db.getLastHand(tableAddr);
+      if (hand.type !== 'tournament') {
+        const leaveHex = Receipt.parseToParams(leaveReceipt);
+        await this.factory.getTable(tableAddr).leave(tableAddr, leaveHex);
+        this.logger.log('tx: table.leave()', {
+          tags: { tableAddr, handId: exitHand },
+          extra: { leaveReceipt },
+        });
+      }
     } catch (error) {
       this.logger.log('tx: table.leave()', {
         level: 'error',
@@ -178,12 +181,10 @@ class EventWorker {
 
   async kickPlayer(tableAddr, pos) {
     const [{ lineup }, hand] = await Promise.all([
-      this.table.getLineup(tableAddr),
+      this.factory.getTable(tableAddr).getLineup(tableAddr),
       this.db.getLastHand(tableAddr),
     ]);
-    this.logger.log('kickPlayer', {
-      extra: { tableAddr, pos, hand },
-    });
+
     if (typeof pos === 'undefined' || pos > hand.lineup.length) {
       throw new Error(`pos ${pos} could not be found to kick.`);
     }
@@ -215,7 +216,7 @@ class EventWorker {
 
   async progressNetting(tableAddr) {
     try {
-      await this.table.net(tableAddr);
+      await this.factory.getTable(tableAddr).net(tableAddr);
       this.logger.log('tx: table.net()', {
         tags: { tableAddr },
       });
@@ -245,7 +246,7 @@ class EventWorker {
     const receipts = [].concat(...bets.concat(dists).map(r => Receipt.parseToParams(r)));
 
     try {
-      await this.table.submit(tableAddr, receipts);
+      await this.factory.getTable(tableAddr).submit(tableAddr, receipts);
       this.logger.log('tx: table.submit()', {
         tags: { tableAddr },
         extra: { receipts },
@@ -261,7 +262,7 @@ class EventWorker {
 
   async deleteHands(tableAddr) {
     const [{ lastHandNetted: lhn }, hand] = await Promise.all([
-      this.table.getLineup(tableAddr),
+      this.factory.getTable(tableAddr).getLineup(tableAddr),
       this.db.getLastHand(tableAddr, true),
     ]);
 
@@ -277,7 +278,7 @@ class EventWorker {
 
   async settleTable(tableAddr, sigs, hand) {
     try {
-      await this.table.settle(tableAddr, sigs, hand.netting.newBalances);
+      await this.factory.getTable(tableAddr).settle(tableAddr, sigs, hand.netting.newBalances);
       await this.logger.log('tx: table.settle()', {
         tags: { tableAddr },
         extra: { bals: hand.netting.newBalances, sigs },
@@ -310,7 +311,7 @@ class EventWorker {
     const old = [];
     const bal = [];
     let lhn;
-    return this.table.getLineup(tableAddr).then((rsp) => {
+    return this.factory.getTable(tableAddr).getLineup(tableAddr).then((rsp) => {
       for (let pos = 0; pos < rsp.lineup.length; pos += 1) {
         if (rsp.lineup[pos].address && rsp.lineup[pos].address !== EMPTY_ADDR) {
           bal[pos] = rsp.lineup[pos].amount;
@@ -364,7 +365,7 @@ class EventWorker {
   }
 
   async toggleTable(tableAddr) {
-    const lhn = await this.table.getLastHandNetted(tableAddr);
+    const lhn = await this.factory.getTable(tableAddr).getLastHandNetted(tableAddr);
     const priv = new Buffer(this.oraclePriv.replace('0x', ''), 'hex');
     const callDest = new Buffer(tableAddr.replace('0x', ''), 'hex');
     const hand = Buffer.alloc(4);
@@ -377,7 +378,7 @@ class EventWorker {
     sig.r.copy(activeReceipt, 24);
     sig.s.copy(activeReceipt, 56);
     activeReceipt.writeInt8(sig.v, 88);
-    return this.table.toggleTable(tableAddr, `0x${activeReceipt.toString('hex')}`);
+    return this.factory.getTable(tableAddr).toggleTable(tableAddr, `0x${activeReceipt.toString('hex')}`);
   }
 
   addPlayer(tableAddr) {
@@ -462,7 +463,8 @@ class EventWorker {
   }
 
   async putNextHand(tableAddr) {
-    const { lineup, lastHandNetted } = await this.table.getLineup(tableAddr);
+    const table = this.factory.getTable(tableAddr);
+    const { lineup, lastHandNetted } = await table.getLineup(tableAddr);
 
     try {
       const prevHand = await this.db.getLastHand(tableAddr);
@@ -487,18 +489,12 @@ class EventWorker {
 
       if (prevHand.distribution) {
         // sum up previous hands
-        for (let pos = 0; pos < prevHand.lineup.length; pos += 1) {
-          const distribution = this.rc.get(prevHand.distribution);
-          const outs = distribution ? distribution.outs : [];
-          if (prevHand.lineup[pos].last) {
-            if (typeof outs[pos] === 'undefined') {
-              outs[pos] = new BigNumber(0);
-            }
-            const value = this.rc.get(prevHand.lineup[pos].last).amount;
-            const bal = balances[prevHand.lineup[pos].address] || new BigNumber(0);
-            balances[prevHand.lineup[pos].address] = bal.add(outs[pos]).sub(value);
-          }
-        }
+        const distribution = this.rc.get(prevHand.distribution);
+        const { outs } = distribution;
+        prevHand.lineup.filter(not(isEmpty)).forEach(({ address, last }, pos) => {
+          const out = outs[pos] || new BigNumber(0);
+          balances[address] = balances[address].add(out).sub(this.rc.get(last).amount);
+        });
       }
 
       // create new lineup
@@ -535,9 +531,15 @@ class EventWorker {
       }
 
       const prevDealer = (typeof prevHand.dealer !== 'undefined') ? (prevHand.dealer + 1) : 0;
-      const newDealer = this.helper.nextPlayer(lineup, prevDealer, 'involved', 'waiting');
+      const newDealer = this.helper.nextPlayer(
+        lineup,
+        prevDealer,
+        prevHand.type === 'tournament' ? 'busy' : 'involved',
+        'waiting',
+      );
       await this.db.putHand(
         tableAddr,
+        prevHand.type,
         prevHand.handId + 1,
         lineup,
         newDealer,
@@ -563,10 +565,20 @@ class EventWorker {
         delete lineup[i].amount;
         delete lineup[i].exitHand;
       }
+      const tableType = await this.factory.getTable(tableAddr).type;
       const deck = shuffle();
       const changed = now();
       const smallBlind = await this.table.getSmallBlind(tableAddr, 0);
-      await this.db.putHand(tableAddr, lastHandNetted + 1, lineup, 0, deck, smallBlind, changed);
+      await this.db.putHand(
+        tableAddr,
+        tableType,
+        lastHandNetted + 1,
+        lineup,
+        0,
+        deck,
+        smallBlind,
+        changed,
+      );
 
       return this.logger.log(`NewHand: ${tableAddr}`, {
         level: 'info',

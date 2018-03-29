@@ -131,12 +131,13 @@ export default class Db {
     return rsp.Item;
   }
 
-  async putHand(tableAddr, handId, lineup, dealer, deck, sb, changed, started = changed) {
+  async putHand(tableAddr, type, handId, lineup, dealer, deck, sb, changed, started = changed) {
     try {
       const data = await this.putItem({
         TableName: this.dynamoTableName,
         Item: {
           tableAddr,
+          type,
           handId,
           lineup,
           dealer,
