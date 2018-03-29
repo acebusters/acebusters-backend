@@ -1,0 +1,9 @@
+.env
+deploy.env
+event.json
+event-setup.json
+context.json
+node_modules
+dist
+lambda.zip
+npm-debug.log
