@@ -1,6 +1,7 @@
 import 'buffer-v6-polyfill';
 import request from 'request';
 import ethUtil from 'ethereumjs-util';
+import BigNumber from 'bignumber.js';
 import { PokerHelper, Receipt, Type } from 'poker-helper';
 import { Unauthorized, BadRequest, Forbidden, NotFound, Conflict } from './errors';
 import {
@@ -16,6 +17,19 @@ import {
 } from './utils';
 import { emulateSeatsUpdate } from './db';
 
+const degrade = (fn, fallbackValue) => {
+  try { return fn(); } catch (e) { return fallbackValue; }
+};
+
+const states = ['waiting', 'dealing', 'preflop', 'flop', 'turn', 'river', 'showdown'];
+const nextState = (state) => {
+  const i = states.indexOf(state);
+  if (i >= states.length - 1 || i === -1) {
+    throw new Error(`Wrong state: ${state}`);
+  }
+  return states[i + 1];
+};
+
 class TableManager {
   constructor(
     db,
@@ -25,6 +39,7 @@ class TableManager {
     pusher,
     providerUrl,
     logger,
+    privKey,
   ) {
     this.db = db;
     this.rc = receiptCache;
@@ -32,6 +47,7 @@ class TableManager {
     this.contract = contract;
     this.pusher = pusher;
     this.providerUrl = providerUrl;
+    this.privKey = privKey;
 
     if (typeof timeout !== 'function') {
       this.getTimeout = () => timeout || 60;
@@ -232,6 +248,9 @@ class TableManager {
     if ((prevReceipt && prevReceipt.amount.lt(recAmount)) || (!prevReceipt && recAmount.gt(0))) {
       // calc bal
       const balLeft = await this.calcBalance(tableAddr, pos, receipt);
+      if (balLeft < 0) {
+        throw new Forbidden(`can not bet more than balance (${recAmount}).`);
+      }
       hand.lineup[pos].last = receiptHash;
       if (balLeft === 0) {
         hand.lineup[pos].sitout = 'allin';
@@ -264,41 +283,24 @@ class TableManager {
     return response;
   }
 
-  updateState(tableAddr, handParam, pos) {
-    const hand = handParam;
-    const changed = now();
-    let bettingComplete = false;
-    try {
-      bettingComplete = this.helper.isBettingDone(hand.lineup,
-      hand.dealer, hand.state, hand.sb * 2);
-    } catch (err) {
-      this.logger.log('\'is betting done\' error', {
-        tags: { tableAddr, handId: hand.handId },
-      });
-    }
-    const handComplete = this.helper.isHandComplete(hand.lineup, hand.dealer, hand.state);
-    let streetMaxBet;
-    const prevState = hand.state;
+  async updateState(tableAddr, oldHand, pos) {
+    const hand = { ...oldHand };
+    const { handId, lineup, dealer, sb, type } = hand;
+    const posForUpdate = [pos];
+    const bettingComplete = degrade(
+      () => this.helper.isBettingDone(lineup, dealer, hand.state, sb * 2),
+      false,
+    );
+    const handComplete = this.helper.isHandComplete(lineup, dealer, hand.state);
+
+    const streetMaxBet = (
+      bettingComplete && !handComplete
+      ? this.helper.getMaxBet(lineup, hand.state).amount.toString()
+      : undefined
+    );
+
     if (bettingComplete && !handComplete) {
-      if (hand.state === 'river') {
-        hand.state = 'showdown';
-      }
-      if (hand.state === 'turn') {
-        hand.state = 'river';
-      }
-      if (hand.state === 'flop') {
-        hand.state = 'turn';
-      }
-      if (hand.state === 'preflop') {
-        hand.state = 'flop';
-      }
-      if (hand.state === 'dealing') {
-        hand.state = 'preflop';
-      }
-      if (hand.state === 'waiting') {
-        hand.state = 'dealing';
-      }
-      streetMaxBet = this.helper.getMaxBet(hand.lineup, hand.state).amount.toString();
+      hand.state = nextState(hand.state);
     }
 
     // take care of all-in
@@ -311,12 +313,51 @@ class TableManager {
       } else if (activePlayerCount === 0 && allInPlayerCount < 2) {
         // when there are no active players and only one all-in player,
         // then we should just finish hand
-        hand.state = prevState;
+        hand.state = oldHand.state;
       }
     }
+
+    if (oldHand.state === 'dealing' && hand.state === 'preflop' && type === 'tournament') {
+      const sbPos = this.helper.getSbPos(lineup, dealer, hand.state, type);
+      if (lineup[sbPos].sitout && !lineup[sbPos].last) {
+        const receipt = new Receipt(tableAddr).bet(
+          handId,
+          new BigNumber(sb),
+        ).sign(this.privKey);
+        const sbBal = await this.calcBalance(tableAddr, sbPos, this.rc.get(receipt));
+
+        if (sbBal >= 0) { // check balance > 0 after bet
+          lineup[sbPos].last = receipt;
+          posForUpdate.push(sbPos);
+        }
+      }
+
+      const bbPos = this.helper.getBbPos(lineup, dealer, hand.state, type);
+      if (lineup[bbPos].sitout && !lineup[bbPos].last) {
+        const receipt = new Receipt(tableAddr).bet(
+          handId,
+          new BigNumber(sb * 2),
+        ).sign(this.privKey);
+        const bbBal = await this.calcBalance(tableAddr, bbPos, this.rc.get(receipt));
+
+        if (bbBal >= 0) { // check balance > 0 after bet
+          lineup[bbPos].last = receipt;
+          posForUpdate.push(bbPos);
+        }
+      }
+    }
+
     // update db
-    return this.db.updateSeat(tableAddr,
-      hand.handId, hand.lineup[pos], pos, hand.state, changed, streetMaxBet);
+    return this.db.updateSeatsWithState(
+      tableAddr,
+      hand.handId,
+      posForUpdate.reduce((seats, i) => ({
+        ...seats,
+        [i]: hand.lineup[i],
+      }), {}),
+      hand.state,
+      streetMaxBet,
+    );
   }
 
   async calcBalance(tableAddr, pos, receipt) {
@@ -427,33 +468,54 @@ class TableManager {
 
   async leave(tableAddr, receiptString) {
     const receipt = this.rc.get(receiptString);
-    const { handId, leaverAddr } = receipt;
+    const { leaverAddr } = receipt;
     // check if this hand exists
     const hand = await this.db.getLastHand(tableAddr);
-    const minHandId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
-    if (handId < minHandId) {
-      throw new BadRequest(`forbidden to exit at handId ${handId}`);
+
+    if (hand.type !== 'tournament') {
+      const minHandId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
+      if (receipt.handId < minHandId) {
+        throw new BadRequest(`forbidden to exit at handId ${receipt.handId}`);
+      }
     }
+
     // check signer in lineup
     const { lineup } = await this.contract.getLineup(tableAddr);
     const pos = lineup.findIndex(seat => seat.address === leaverAddr);
     if (pos < 0 || !hand.lineup[pos]) {
       throw new Forbidden(`address ${leaverAddr} not in lineup.`);
     }
-    // check signer not submitting another leave receipt
-    if (hand.lineup[pos].exitHand) {
-      throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} already set.`);
-    }
 
     // set sitout if next hand started after leave receipt
     hand.lineup[pos].sitout = 1;
 
-    const exitHand = calcLeaveExitHand(this.helper, hand, receipt);
+    if (hand.type !== 'tournament') {
+      const minHandId = (hand.state === 'waiting') ? hand.handId - 1 : hand.handId;
+      if (receipt.handId < minHandId) {
+        throw new BadRequest(`forbidden to exit at handId ${receipt.handId}`);
+      }
+
+      // check signer not submitting another leave receipt
+      if (hand.lineup[pos].exitHand) {
+        throw new Forbidden(`exitHand ${hand.lineup[pos].exitHand} already set.`);
+      }
+
+      const exitHand = calcLeaveExitHand(this.helper, hand, receipt);
+      return this.db.updateLeave(
+        tableAddr,
+        hand.handId,
+        pos,
+        exitHand,
+        hand.lineup[pos].sitout,
+        now(),
+      );
+    }
+
     return this.db.updateLeave(
       tableAddr,
       hand.handId,
       pos,
-      exitHand,
+      undefined, // exitHand
       hand.lineup[pos].sitout,
       now(),
     );
@@ -505,7 +567,7 @@ class TableManager {
         // lineup, startPos, type, state) {
         pos = this.helper.nextPlayer(hand.lineup, 0, 'involved', hand.state);
       }
-      if (typeof pos === 'undefined' || hand.lineup[pos].address === EMPTY_ADDR ||
+      if (typeof pos === 'undefined' || pos === -1 || hand.lineup[pos].address === EMPTY_ADDR ||
         typeof hand.lineup[pos].sitout === 'number') {
         return `could not find next player to act in hand ${hand.handId}`;
       }
@@ -577,14 +639,6 @@ class TableManager {
     const isStart = hand.state === 'waiting' && activeCount < 2 && nextActiveCount >= 2;
     const isEnd = hand.state === 'waiting' && nextActiveCount < 2;
 
-    console.log('lineup sb', {
-      extra: {
-        isEnd,
-        sb: isEnd ? defaultSmallBlind : hand.sb,
-        defaultSmallBlind,
-        handSb: hand.sb,
-      },
-    });
     await this.db.updateSeats(
       tableAddr,
       hand.handId,

@@ -18,6 +18,8 @@ function babz(ntz) {
 }
 const BALANCE = babz(50000);
 
+const matchHasNot = property => sinon.match(s => !s.hasOwnProperty(property), `has not ${property}`); // eslint-disable-line no-prototype-builtins
+
 // BET can replace lower bet
 // BET can replace SIT_OUT during dealing state
 // FOLD can replace all but SIT_OUT, and SHOW, given same amount
@@ -71,6 +73,9 @@ const contract = {
   smallBlind: {
     call() {},
   },
+  getTables: {
+    call() {},
+  },
 };
 
 const pusher = {
@@ -90,6 +95,7 @@ const rc = new ReceiptCache();
 const helper = new PokerHelper(rc);
 sinon.stub(web3.eth, 'contract').returns(web3);
 sinon.stub(web3, 'at').returns(contract);
+sinon.stub(contract.getTables, 'call').yields(null, [tableAddr]);
 
 describe('Oracle pay', () => {
   it('should reject receipt with unknown hand Ids.', (done) => {
@@ -117,7 +123,7 @@ describe('Oracle pay', () => {
         address: P3_ADDR,
       }],
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const blind = new Receipt(tableAddr).bet(1, babz(50)).sign(P1_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
@@ -146,7 +152,7 @@ describe('Oracle pay', () => {
         address: P3_ADDR,
       }],
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const blind = new Receipt(tableAddr).bet(3, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
@@ -176,7 +182,7 @@ describe('Oracle pay', () => {
         last: new Receipt(tableAddr).bet(3, babz(50)).sign(P3_PRIV),
       }],
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const blind = new Receipt(tableAddr).bet(3, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
@@ -202,7 +208,7 @@ describe('Oracle pay', () => {
         address: EMPTY_ADDR,
       }],
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const blind = new Receipt(tableAddr).bet(1, babz(100)).sign(P1_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
@@ -230,7 +236,7 @@ describe('Oracle pay', () => {
         address: P2_ADDR,
       }],
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const blind = new Receipt(tableAddr).bet(1, babz(80)).sign(P1_PRIV);
     oracle.pay(tableAddr, blind).catch((err) => {
@@ -252,7 +258,7 @@ describe('Oracle pay', () => {
         address: P2_ADDR,
       }],
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const smallBlind = new Receipt(tableAddr).bet(1, babz(50)).sign(P1_PRIV);
     oracle.pay(tableAddr, smallBlind).catch((err) => {
@@ -277,7 +283,7 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const smallBlind = new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, smallBlind).then(() => {
@@ -302,7 +308,7 @@ describe('Oracle pay', () => {
       state: 'waiting',
       deck,
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const smallBlind = new Receipt(tableAddr).bet(1, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, smallBlind).then((rsp) => {
@@ -330,7 +336,7 @@ describe('Oracle pay', () => {
       }],
       deck,
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bet3 = new Receipt(tableAddr).bet(1, babz(100)).sign(P3_PRIV);
     oracle.pay(tableAddr, bet3).then((rsp) => {
@@ -359,7 +365,7 @@ describe('Oracle pay', () => {
       }],
       deck,
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
     oracle.pay(tableAddr, bet4).then((rsp) => {
@@ -389,12 +395,129 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
     oracle.pay(tableAddr, bet4).then((rsp) => {
       expect(rsp.cards.length).to.eql(2);
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      done();
+    }).catch(done);
+  });
+
+  it('should set state preflop after last 0 receipts and post small blind for sitout at tournament.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
+      dealer: 3,
+      handId: 1,
+      type: 'tournament',
+      state: 'dealing',
+      sb: babz(1).toNumber(),
+      lineup: [{
+        address: P1_ADDR,
+        sitout: 1,
+      }, {
+        address: EMPTY_ADDR,
+      }, {
+        address: P3_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P3_PRIV),
+      }, {
+        address: P4_ADDR,
+      }],
+      deck,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc, 0, null, '', null, P4_PRIV);
+
+    const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
+    oracle.pay(tableAddr, bet4).then((rsp) => {
+      expect(rsp.cards.length).to.eql(2);
+      const seat = {
+        address: P1_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(1)).sign(P4_PRIV),
+        sitout: 1,
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat0', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('should set state preflop after last 0 receipts and post big blind for sitout at tournament.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
+      dealer: 3,
+      handId: 1,
+      type: 'tournament',
+      state: 'dealing',
+      sb: babz(1).toNumber(),
+      lineup: [{
+        address: P1_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P1_PRIV),
+      }, {
+        address: EMPTY_ADDR,
+      }, {
+        address: P3_ADDR,
+        sitout: 1,
+      }, {
+        address: P4_ADDR,
+      }],
+      deck,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc, 0, null, '', null, P4_PRIV);
+
+    const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
+    oracle.pay(tableAddr, bet4).then((rsp) => {
+      expect(rsp.cards.length).to.eql(2);
+      const seat = {
+        address: P3_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(2)).sign(P4_PRIV),
+        sitout: 1,
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
+      done();
+    }).catch(done);
+  });
+
+  it('shouldn\'t post blind for broke players at tournament.', (done) => {
+    sinon.stub(dynamo, 'query').yields(null, []).onFirstCall().yields(null, { Items: [{
+      dealer: 3,
+      handId: 1,
+      type: 'tournament',
+      state: 'dealing',
+      sb: babz(1).toNumber(),
+      lineup: [{
+        address: P1_ADDR,
+        sitout: 1,
+      }, {
+        address: P2_ADDR,
+        sitout: 1,
+      }, {
+        address: P3_ADDR,
+        last: new Receipt(tableAddr).bet(1, babz(0)).sign(P3_PRIV),
+      }, {
+        address: P4_ADDR,
+      }],
+      deck,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [babz(0), babz(0), BALANCE, BALANCE], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc, 0, null, '', null, P4_PRIV);
+
+    const bet4 = new Receipt(tableAddr).bet(1, new BigNumber(0)).sign(P4_PRIV);
+    oracle.pay(tableAddr, bet4).then((rsp) => {
+      expect(rsp.cards.length).to.eql(2);
+      const seat = {
+        address: P4_ADDR,
+        last: bet4,
+      };
+      expect(dynamo.updateItem).callCount(1);
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'preflop')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat3', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', matchHasNot(':seat0')));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', matchHasNot(':seat1')));
       done();
     }).catch(done);
   });
@@ -458,7 +581,7 @@ describe('Oracle pay', () => {
       dealer: 0,
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bet = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, bet).then(() => {
@@ -489,13 +612,13 @@ describe('Oracle pay', () => {
       dealer: 0,
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const pfCheck = new Receipt(tableAddr).checkPre(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, pfCheck).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':m', babz(100).toString())));
-      expect(dynamo.updateItem).calledWith(sinon.match.has('UpdateExpression', 'set lineup[1] = :l, #hand_state = :s, changed = :c, preMaxBet = :m'));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('UpdateExpression', 'set #hand_state = :s, changed = :c, preMaxBet = :m, lineup[1] = :seat1'));
       done();
     }).catch(done);
   });
@@ -530,7 +653,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(1), [P1_ADDR, P2_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bigBlind = new Receipt(tableAddr).bet(3, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, bigBlind).then((rsp) => {
@@ -585,8 +708,7 @@ describe('Oracle pay', () => {
       [new BigNumber(BALANCE), babz(25000)],
       [0, 0],
     ]);
-    sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bet = new Receipt(tableAddr).bet(3, babz(10000)).sign(P2_PRIV);
     try {
@@ -616,7 +738,7 @@ describe('Oracle pay', () => {
       [0, 0],
     ];
     sinon.stub(contract.getLineup, 'call').yields(null, lineup);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const tooMuchBet = new Receipt(tableAddr).bet(1, babz(200)).sign(P2_PRIV);
     oracle.pay(tableAddr, tooMuchBet).catch((err) => {
@@ -657,7 +779,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const fold = new Receipt(tableAddr).fold(1, babz(50)).sign(P2_PRIV);
     oracle.pay(tableAddr, fold).then((rsp) => {
@@ -666,7 +788,7 @@ describe('Oracle pay', () => {
         address: P2_ADDR,
         last: fold,
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       done();
     }).catch(done);
   });
@@ -689,7 +811,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P2_ADDR], [babz(1000), babz(100), babz(1000)], [bn0, bn0, bn0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const allin = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, allin).then((rsp) => {
@@ -699,7 +821,7 @@ describe('Oracle pay', () => {
         last: allin,
         sitout: 'allin',
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'flop')));
       done();
     }).catch(done);
@@ -730,7 +852,7 @@ describe('Oracle pay', () => {
       [babz(1000), bn0, babz(100), babz(1000)],
       [bn0, bn0, bn0, bn0],
     ]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const allin = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, allin).then(() => {
@@ -739,7 +861,7 @@ describe('Oracle pay', () => {
         last: allin,
         sitout: 'allin',
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'showdown')));
       done();
     }).catch(done);
@@ -770,7 +892,7 @@ describe('Oracle pay', () => {
       [EMPTY_ADDR, P1_ADDR, P4_ADDR, P2_ADDR],
       [bn0, babz(2000), babz(2000), babz(1000)],
       [bn0, bn0, bn0, bn0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const call = new Receipt(tableAddr).bet(3, babz(1000)).sign(P1_PRIV);
     oracle.pay(tableAddr, call).then((rsp) => {
@@ -779,7 +901,7 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
         last: call,
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'showdown')));
       done();
     }).catch(done);
@@ -808,7 +930,7 @@ describe('Oracle pay', () => {
       [babz(2000), babz(1000), babz(2000)],
       [bn0, bn0, bn0],
     ]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const callIn = new Receipt(tableAddr).bet(3, babz(1000)).sign(P2_PRIV);
     oracle.pay(tableAddr, callIn).then((rsp) => {
@@ -818,7 +940,7 @@ describe('Oracle pay', () => {
         last: callIn,
         sitout: 'allin',
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'turn')));
       done();
     }).catch(done);
@@ -849,7 +971,7 @@ describe('Oracle pay', () => {
       [babz(2000), babz(1000), babz(0), babz(2000)],
       [bn0, bn0, bn0, bn0],
     ]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const callIn = new Receipt(tableAddr).bet(3, babz(1000)).sign(P2_PRIV);
     oracle.pay(tableAddr, callIn).then((rsp) => {
@@ -859,7 +981,7 @@ describe('Oracle pay', () => {
         last: callIn,
         sitout: 'allin',
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'showdown')));
       done();
     }).catch(done);
@@ -893,7 +1015,7 @@ describe('Oracle pay', () => {
       [babz(800), babz(1300), babz(0), babz(1400)],
       [bn0, bn0, bn0, bn0],
     ]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const call = new Receipt(tableAddr).bet(3, babz(1300)).sign(P2_PRIV);
     oracle.pay(tableAddr, call).then((rsp) => {
@@ -903,7 +1025,7 @@ describe('Oracle pay', () => {
         last: call,
         sitout: 'allin',
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'showdown')));
       done();
     }).catch(done);
@@ -918,7 +1040,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(1, new BigNumber(0)).sign(P3_PRIV);
     oracle.pay(tableAddr, sitout).then((rsp) => {
@@ -927,7 +1049,7 @@ describe('Oracle pay', () => {
         address: P3_ADDR,
         sitout: sinon.match.any,
         last: sitout };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
       done();
     }).catch(done);
   });
@@ -948,7 +1070,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(1, new BigNumber(0)).sign(P3_PRIV);
     oracle.pay(tableAddr, sitout).then((rsp) => {
@@ -957,7 +1079,7 @@ describe('Oracle pay', () => {
         address: P3_ADDR,
         sitout: sinon.match.any,
         last: sitout };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
       done();
     }).catch(done);
   });
@@ -986,7 +1108,7 @@ describe('Oracle pay', () => {
       [new BigNumber(BALANCE), new BigNumber(0), new BigNumber(BALANCE), new BigNumber(0)],
       [new BigNumber(0), new BigNumber(0), new BigNumber(0), new BigNumber(0)],
     ]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(3, babz(50)).sign(P1_PRIV);
     oracle.pay(tableAddr, sitout).then((rsp) => {
@@ -995,7 +1117,7 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
         sitout: sinon.match.any,
         last: sitout };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat0', seat)));
       done();
     }).catch(done);
   });
@@ -1016,7 +1138,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(1, new BigNumber(0)).sign(P3_PRIV);
     oracle.pay(tableAddr, sitout).then(() => {
@@ -1024,7 +1146,7 @@ describe('Oracle pay', () => {
         address: P3_ADDR,
         sitout: sinon.match.any,
         last: sitout };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
       done();
     }).catch(done);
   });
@@ -1045,7 +1167,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(1, babz(1)).sign(P3_PRIV);
     oracle.pay(tableAddr, sitout).then((rsp) => {
@@ -1054,7 +1176,7 @@ describe('Oracle pay', () => {
         address: P3_ADDR,
         sitout: sinon.match.any,
         last: sitout };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
       done();
     }).catch(done);
   });
@@ -1079,7 +1201,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(13, babz(100)).sign(P1_PRIV);
     oracle.pay(tableAddr, sitout).catch((err) => {
@@ -1105,14 +1227,14 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(13, babz(4)).sign(P1_PRIV);
     oracle.pay(tableAddr, sitout).then((rsp) => {
       expect(rsp).to.eql({});
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'dealing')));
       const seat = { address: P1_ADDR, last: sitout };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat0', seat)));
       done();
     }).catch(done);
   });
@@ -1135,7 +1257,7 @@ describe('Oracle pay', () => {
       lineup,
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     expect(helper.isHandComplete(lineup, 0, 'preflop')).to.eql(false);
 
@@ -1143,7 +1265,7 @@ describe('Oracle pay', () => {
     oracle.pay(tableAddr, fold).then((rsp) => {
       expect(rsp).to.eql({});
       const trueIsh = sinon.match((value) => {
-        const l = [lineup[0], value.ExpressionAttributeValues[':l']];
+        const l = [lineup[0], value.ExpressionAttributeValues[':seat1']];
         return helper.isHandComplete(l, 0, 'preflop');
       }, 'trueIsh');
 
@@ -1172,7 +1294,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(12), [P1_ADDR, P2_ADDR, P3_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const sitout = new Receipt(tableAddr).sitOut(13, babz(100)).sign(P1_PRIV);
     oracle.pay(tableAddr, sitout).then((rsp) => {
@@ -1181,7 +1303,7 @@ describe('Oracle pay', () => {
         address: P1_ADDR,
         sitout: sinon.match.any,
         last: sitout };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat0', seat)));
       done();
     }).catch(done);
   });
@@ -1209,7 +1331,7 @@ describe('Oracle pay', () => {
     sinon.stub(contract.smallBlind, 'call').yields(null, babz(50));
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR, P3_ADDR, P4_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const fold3 = new Receipt(tableAddr).fold(1, babz(100)).sign(P3_PRIV);
     oracle.pay(tableAddr, fold3).then((rsp) => {
@@ -1311,13 +1433,13 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bet = new Receipt(tableAddr).sitOut(1, new BigNumber(0)).sign(P2_PRIV);
     oracle.pay(tableAddr, bet).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'waiting')));
       const seat = { address: P2_ADDR, last: bet };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat2', seat)));
       done();
     }).catch(done);
   });
@@ -1345,13 +1467,13 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bet = new Receipt(tableAddr).sitOut(1, new BigNumber(0)).sign(P2_PRIV);
     oracle.pay(tableAddr, bet).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'waiting')));
       const seat = { address: P2_ADDR, last: bet };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       done();
     }).catch(done);
   });
@@ -1380,7 +1502,7 @@ describe('Oracle pay', () => {
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const action = new Receipt(tableAddr).sitOut(1, NTZ_DECIMAL).sign(P2_PRIV);
     oracle.pay(tableAddr, action).then(() => {
@@ -1389,7 +1511,7 @@ describe('Oracle pay', () => {
         address: P2_ADDR,
         last: action,
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       done();
     }).catch(done);
   });
@@ -1417,7 +1539,7 @@ describe('Oracle pay', () => {
         last: new Receipt(tableAddr).bet(3, babz(100)).sign(P1_PRIV),
       }],
     }] });
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const action = new Receipt(tableAddr).sitOut(3, new BigNumber(0)).sign(P2_PRIV);
     oracle.pay(tableAddr, action).catch((err) => {
@@ -1496,7 +1618,7 @@ describe('Oracle pay', () => {
       deck,
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const bigBlind = new Receipt(tableAddr).bet(1, babz(100)).sign(P2_PRIV);
     oracle.pay(tableAddr, bigBlind).then((rsp) => {
@@ -1528,7 +1650,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     oracle.pay(tableAddr, check2).then((rsp) => {
       expect(rsp).to.eql({
@@ -1559,7 +1681,7 @@ describe('Oracle pay', () => {
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     oracle.pay(tableAddr, check3a).then((rsp) => {
       expect(rsp).to.eql({
@@ -1592,7 +1714,7 @@ describe('Oracle pay', () => {
       deck,
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const call = new Receipt(tableAddr).bet(13, babz(200)).sign(P1_PRIV);
     oracle.pay(tableAddr, call).then((rsp) => {
@@ -1626,7 +1748,7 @@ describe('Oracle pay', () => {
       dealer: 0,
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
 
     const lowBet = new Receipt(tableAddr).bet(2, babz(60)).sign(P1_PRIV);
     oracle.pay(tableAddr, lowBet).catch((err) => {
@@ -1660,7 +1782,7 @@ describe('Oracle pay', () => {
 
     oracle.pay(tableAddr, fold).then(() => {
       const seat = { address: P1_ADDR, last: fold };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat0', seat)));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s', 'turn')));
       done();
     }).catch(done);
@@ -1711,7 +1833,7 @@ describe('Oracle beat', () => {
   it('should reject receipt if player not in lineup', async () => {
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, EMPTY_ADDR], [new BigNumber(BALANCE), bn0], [0, 0]]);
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
     const wait = new Receipt(tableAddr).wait().sign(P2_PRIV);
     try {
       await oracle.beat(tableAddr, wait);
@@ -1725,7 +1847,7 @@ describe('Oracle beat', () => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [{ handId: 2 }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc);
+    const oracle = new Oracle(new Db(dynamo), new TableContract(EMPTY_ADDR, web3), rc);
     const wait = new Receipt(tableAddr).wait().sign(P1_PRIV);
     await oracle.beat(tableAddr, wait);
 
@@ -2212,7 +2334,12 @@ describe('Oracle leave', () => {
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, timeoutPeriod);
+    const oracle = new Oracle(
+      new Db(dynamo),
+      new TableContract(EMPTY_ADDR, web3),
+      rc,
+      timeoutPeriod,
+    );
 
     oracle.leave(tableAddr, leave).then(() => {
       const seat = {
@@ -2236,7 +2363,12 @@ describe('Oracle leave', () => {
     sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
-    const oracle = new Oracle(new Db(dynamo), new TableContract(web3), rc, timeoutPeriod);
+    const oracle = new Oracle(
+      new Db(dynamo),
+      new TableContract(EMPTY_ADDR, web3),
+      rc,
+      timeoutPeriod,
+    );
 
     oracle.leave(tableAddr, leave).then(() => {
       const seat = {
@@ -2245,6 +2377,40 @@ describe('Oracle leave', () => {
         sitout: 1,
       };
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':eh', seat.exitHand)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', seat.sitout)));
+      done();
+    }).catch(done);
+  });
+
+  it('should disallow to leave for tournament tables', (done) => {
+    const leave = new Receipt(tableAddr).leave(2, P1_ADDR).sign(P1_PRIV);
+    const lineup = [{ address: P1_ADDR }, { address: P2_ADDR }];
+
+    sinon.stub(dynamo, 'query').yields(null, { Items: [{
+      handId: 3,
+      state: 'waiting',
+      type: 'tournament',
+      lineup,
+    }] });
+    sinon.stub(contract.getLineup, 'call').yields(null, [bn0, [P1_ADDR, P2_ADDR], [new BigNumber(BALANCE), new BigNumber(BALANCE)], [0, 0]]);
+    sinon.stub(dynamo, 'updateItem').yields(null, {});
+
+    const oracle = new Oracle(
+      new Db(dynamo),
+      new TableContract(EMPTY_ADDR, web3),
+      rc,
+      timeoutPeriod,
+    );
+
+    oracle.leave(tableAddr, leave).then(() => {
+      const seat = {
+        address: P1_ADDR,
+        sitout: 1,
+      };
+      expect(dynamo.updateItem).calledWith(sinon.match.has(
+        'ExpressionAttributeValues',
+        matchHasNot(':eh'), // eslint-disable-line
+      ));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':so', seat.sitout)));
       done();
     }).catch(done);
@@ -2331,7 +2497,7 @@ describe('Oracle timing', () => {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).then(() => {
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', {
         address: P2_ADDR,
         last: bet1,
         sitout: sinon.match.number,
@@ -2375,7 +2541,7 @@ describe('Oracle timing', () => {
 
     const oracle = new Oracle(new Db(dynamo), null, rc);
     oracle.timeout(tableAddr).then(() => {
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', {
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat0', {
         address: P1_ADDR,
         sitout: sinon.match.number,
       })));
@@ -2447,7 +2613,7 @@ describe('Oracle timing', () => {
         address: P1_ADDR,
         sitout: sinon.match.number,
       };
-      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':l', seat)));
+      expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':seat1', seat)));
       done();
     }).catch(done);
   });
@@ -2612,7 +2778,7 @@ describe('Oracle lineup', () => {
     sinon.stub(sentry, 'captureMessage').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, logger);
+      new TableContract(EMPTY_ADDR, web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       const seat = { address: EMPTY_ADDR };
       expect(dynamo.updateItem).callCount(1);
@@ -2625,7 +2791,6 @@ describe('Oracle lineup', () => {
       done();
     }).catch(done);
   });
-
 
   it('should handle Table join as first player.', (done) => {
     sinon.stub(contract.getLineup, 'call').yields(null, [new BigNumber(2),
@@ -2646,7 +2811,7 @@ describe('Oracle lineup', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, logger);
+      new TableContract(EMPTY_ADDR, web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s1', { address: P2_ADDR })));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
@@ -2677,7 +2842,7 @@ describe('Oracle lineup', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, logger);
+      new TableContract(EMPTY_ADDR, web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s1', { address: P2_ADDR })));
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':d', 1)));
@@ -2709,7 +2874,7 @@ describe('Oracle lineup', () => {
     sinon.stub(dynamo, 'updateItem').yields(null, {});
 
     const oracle = new Oracle(new Db(dynamo),
-      new TableContract(web3), rc, null, null, null, logger);
+      new TableContract(EMPTY_ADDR, web3), rc, null, null, null, logger);
     oracle.lineup(tableAddr).then(() => {
       expect(dynamo.updateItem).calledWith(sinon.match.has('ExpressionAttributeValues', sinon.match.has(':s2', { address: P3_ADDR, sitout: sinon.match.number })));
       done();
