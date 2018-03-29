@@ -8,9 +8,18 @@ export default class CashgameTable extends Table {
     this.type = 'cashgame';
   }
 
-  async getSmallBlind(tableAddr) {
+  net(tableAddr) {
+    return this.sendTransaction(this.contract(tableAddr), 'net', 2600000);
+  }
+
+  submit(tableAddr, receipts) {
     const contract = this.contract(tableAddr);
-    return this.call(contract.smallBlind.call).then(val => val.toNumber());
+    return this.call(contract.submit.call, receipts).then((writeCount) => {
+      if (writeCount === 0) {
+        throw new Error('Already submitted');
+      }
+      return this.sendTransaction(contract, 'submit', 1900000, [receipts]);
+    });
   }
 
 }
