@@ -1,13 +1,12 @@
 import AWS from 'aws-sdk';
-import Raven from 'raven';
 import Web3 from 'web3';
+import Logger from 'ab-backend-common/logger';
 import Db from './src/db';
 import Email from './src/email';
 import Recaptcha from './src/recaptcha';
 import ProxyContr from './src/proxyContract';
 import NutzContr from './src/nutzContract';
 import AccountManager from './src/index';
-import Logger from './src/logger';
 import SlackAlert from './src/slackAlert';
 
 const simpledb = new AWS.SimpleDB();
@@ -20,9 +19,7 @@ const handleError = function handleError(err, logger, callback) {
 let web3Provider;
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL).install();
-
-  const logger = new Logger(Raven, context.functionName, 'account-service');
+  const logger = new Logger(process.env.SENTRY_URL, context.functionName, 'account-service');
 
   let web3;
   if (!web3Provider) {

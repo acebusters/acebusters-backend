@@ -2,13 +2,12 @@ import Web3 from 'web3';
 import AWS from 'aws-sdk';
 import doc from 'dynamodb-doc';
 import { ReceiptCache } from 'poker-helper';
-import Raven from 'raven';
 import Pusher from 'pusher';
+import Logger from 'ab-backend-common/logger';
 
 import Db from './src/db';
 import TableContract from './src/tableContract';
 import TableManager from './src/index';
-import Logger from './src/logger';
 
 let web3;
 let pusher;

@@ -1,17 +1,14 @@
 import AWS from 'aws-sdk';
 import Pusher from 'pusher';
 import { ReceiptCache } from 'poker-helper';
-import Raven from 'raven';
+import Logger from 'ab-backend-common/logger';
 import StreamWorker from './src/index';
-import Logger from './src/logger';
 
 let pusher;
 const rc = new ReceiptCache();
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL).install();
-
-  const logger = new Logger(Raven, context.functionName, 'stream-scanner');
+  const logger = new Logger(process.env.SENTRY_URL, context.functionName, 'stream-scanner');
 
   if (typeof pusher === 'undefined') {
     pusher = new Pusher({

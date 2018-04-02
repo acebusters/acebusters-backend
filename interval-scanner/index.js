@@ -1,15 +1,13 @@
 import AWS from 'aws-sdk';
 import doc from 'dynamodb-doc';
 import Web3 from 'web3';
-import Raven from 'raven';
+import Logger from 'ab-backend-common/logger';
 
 import Dynamo from './src/dynamo';
 import Db from './src/db';
 import ScanManager from './src/scanner';
 import Table from './src/tableContract';
 import Factory from './src/factoryContract';
-import Logger from './src/logger';
-
 
 let web3Provider;
 const simpledb = new AWS.SimpleDB();
@@ -19,8 +17,7 @@ let dynamo;
 exports.handler = function handler(event, context, callback) {
   context.callbackWaitsForEmptyEventLoop = false; // eslint-disable-line no-param-reassign
 
-  Raven.config(process.env.SENTRY_URL).install();
-  const logger = new Logger(Raven, context.functionName, 'interval-scanner');
+  const logger = new Logger(process.env.SENTRY_URL, context.functionName, 'interval-scanner');
 
   let web3;
   if (!web3Provider) {

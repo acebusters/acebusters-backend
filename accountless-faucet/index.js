@@ -1,18 +1,15 @@
 import AWS from 'aws-sdk';
-import Raven from 'raven';
 import Web3 from 'web3';
+import Logger from 'ab-backend-common/logger';
 import NutzContract from './src/nutzContract';
 import Faucet from './src/index';
-import Logger from './src/logger';
 
 const handleError = function handleError(err, logger, callback) {
   logger.exception(err).then(callback);
 };
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL).install();
-
-  const logger = new Logger(Raven, context.functionName, 'accountless-faucet');
+  const logger = new Logger(process.env.SENTRY_URL, context.functionName, 'accountless-faucet');
   const web3 = new Web3();
   web3.setProvider(new web3.providers.HttpProvider(process.env.PROVIDER_URL));
 

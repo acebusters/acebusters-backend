@@ -1,7 +1,10 @@
-export default class Logger {
+import Raven from 'raven';
 
-  constructor(sentry, serverName, serviceName) {
-    this.sentry = sentry;
+module.exports = class Logger {
+
+  constructor(sentryUrl, serverName, serviceName) {
+    Raven.config(sentryUrl).install();
+    this.sentry = Raven;
     this.serverName = serverName || serviceName;
 
     if (process.env.SERVICE_NAME !== serviceName) {
@@ -16,11 +19,10 @@ export default class Logger {
       const now = Math.floor(Date.now() / 1000);
       this.sentry.captureMessage(
         `${now} - ${message}`,
-        {
+        Object.assign({
           level: 'info',
-          ...context,
           server_name: this.serverName,
-        },
+        }, context),
         (error, eventId) => {
           if (error) {
             // not able to captureMessage, use just console.log
@@ -29,7 +31,7 @@ export default class Logger {
             return;
           }
           resolve(eventId);
-        },
+        }
       );
     });
   }
@@ -40,7 +42,7 @@ export default class Logger {
         server_name: this.serverName,
       }, (sendErr) => {
         if (sendErr) {
-          console.log(sendErr); // eslint-disable-line no-console
+          console.log(JSON.stringify(sendErr)); // eslint-disable-line no-console
           return resolve(sendErr);
         }
         return resolve(e);

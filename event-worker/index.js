@@ -1,16 +1,15 @@
 import doc from 'dynamodb-doc';
 import Web3 from 'web3';
-import Raven from 'raven';
 import AWS from 'aws-sdk';
 import request from 'request';
 import Pusher from 'pusher';
+import Logger from 'ab-backend-common/logger';
 
 import Db from './src/db';
 import EventWorker from './src/index';
 import Table from './src/tableContract';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
-import Logger from './src/logger';
 
 let web3Provider;
 let pusher;
@@ -18,8 +17,7 @@ let dynamo;
 let sdb;
 
 exports.handler = function handler(event, context, callback) {
-  Raven.config(process.env.SENTRY_URL).install();
-  const logger = new Logger(Raven, context.functionName, 'event-worker');
+  const logger = new Logger(process.env.SENTRY_URL, context.functionName, 'event-worker');
 
   if (typeof pusher === 'undefined') {
     pusher = new Pusher({

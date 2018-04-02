@@ -1,12 +1,11 @@
 import Web3 from 'web3';
-import Raven from 'raven';
 import Pusher from 'pusher';
 import AWS from 'aws-sdk';
+import Logger from 'ab-backend-common/logger';
 
 import Db from './src/db';
 import TableContract from './src/tableContract';
 import ReserveService from './src/index';
-import Logger from './src/logger';
 
 const simpledb = new AWS.SimpleDB();
 let web3Provider;
@@ -14,8 +13,7 @@ let pusher;
 
 exports.handler = function handler(event, context, callback) {
   context.callbackWaitsForEmptyEventLoop = false; // eslint-disable-line no-param-reassign
-  Raven.config(process.env.SENTRY_URL).install();
-  const logger = new Logger(Raven, context.functionName || 'reserve-service');
+  const logger = new Logger(process.env.SENTRY_URL, context.functionName || 'reserve-service');
 
   try {
     if (typeof pusher === 'undefined') {
