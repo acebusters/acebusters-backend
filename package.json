@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "postinstall": "npm --prefix=./common install",
     "lint": "eslint --fix",
     "build": "npm run build:init && npm run build:js && npm run build:install",
     "build:init": "rm -rf $PACKAGE/dist && mkdir $PACKAGE/dist",
