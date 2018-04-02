@@ -4,14 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r babel-register -r babel-polyfill *.test.js"
+    "test": "cd .. && PACKAGE=accountless-faucet npm test"
   },
   "author": "Alex Lunyov <isuntc@gmail.com> (http://sunify.github.io/)",
   "license": "MIT",
   "devDependencies": {
-    "babel-register": "^6.9.0",
     "chai": "latest",
-    "mocha": "^2.5.3",
     "node-lambda": "^0.8.3",
     "sinon": "^1.17.4",
     "sinon-chai": "^2.8.0"

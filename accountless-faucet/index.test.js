@@ -1,7 +1,6 @@
 import chai from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
-import { it, describe, afterEach } from 'mocha';
 
 chai.use(sinonChai);
 

@@ -3,7 +3,6 @@ import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
 import BigNumber from 'bignumber.js';
 import { Receipt, ReceiptCache } from 'poker-helper';
-import { it, describe, afterEach } from 'mocha';
 import Logger from 'ab-backend-common/logger';
 import StreamWorker from './src/index';
 

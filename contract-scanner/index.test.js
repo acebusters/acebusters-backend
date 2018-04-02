@@ -1,7 +1,6 @@
 import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
-import { it, describe, afterEach, beforeEach } from 'mocha';
 
 import ScanManager from './src/scanner';
 import Db from './src/db';

@@ -4,7 +4,7 @@
   "description": "checking certain condition in regular intervals.",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r babel-register -r babel-polyfill index.test.js"
+    "test": "cd .. && PACKAGE=interval-scanner npm test"
   },
   "author": "acebusters",
   "license": "MIT",
@@ -18,9 +18,7 @@
     "web3": "^0.18.2"
   },
   "devDependencies": {
-    "babel-register": "^6.9.0",
     "chai": "latest",
-    "mocha": "^2.5.3",
     "node-lambda": "^0.8.3",
     "sinon": "^1.17.4",
     "sinon-chai": "^2.8.0"

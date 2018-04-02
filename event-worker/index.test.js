@@ -2,7 +2,6 @@ import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
 import { Receipt } from 'poker-helper';
-import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
 import Logger from 'ab-backend-common/logger';
 

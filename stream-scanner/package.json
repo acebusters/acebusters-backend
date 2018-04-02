@@ -4,7 +4,7 @@
   "description": "checks dynamo stream and takes actions",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r babel-register -r babel-polyfill index.test.js"
+    "test": "cd .. && PACKAGE=stream-scanner npm test"
   },
   "repository": {
     "type": "git",
@@ -16,7 +16,6 @@
   "devDependencies": {
     "babel-register": "^6.9.0",
     "chai": "latest",
-    "mocha": "^3.0.2",
     "node-lambda": "^0.8.13",
     "sinon": "^1.17.5",
     "sinon-chai": "^2.8.0"

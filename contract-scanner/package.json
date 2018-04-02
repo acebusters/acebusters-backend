@@ -4,7 +4,7 @@
   "description": "scanning contract events and sending notifications.",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r babel-register -r babel-polyfill index.test.js"
+    "test": "cd .. && PACKAGE=contract-scanner npm test"
   },
   "author": "acebusters",
   "license": "MIT",
@@ -15,8 +15,6 @@
     "web3": "^0.18.2"
   },
   "devDependencies": {
-    "babel-register": "^6.9.0",
-    "mocha": "^2.5.3",
     "chai": "latest",
     "node-lambda": "^0.8.3",
     "sinon": "^1.17.4",

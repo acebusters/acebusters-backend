@@ -4,12 +4,10 @@
   "description": "take events and execute",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -r babel-register -r babel-polyfill index.test.js"
+    "test": "cd .. && PACKAGE=event-worker npm test"
   },
   "devDependencies": {
-    "babel-register": "^6.9.0",
     "chai": "latest",
-    "mocha": "^3.0.2",
     "node-lambda": "^0.8.7",
     "sinon": "^1.17.5",
     "sinon-chai": "^2.8.0"

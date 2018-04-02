@@ -1,7 +1,6 @@
 import chai, { expect, assert } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
-import { it, describe, afterEach } from 'mocha';
 import { Receipt } from 'poker-helper';
 import Db from './src/db';
 import Email from './src/email';
