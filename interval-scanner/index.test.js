@@ -3,12 +3,12 @@ import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
 import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
+import Logger from 'ab-backend-common/logger';
 
 import ScanManager from './src/scanner';
 import Dynamo from './src/dynamo';
 import Db from './src/db';
 import Table from './src/tableContract';
-import Logger from './src/logger';
 import Factory from './src/factoryContract';
 
 chai.use(sinonChai);

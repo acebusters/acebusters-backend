@@ -17,6 +17,7 @@
   "devDependencies": {
     "babel-register": "^6.9.0",
     "mocha": "^2.5.3",
+    "chai": "latest",
     "node-lambda": "^0.8.3",
     "sinon": "^1.17.4",
     "sinon-chai": "^2.8.0"

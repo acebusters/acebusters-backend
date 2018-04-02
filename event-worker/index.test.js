@@ -4,13 +4,13 @@ import sinon from 'sinon';
 import { Receipt } from 'poker-helper';
 import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
+import Logger from 'ab-backend-common/logger';
 
 import EventWorker from './src/index';
 import Table from './src/tableContract';
 import Db from './src/db';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
-import Logger from './src/logger';
 
 chai.use(sinonChai);
 

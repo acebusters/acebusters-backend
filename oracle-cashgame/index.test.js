@@ -4,9 +4,9 @@ import sinon from 'sinon';
 import { it, describe, afterEach } from 'mocha';
 import BigNumber from 'bignumber.js';
 import { Receipt, ReceiptCache, PokerHelper } from 'poker-helper';
+import Logger from 'ab-backend-common/logger';
 import Oracle from './src/index';
 import Db from './src/db';
-import Logger from './src/logger';
 import TableContract from './src/tableContract';
 import { EMPTY_ADDR, now } from './src/utils';
 

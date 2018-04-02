@@ -4,8 +4,8 @@ import sinon from 'sinon';
 import BigNumber from 'bignumber.js';
 import { Receipt, ReceiptCache } from 'poker-helper';
 import { it, describe, afterEach } from 'mocha';
+import Logger from 'ab-backend-common/logger';
 import StreamWorker from './src/index';
-import Logger from './src/logger';
 
 chai.use(sinonChai);
 
@@ -21,8 +21,8 @@ const P1_PRIV = '0x278a5de700e29faae8e40e366ec5012b5ec63d36ec77e8a2417154cc1d253
 const P2_ADDR = '0xe10f3d125e5f4c753a6456fc37123cf17c6900f2';
 const P2_PRIV = '0x7bc8feb5e1ce2927480de19d8bc1dc6874678c016ae53a2eec6a6e9df717bfac';
 
-const P3_ADDR = '0xb7164eD7ce81F1940923F3fc9c1e50F703840863';
-const P3_PRIV = '0xc6d34959ee31f2e2577aa678ef8b8c3cda3176727c2e3588c95e99e9d95714d3';
+// const P3_ADDR = '0xb7164eD7ce81F1940923F3fc9c1e50F703840863';
+// const P3_PRIV = '0xc6d34959ee31f2e2577aa678ef8b8c3cda3176727c2e3588c95e99e9d95714d3';
 
 const ORACLE_ADDR = '0x82e8c6cf42c8d1ff9594b17a3f50e94a12cc860f';
 
@@ -281,8 +281,8 @@ describe('Stream scanner', () => {
           handId: { N: '2' },
           state: { S: 'waiting' },
           lineup: { L: [
-            { M: { address: { S: P1_ADDR } }},
-            { M: { address: { S: P2_ADDR } }},
+            { M: { address: { S: P1_ADDR } } },
+            { M: { address: { S: P2_ADDR } } },
           ] },
         },
         NewImage: {
@@ -291,7 +291,7 @@ describe('Stream scanner', () => {
           state: { S: 'waiting' },
           lineup: { L: [
             { M: { address: { S: P1_ADDR }, sitout: { N: '123' } } },
-            { M: { address: { S: P2_ADDR } }},
+            { M: { address: { S: P2_ADDR } } },
           ] },
         },
       },
@@ -574,6 +574,7 @@ describe('Stream scanner', () => {
         payload: {
           cards: [],
           changed: 123,
+          started: sinon.match.any,
           dealer: 0,
           handId: 3,
           sb: 50,
@@ -623,6 +624,7 @@ describe('Stream scanner', () => {
         payload: {
           cards: [],
           changed: 123,
+          started: sinon.match.any,
           dealer: 0,
           sb: 50,
           handId: 3,

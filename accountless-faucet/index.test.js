@@ -24,9 +24,9 @@ const ses = {
   sendEmail() {},
 };
 
-const sqs = {
-  sendMessage() {},
-};
+// const sqs = {
+//   sendMessage() {},
+// };
 
 const contract = {
   forward: {

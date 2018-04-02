@@ -1,10 +1,14 @@
 import Raven from 'raven';
 
-module.exports = class Logger {
+export default class Logger {
 
   constructor(sentryUrl, serverName, serviceName) {
-    Raven.config(sentryUrl).install();
-    this.sentry = Raven;
+    if (typeof sentryUrl === 'string') {
+      Raven.config(sentryUrl).install();
+      this.sentry = Raven;
+    } else {
+      this.sentry = sentryUrl;
+    }
     this.serverName = serverName || serviceName;
 
     if (process.env.SERVICE_NAME !== serviceName) {
@@ -31,7 +35,7 @@ module.exports = class Logger {
             return;
           }
           resolve(eventId);
-        }
+        },
       );
     });
   }
