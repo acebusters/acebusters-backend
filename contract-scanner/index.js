@@ -1,10 +1,10 @@
 import AWS from 'aws-sdk';
 import Web3 from 'web3';
 import Logger from 'ab-backend-common/logger';
+import Table from 'ab-backend-common/tableContract';
+import Factory from 'ab-backend-common/factoryContract';
 import Db from './src/db';
 import ScanManager from './src/scanner';
-import Table from './src/tableContract';
-import Factory from './src/factoryContract';
 
 const web3 = new Web3();
 const simpledb = new AWS.SimpleDB();

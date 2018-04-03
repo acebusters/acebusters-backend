@@ -103,14 +103,13 @@ function checkWallet(walletStr) {
 }
 
 class AccountManager {
-  constructor(db, email, recaptcha, sns, topicArn, sessionPriv, proxy, nutz,
+  constructor(db, email, recaptcha, sns, topicArn, sessionPriv, proxy,
     logger, unlockPriv, slackAlert, minProxiesAlertThreshold) {
     this.db = db;
     this.email = email;
     this.recaptcha = recaptcha;
     this.sns = sns;
     this.proxy = proxy;
-    this.nutz = nutz;
     this.topicArn = topicArn;
     this.logger = logger;
     this.unlockPriv = unlockPriv;

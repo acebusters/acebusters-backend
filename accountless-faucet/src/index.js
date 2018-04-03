@@ -28,9 +28,16 @@ export default class Faucet {
         tasks.push(this.nutz.transfer(signerAddr, this.babzThreshold.sub(babzBalance)));
       }
 
-      const weiBalance = await this.nutz.weiBalance(signerAddr);
+      const weiBalance = await this.nutz.getBalance(signerAddr);
       if (this.weiThreshold.gt(weiBalance)) {
-        tasks.push(this.nutz.sendEth(signerAddr, this.weiThreshold.sub(weiBalance)));
+        tasks.push(this.nutz.sendTransaction(
+          this.nutz.senderAddr,
+          signerAddr,
+          {
+            value: this.weiThreshold.sub(weiBalance),
+            gas: 30000,
+          },
+        ));
       }
     }
 

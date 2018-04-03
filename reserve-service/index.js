@@ -2,9 +2,9 @@ import Web3 from 'web3';
 import Pusher from 'pusher';
 import AWS from 'aws-sdk';
 import Logger from 'ab-backend-common/logger';
+import TableContract from 'ab-backend-common/tableContract';
 
 import Db from './src/db';
-import TableContract from './src/tableContract';
 import ReserveService from './src/index';
 
 const simpledb = new AWS.SimpleDB();

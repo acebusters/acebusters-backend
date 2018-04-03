@@ -1,4 +1,3 @@
-
 class ScanManager {
   constructor(db, table, sns, factory, topicArn, logger) {
     this.db = db;
@@ -25,12 +24,12 @@ class ScanManager {
         throw 'no new blocks'; // eslint-disable-line no-throw-literal
       }
 
-      const events = await Promise.all(set.map(
-        addr => this.table.filterContract(lastBlock, blockNumber, addr),
+      const contractsEvents = await Promise.all(set.map(
+        addr => this.table.allEvents(lastBlock, blockNumber, addr),
       ));
 
       await Promise.all(
-        events
+        contractsEvents
           .reduce((m, event) => m.concat(event), [])
           .filter(e => e)
           .map(event => this.notify(event, `ContractEvent::${event.address}`)),

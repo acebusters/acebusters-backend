@@ -4,10 +4,10 @@ import AWS from 'aws-sdk';
 import request from 'request';
 import Pusher from 'pusher';
 import Logger from 'ab-backend-common/logger';
+import Table from 'ab-backend-common/tableContract';
 
 import Db from './src/db';
 import EventWorker from './src/index';
-import Table from './src/tableContract';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
 

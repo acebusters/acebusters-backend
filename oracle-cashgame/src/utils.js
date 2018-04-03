@@ -19,9 +19,7 @@ export function now(secs = 0) {
   return Math.floor(Date.now() / 1000) + secs;
 }
 
-export const calcLeaveExitHand = (helper, hand, receipt) => {
-  return receipt.handId;
-};
+export const calcLeaveExitHand = (helper, hand, receipt) => receipt.handId;
 
 export const getIsTurn = (helper, hand, receipt) => {
   try {

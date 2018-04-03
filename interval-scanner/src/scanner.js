@@ -83,8 +83,8 @@ class ScanManager {
   async handleTable(tableAddr) {
     const [lhn, lnr, lnt] = await Promise.all([
       this.table.getLastHandNetted(tableAddr),
-      this.table.getLNRHandId(tableAddr),
-      this.table.getLNRTime(tableAddr),
+      this.table.getLastNettingRequestHandId(tableAddr),
+      this.table.getLastNettingRequestTime(tableAddr),
     ]);
 
     if (lnr > lhn) {

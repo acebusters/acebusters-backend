@@ -1,11 +1,11 @@
 import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
+import Table from 'ab-backend-common/tableContract';
+import Factory from 'ab-backend-common/factoryContract';
 
 import ScanManager from './src/scanner';
 import Db from './src/db';
-import Table from './src/tableContract';
-import Factory from './src/factoryContract';
 
 chai.use(sinonChai);
 

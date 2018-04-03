@@ -4,9 +4,9 @@ import sinon from 'sinon';
 import { Receipt } from 'poker-helper';
 import BigNumber from 'bignumber.js';
 import Logger from 'ab-backend-common/logger';
+import Table from 'ab-backend-common/tableContract';
 
 import EventWorker from './src/index';
-import Table from './src/tableContract';
 import Db from './src/db';
 import MailerLite from './src/mailerLite';
 import Lambda from './src/lambda';
@@ -746,7 +746,7 @@ describe('Stream worker other events', () => {
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
-        MessageBody: `{"from":"0x1255","to":"${P2_ADDR}","gas":1200,"data":"0x112233"}`,
+        MessageBody: `{"from":"0x1255","to":"${P2_ADDR}","gas":1440,"data":"0x112233"}`,
         MessageGroupId: 'someGroup',
         QueueUrl: 'url',
       }, sinon.match.any);
@@ -773,7 +773,7 @@ describe('Stream worker other events', () => {
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
-        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":120,"data":"0x112233"}`,
+        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":144,"data":"0x112233"}`,
         MessageGroupId: 'someGroup',
         QueueUrl: 'url',
       }, sinon.match.any);
@@ -816,7 +816,7 @@ describe('Stream worker other events', () => {
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
-        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":120,"data":"0x112233"}`,
+        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":144,"data":"0x112233"}`,
         MessageGroupId: 'someGroup',
         QueueUrl: 'url',
       }, sinon.match.any);
@@ -853,7 +853,7 @@ describe('Stream worker other events', () => {
 
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
-        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":1200,"data":"0x112233"}`,
+        MessageBody: `{"from":"0x1255","to":"${tableAddr}","gas":1440,"data":"0x112233"}`,
         MessageGroupId: 'someGroup',
         QueueUrl: 'url',
       }, sinon.match.any);
@@ -1141,7 +1141,7 @@ describe('Stream worker other events', () => {
     const worker = new EventWorker(new Table(web3, senderAddr, sqs, 'url'), null, ORACLE_PRIV);
     Promise.all(worker.process(event)).then(() => {
       expect(sqs.sendMessage).calledWith({
-        MessageBody: `{"from":"0x3322","to":"${P1_ADDR}","gas":120,"data":"0x123456"}`,
+        MessageBody: `{"from":"0x3322","to":"${P1_ADDR}","gas":144,"data":"0x123456"}`,
         MessageGroupId: 'someGroup',
         QueueUrl: 'url',
       }, sinon.match.any);

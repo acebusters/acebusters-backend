@@ -2,12 +2,12 @@ import AWS from 'aws-sdk';
 import doc from 'dynamodb-doc';
 import Web3 from 'web3';
 import Logger from 'ab-backend-common/logger';
+import Factory from 'ab-backend-common/factoryContract';
+import Table from 'ab-backend-common/tableContract';
 
 import Dynamo from './src/dynamo';
 import Db from './src/db';
 import ScanManager from './src/scanner';
-import Table from './src/tableContract';
-import Factory from './src/factoryContract';
 
 let web3Provider;
 const simpledb = new AWS.SimpleDB();

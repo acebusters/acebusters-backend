@@ -6,10 +6,10 @@ export default class FactoryContract extends Contract {
   constructor(web3, factoryAddr) {
     super(web3);
     this.factoryAddr = factoryAddr;
-    this.contract = this.web3.eth.contract(FACTORY_ABI).at(this.factoryAddr);
   }
 
   getTables() {
-    return this.call(this.contract.getTables.call);
+    const contract = this.web3.eth.contract(FACTORY_ABI).at(this.factoryAddr);
+    return this.call(contract.getTables.call);
   }
 }

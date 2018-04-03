@@ -1,8 +1,8 @@
 import chai, { expect } from 'chai';
 import sinonChai from 'sinon-chai';
 import sinon from 'sinon';
+import TableContract from 'ab-backend-common/tableContract';
 import Db from './src/db';
-import TableContract from './src/tableContract';
 import Service from './src/index';
 
 chai.use(sinonChai);
@@ -51,7 +51,7 @@ describe('Reservation Service - reserve seat', () => {
 
     sinon.stub(sdb, 'putAttributes').yields(null, { ResponseMetadata: {} });
     sinon.stub(sdb, 'select').yields(null, {});
-    sinon.stub(contract.getLineup, 'call').yields(null, [[], [], [], []]);
+    sinon.stub(contract.getLineup, 'call').yields(null, [[], ['0x0000000000000000000000000000000000000000', '0x0000000000000000000000000000000000000000'], [], []]);
     sinon.stub(web3.eth, 'getTransaction').yields(null, {
       input: TX_INPUT,
     });

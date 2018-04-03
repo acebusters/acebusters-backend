@@ -4,9 +4,9 @@ import doc from 'dynamodb-doc';
 import { ReceiptCache } from 'poker-helper';
 import Pusher from 'pusher';
 import Logger from 'ab-backend-common/logger';
+import TableContract from 'ab-backend-common/tableContract';
 
 import Db from './src/db';
-import TableContract from './src/tableContract';
 import TableManager from './src/index';
 
 let web3;
@@ -26,9 +26,7 @@ const handleError = function handleError(err, logger, callback) {
 };
 
 exports.handler = function handler(event, context, callback) {
-  const sentryUrl = process.env.SENTRY_URL;
-  Raven.config(sentryUrl).install();
-  const logger = new Logger(Raven, context.functionName, 'oracle-cashgame');
+  const logger = new Logger(process.env.SENTRY_URL, context.functionName, 'oracle-cashgame');
 
   const providerUrl = process.env.PROVIDER_URL;
   const tableName = process.env.TABLE_NAME;

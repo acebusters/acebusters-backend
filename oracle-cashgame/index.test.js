@@ -4,9 +4,9 @@ import sinon from 'sinon';
 import BigNumber from 'bignumber.js';
 import { Receipt, ReceiptCache, PokerHelper } from 'poker-helper';
 import Logger from 'ab-backend-common/logger';
+import TableContract from 'ab-backend-common/tableContract';
 import Oracle from './src/index';
 import Db from './src/db';
-import TableContract from './src/tableContract';
 import { EMPTY_ADDR, now } from './src/utils';
 
 chai.use(sinonChai);

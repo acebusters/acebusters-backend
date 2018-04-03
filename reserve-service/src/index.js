@@ -49,12 +49,12 @@ export default class ReserveSerivce {
         throw new Error('Already at table');
       }
 
-      const lineup = await this.table.getLineup(tableAddr);
-      if (lineup[1][pos] && lineup[1][pos] !== EMPTY_ADDR) {
+      const { lineup } = await this.table.getLineup(tableAddr);
+      if (lineup[pos].address !== EMPTY_ADDR) {
         throw new Error('Seat is busy');
       }
 
-      if (Array.isArray(lineup[1]) && lineup[1].indexOf(signerAddr) > -1) {
+      if (lineup.findIndex(seat => seat.address === signerAddr) > -1) {
         throw new Error('Already at table');
       }
 
