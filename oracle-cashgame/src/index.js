@@ -576,15 +576,12 @@ class TableManager {
     const nextActiveCount = this.helper.countActivePlayers(updatedHand.lineup, updatedHand.state);
     const isStart = hand.state === 'waiting' && activeCount < 2 && nextActiveCount >= 2;
     const isEnd = hand.state === 'waiting' && nextActiveCount < 2;
+    const started = (
+      isStart // eslint-disable-line no-nested-ternary
+      ? now()
+      : (isEnd ? 0 : hand.started)
+    );
 
-    console.log('lineup sb', {
-      extra: {
-        isEnd,
-        sb: isEnd ? defaultSmallBlind : hand.sb,
-        defaultSmallBlind,
-        handSb: hand.sb,
-      },
-    });
     await this.db.updateSeats(
       tableAddr,
       hand.handId,
@@ -594,7 +591,7 @@ class TableManager {
       isEnd ? defaultSmallBlind : hand.sb,
       sitout,
       now(), // changed
-      isStart ? now() : hand.started, // started
+      started,
     );
 
     this.logger.log(`removed players ${JSON.stringify(leavePos)}, added players ${JSON.stringify(joinPos)} in db`, {
