@@ -6,13 +6,17 @@
   "scripts": {
     "postinstall": "npm --prefix=./common install",
     "lint": "eslint --fix",
-    "build": "npm run build:init && npm run build:js && npm run build:install",
+    "build": "npm run build:init && npm run build:js && npm run build:common && npm run build:install",
     "build:init": "rm -rf $PACKAGE/dist && mkdir $PACKAGE/dist",
     "build:js": "cd $PACKAGE && babel index.js --out-dir dist && babel src --out-dir dist/src",
-    "build:copypack": "cd $PACKAGE && cp package.json dist/ && sed -i '' 's/..\\/common/..\\/common/g' dist/package.json",
-    "build:install": "npm run build:copypack && cd $PACKAGE/dist && npm install --production && babel node_modules/ab-backend-common/*.js --out-dir .",
+    "build:copypack": "cd $PACKAGE && cp package.json dist/ && sed -i 's/..\\/common/\\^1\\.0\\.0/g' dist/package.json",
+    "build:common": "cd common/ && npm install --production && npm run build",
+    "build:install": "npm run build:copypack && cd $PACKAGE/dist && npm link ab-backend-common && npm install --production",
     "package": "npm run build && npm run package:pack",
-    "package:pack": "cd $PACKAGE/dist && zip -r ../../$PACKAGE-lambda.zip *",
+    "package:pack": "cd $PACKAGE/dist && zip -r ../../$PACKAGE-lambda.zip * && ls ../../$PACKAGE-lambda.zip",
+    "deploy": "npm run package && npm run deploy:upload && npm run deploy:lambda",
+    "deploy:upload": "AWS_ACCESS_KEY_ID=$AWS_STAGING_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_STAGING_KEY aws s3 cp $PACKAGE-lambda.zip s3://builds.acebusters/sandbox/$PACKAGE-lambda.zip",
+    "deploy:lambda": "AWS_ACCESS_KEY_ID=$AWS_SANDBOX_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SANDBOX_KEY aws lambda update-function-code --function-name $LAMBDA_NAME --zip-file fileb://./$PACKAGE-lambda.zip --region eu-west-1",
     "test": "./node_modules/.bin/mocha -r ./babel-register $PACKAGE/index.test.js"
   },
   "repository": {
@@ -44,6 +48,7 @@
     "eslint-plugin-promise": "^3.5.0",
     "eslint-plugin-react": "^6.6.0",
     "eslint-plugin-standard": "^2.1.1",
+    "github-changed-folders": "^1.1.0",
     "mocha": "^3.0.2"
   },
   "homepage": "https://github.com/parsec-labs/acebusters-backend#readme"

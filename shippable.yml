@@ -1,0 +1,35 @@
+language: node_js
+
+env:
+  global:
+    # AWS_SANDBOX_KEY_ID, AWS_SANDBOX_KEY, AWS_STAGING_KEY_ID, AWS_STAGING_KEY, GITHUB_KEY
+    - secure: cTisAnnaVu/CphHSAKAZtkgb5coEIYlDf77RddylZHiYK1qTNxCc2PuWfrM7KhvvOe+t5sJ6SeFK5JjG1MADAJJZkafjOjDbogYXXhvRyN/TT+9t9OnP3Upb1qyYizIzROkWpM6WCj1OuJtFt6+hAcsH3qO2UrFUWoRtb5BIJICXx//1VpSgTa3BcEs2Jf2FiPLODt3nqqL+g5h4rkcvdTCAt/7r7ex1+J6ePdtKXvVU5/iPbZ6xzPKLlAgFBRA6W7ts48wfzPvnnyacVYq5c8kulDfr/Be05jhM8IxCuoYFRvCzumr2npxejXb28JclblX1zAwxvuAmFuMbkeLoDcVlJhaBZAjFovf3ODqUwJkR3iff9A5l7SJZSEpmhoJiw+oahuUrYPbqSN70kxC70Drnh7Cxcsulhh2ONIVnGxbTW/OnlqmnEcpwAndo03OccjvfJ2aP6AZgh8aNBmNlwfa8lfTTUkuEnLbgedjcpcwjE0a011GF/fPOw8/Hr6SR9ZgPT/x45ZGeR7MxzOl4D4/jvKF07rEfMNiSRKvLpPV4Rgdh8Evtp0gE6+murBvB6l7v9JHML8zj5ogDDVZQ49g8nrRBS6JhB8sYWe+Ts+YiawFqOvXbfKTGnGclY76p0mGIRwodX1lM/4CKr5EDVhGyJlZjUF0S4lVfvF0NkAM=
+
+node_js:
+  - "6.10"
+
+install:
+  - sudo apt-get install zip
+
+build:
+  ci:
+    - npm install
+  #  - npm test
+
+  on_success:
+    - if [ "$BRANCH" == "develop" ] || [ "$BRANCH" == "ci" ]; then GITHUB_KEY=$GITHUB_KEY node deploy; fi
+
+integrations:
+
+  notifications:
+    - integrationName: slack_chainfish
+      type: slack
+      recipients:
+        - "#20_acebusters_dapp"
+      branches:
+        only:
+          - master
+          - develop
+      on_success: change
+      on_failure: always
+      on_start: never

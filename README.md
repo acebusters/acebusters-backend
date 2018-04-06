@@ -20,7 +20,7 @@
 
 ## Common code for development env
 
-`common` installs like dependncy so if you will just change the code in common folder it won't change for the service untill `npm install`
+`common` installs like dependency so if you will just change the code in common folder it won't change for the service until `npm install`
 
 For changing common code you can use `npm link`:
 
@@ -28,7 +28,7 @@ For changing common code you can use `npm link`:
 2. `cd put_service_name_here`
 3. `npm link ab-backend-common`
 
-This commands will create symlink for common folder in `{put service name here}/node_modules`
+These commands will create symlink for common folder in `{put service name here}/node_modules`
 
 
 ## Build and deploy
