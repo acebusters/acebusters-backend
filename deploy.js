@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const commit = process.env.COMMIT;
 
 const sandboxLambdas = {
+  'accountless-faucet': 'ab-faucet-service',
   'account-service': 'sb-account-service',
   'contract-scanner': 'ab-contract-scanner',
   'event-worker': 'sb-event-worker',
@@ -15,6 +16,10 @@ const sandboxLambdas = {
 };
 
 changedFolders('parsec-labs/acebusters-backend', commit).then((repos) => {
+  // if 'common' changed rebuild and deploy all the services
+  if (repos.includes('common')) {
+    repos = Object.keys(sandboxLambdas);
+  }
   repos.forEach((repo) => {
     console.log(`Packaging ${repo}..`);  // eslint-disable-line no-console
     const child = spawn('npm', ['run', 'deploy'], {
@@ -25,6 +30,7 @@ changedFolders('parsec-labs/acebusters-backend', commit).then((repos) => {
     });
     child.stdout.pipe(process.stdout);
     child.stderr.pipe(process.stderr);
+    process.on('error', () => process.exit(1));
     process.on('exit', () => { console.log('Done.'); });  // eslint-disable-line no-console
   });
 });

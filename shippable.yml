@@ -17,7 +17,7 @@ build:
   #  - npm test
 
   on_success:
-    - if [ "$BRANCH" == "ci" ]; then GITHUB_KEY=$GITHUB_KEY npm run deploy; fi
+    - if [ "$BRANCH" == "ci" ]; then GITHUB_KEY=$GITHUB_KEY node deploy; fi
 
 integrations:
 

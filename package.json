@@ -9,7 +9,7 @@
     "build": "npm run build:init && npm run build:js && npm run build:common && npm run build:install",
     "build:init": "rm -rf $PACKAGE/dist && mkdir $PACKAGE/dist",
     "build:js": "cd $PACKAGE && babel index.js --out-dir dist && babel src --out-dir dist/src",
-    "build:copypack": "cd $PACKAGE && cp package.json dist/ && sed -i '' 's/..\\/common/\\^1\\.0\\.0/g' dist/package.json",
+    "build:copypack": "cd $PACKAGE && cp package.json dist/ && sed -i 's/..\\/common/\\^1\\.0\\.0/g' dist/package.json",
     "build:common": "cd common/ && npm install --production && npm run build",
     "build:install": "npm run build:copypack && cd $PACKAGE/dist && npm link ab-backend-common && npm install --production",
     "package": "npm run build && npm run package:pack",
@@ -48,7 +48,7 @@
     "eslint-plugin-promise": "^3.5.0",
     "eslint-plugin-react": "^6.6.0",
     "eslint-plugin-standard": "^2.1.1",
-    "github-changed-folders": "^1.0.0",
+    "github-changed-folders": "^1.1.0",
     "mocha": "^3.0.2"
   },
   "homepage": "https://github.com/parsec-labs/acebusters-backend#readme"
