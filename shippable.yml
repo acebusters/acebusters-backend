@@ -1,0 +1,35 @@
+language: node_js
+
+env:
+  global:
+    # AWS_SANDBOX_KEY_ID, AWS_SANDBOX_KEY, AWS_STAGING_KEY_ID, AWS_STAGING_KEY
+    - secure: aOyXpLzu1ZqqbpWVaryjjvib7t0toV6J91za3M71i6g3o9j252xqEYueTP7OuyeadHPdbRLh0aYwDukS5INXkzFb+yfKVlJPi18InzGA1nJJqr+BZWoKdHsQ+csbVxAvPCnp4dZPDX64zeBhxvKLmDvAD+/PfVNTym3JDzrHXJk9aYcLlndGdng7B1nt7gGChTB2sA6NWMabzrdZAG1b7p+JjdBoP9AQfWx9SQI+ThzGRMo6ZsjR+OiE2AWZQK2ku1RpTi3PpOIWkmYcOleBXRn5/84+rBXfCjD6E47FVwqQhG0ECqHMo+ySE0TPve4VDhlLcWIyT4Da3N0AoSxwcA==
+
+node_js:
+  - "6.10"
+
+install:
+  - sudo apt-get install zip
+
+build:
+  ci:
+    - npm install
+    - npm test
+
+  on_success:
+    - if [ "$BRANCH" == "ci" ]; then GITHUB_KEY=$GITHUB_KEY npm run deploy; fi
+
+integrations:
+
+  notifications:
+    - integrationName: slack_chainfish
+      type: slack
+      recipients:
+        - "#20_acebusters_dapp"
+      branches:
+        only:
+          - master
+          - develop
+      on_success: change
+      on_failure: always
+      on_start: never
