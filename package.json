@@ -6,11 +6,12 @@
   "scripts": {
     "postinstall": "npm --prefix=./common install",
     "lint": "eslint --fix",
-    "build": "npm run build:init && npm run build:js && npm run build:install",
+    "build": "npm run build:init && npm run build:js && npm run build:common && npm run build:install",
     "build:init": "rm -rf $PACKAGE/dist && mkdir $PACKAGE/dist",
     "build:js": "cd $PACKAGE && babel index.js --out-dir dist && babel src --out-dir dist/src",
-    "build:copypack": "cd $PACKAGE && cp package.json dist/ && sed -i '' 's/..\\/common/..\\/common/g' dist/package.json",
-    "build:install": "npm run build:copypack && cd $PACKAGE/dist && npm install --production && babel node_modules/ab-backend-common/*.js --out-dir .",
+    "build:copypack": "cd $PACKAGE && cp package.json dist/ && sed -i '' 's/..\\/common/\\^1\\.0\\.0/g' dist/package.json",
+    "build:common": "cd common/ && npm install --production && npm run build",
+    "build:install": "npm run build:copypack && cd $PACKAGE/dist && npm link ab-backend-common && npm install --production",
     "package": "npm run build && npm run package:pack",
     "package:pack": "cd $PACKAGE/dist && zip -r ../../$PACKAGE-lambda.zip *",
     "test": "./node_modules/.bin/mocha -r ./babel-register $PACKAGE/index.test.js"

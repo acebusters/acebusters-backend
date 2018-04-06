@@ -4,6 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "npm run build:init && npm run build:js && npm run build:copy && npm run build:link",
+    "build:init": "rm -rf dist/ && mkdir dist/",
+    "build:js": "babel *.js --out-dir dist",
+    "build:copy": "cp -r node_modules/ dist/node_modules/ && cp package.json dist/",
+    "build:link": "cd dist/ && npm link",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
