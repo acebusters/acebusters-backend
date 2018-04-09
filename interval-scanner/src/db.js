@@ -1,24 +1,19 @@
+import { Sdb } from 'ab-backend-common/db';
 
-function Db(sdb, proxyTable = 'ab-proxies') {
-  this.sdb = sdb;
-  this.proxyDomain = proxyTable;
-}
+export default class ProxiesDb {
+  constructor(sdb, proxyTable = 'ab-proxies') {
+    this.proxies = new Sdb(sdb, proxyTable);
+  }
 
-Db.prototype.getTableName = function getTableName() {
-  return this.proxyDomain;
-};
+  getTableName() {
+    return this.proxies.tableName;
+  }
 
-Db.prototype.getAvailableProxiesCount = function getAvailableProxiesCount() {
-  return new Promise((fulfill, reject) => {
-    this.sdb.select({
-      SelectExpression: `select count(*) from \`${this.proxyDomain}\``,
-    }, (err, data) => {
-      if (err) {
-        return reject(`Error: ${err}`);
-      }
-      return fulfill(data.Items ? data.Items[0].Attributes[0].Value : 0);
+  async getAvailableProxiesCount() {
+    const data = await this.proxies.select({
+      SelectExpression: `select count(*) from \`${this.proxies.tableName}\``,
     });
-  });
-};
 
-module.exports = Db;
+    return data.Items ? data.Items[0].Attributes[0].Value : 0;
+  }
+}

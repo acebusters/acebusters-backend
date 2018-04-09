@@ -1,53 +1,35 @@
-function Db(sdb, tableName) {
-  this.sdb = sdb;
-  this.domain = tableName;
-}
+import { Sdb } from 'ab-backend-common/db';
 
-Db.prototype.getContractSet = function getContractSet(setId) {
-  return new Promise((fulfill, reject) => {
-    this.sdb.getAttributes({
-      DomainName: this.domain,
-      ItemName: setId,
-    }, (err, data) => {
-      if (err) {
-        reject(`Error: ${err.toString()}`);
-        return;
-      }
-      if (!data || !data.Attributes) {
-        reject(`Error: entry ${setId} not found.`);
-        return;
-      }
-      const rv = {
-        lastBlock: 0,
-      };
-      data.Attributes.forEach((aPair) => {
-        if (aPair.Name === 'lastBlock') {
-          rv.lastBlock = parseInt(aPair.Value, 10);
-        }
-      });
-      fulfill(rv);
-    });
-  });
-};
+export default class ScannerDb {
+  constructor(sdb, tableName = 'blocks') {
+    this.blocksDb = new Sdb(sdb, tableName);
+  }
 
-Db.prototype.updateBlockNumber = function updateBlockNumber(setId, blockNumber) {
-  return new Promise((fulfill, reject) => {
-    this.sdb.putAttributes({
-      DomainName: this.domain,
+  async getContractSet(setId) {
+    const data = await this.blocksDb.getAttributes({ ItemName: setId });
+    if (!data || !data.Attributes) {
+      throw `Error: entry ${setId} not found.`; // eslint-disable-line no-throw-literal
+    }
+    const lastBlock = data.Attributes.find(pair => pair.Name === 'lastBlock');
+
+    if (lastBlock) {
+      return { lastBlock: Number(lastBlock.Value) };
+    }
+
+    return {
+      lastBlock: 0,
+    };
+  }
+
+  updateBlockNumber(setId, blockNumber) {
+    return this.blocksDb.putAttributes({
       ItemName: setId,
       Attributes: [{
         Name: 'lastBlock',
         Replace: true,
         Value: blockNumber.toString(),
       }],
-    }, (err, data) => {
-      if (err) {
-        reject(`Error: ${err.toString}`);
-        return;
-      }
-      fulfill(data);
     });
-  });
-};
+  }
 
-module.exports = Db;
+}

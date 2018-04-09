@@ -1,3 +1,5 @@
+import { transform, range } from 'ab-backend-common/utils';
+import { Sdb, Dynamo } from 'ab-backend-common/db';
 import { NotFound } from './errors';
 
 const performSeatsUpdate = (joins, leaves, sitout) => {
@@ -15,31 +17,6 @@ const performSeatsUpdate = (joins, leaves, sitout) => {
   return seats;
 };
 
-const transform = (data) => {
-  let attributes;
-  if (data && data.forEach) {
-    attributes = {};
-    data.forEach((aPair) => {
-      if (!attributes[aPair.Name]) {
-        attributes[aPair.Name] = {};
-      }
-      attributes[aPair.Name] = aPair.Value;
-    });
-  } else {
-    attributes = [];
-    Object.keys(data).forEach((anAttributeName) => {
-      data[anAttributeName].forEach((aValue) => {
-        attributes.push({
-          Name: anAttributeName,
-          Value: [aValue],
-          Replace: true,
-        });
-      });
-    });
-  }
-  return attributes;
-};
-
 export const emulateSeatsUpdate = (hand, joins, leaves, dealer, sitout, changed) => {
   const seats = performSeatsUpdate(joins, leaves, sitout);
   return {
@@ -55,113 +32,75 @@ export const emulateSeatsUpdate = (hand, joins, leaves, dealer, sitout, changed)
 
 export default class Db {
   constructor(dynamo, tableName = 'tables', sdb, sdbTableName = 'requests') {
-    this.dynamo = dynamo;
-    this.tableName = tableName;
-    this.sdb = sdb;
-    this.sdbTableName = sdbTableName;
+    this.dynamo = new Dynamo(dynamo, tableName);
+    this.sdb = new Sdb(sdb, sdbTableName);
   }
 
-  updateItem(params) {
-    return new Promise((fulfill, reject) => {
-      this.dynamo.updateItem(params, (err, rsp) => {
-        if (err) {
-          return reject(err);
-        }
-        return fulfill(rsp.Item);
-      });
+  async getTableHands(tableAddr) {
+    const rsp = await this.dynamo.query({
+      KeyConditionExpression: 'tableAddr = :a',
+      ExpressionAttributeValues: { ':a': tableAddr },
+      ScanIndexForward: false,
     });
-  }
 
-  getTableHands(tableAddr) {
-    return new Promise((fulfill, reject) => {
-      this.dynamo.query({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tableAddr = :a',
-        ExpressionAttributeValues: { ':a': tableAddr },
-        ScanIndexForward: false,
-      }, (err, rsp) => {
-        if (err) {
-          return reject(err);
-        }
-        if (!rsp.Items || rsp.Items.length < 1) {
-          return reject(new NotFound(`table with address ${tableAddr} unknown.`));
-        }
-        return fulfill(rsp.Items);
-      });
-    });
-  }
-
-  getLastHand(tableAddr) {
-    return new Promise((fulfill, reject) => {
-      this.dynamo.query({
-        TableName: this.tableName,
-        KeyConditionExpression: 'tableAddr = :a',
-        ExpressionAttributeValues: { ':a': tableAddr },
-        Limit: 1,
-        ScanIndexForward: false,
-      }, (err, rsp) => {
-        if (err) {
-          return reject(err);
-        }
-        if (!rsp.Items || rsp.Items.length < 1) {
-          return reject(new NotFound(`table with address ${tableAddr} unknown.`));
-        }
-        return fulfill(rsp.Items[0]);
-      });
-    });
-  }
-
-  getHand(tableAddr, handId) {
-    return new Promise((fulfill, reject) => {
-      if (handId < 1) {
-        // return the genensis hand
-        fulfill({ handId, state: 'showdown', distribution: '0x1234' });
-      } else {
-        this.dynamo.getItem({
-          TableName: this.tableName,
-          Key: { tableAddr, handId },
-        }, (err, data) => {
-          if (err) {
-            return reject(err);
-          }
-          if (!data.Item) {
-            return reject(new NotFound(`handId ${handId} not found.`));
-          }
-          return fulfill(data.Item);
-        });
-      }
-    });
-  }
-
-  getHands(tableAddr, fromHandId, toHandId) {
-    if (fromHandId >= toHandId) {
-      return Promise.resolve([]);
+    if (!rsp.Items || rsp.Items.length < 1) {
+      throw new NotFound(`table with address ${tableAddr} unknown.`);
     }
-    return new Promise((resolve, reject) => {
-      const Keys = [];
-      for (let i = fromHandId; i < toHandId; i += 1) {
-        Keys.push({ tableAddr, handId: i });
-      }
-      this.dynamo.batchGetItem({
-        RequestItems: {
-          [this.tableName]: { Keys },
-        },
-      }, (err, data) => {
-        if (err) {
-          return reject(err);
-        }
 
-        if (!data.Responses || !data.Responses[this.tableName]) {
-          return reject(new NotFound(`ho hands ${fromHandId}-${toHandId} found.`));
-        }
-        return resolve(data.Responses[this.tableName]);
-      });
+    return rsp.Items;
+  }
+
+  async getLastHand(tableAddr) {
+    const rsp = await this.dynamo.query({
+      KeyConditionExpression: 'tableAddr = :a',
+      ExpressionAttributeValues: { ':a': tableAddr },
+      Limit: 1,
+      ScanIndexForward: false,
     });
+
+    if (!rsp.Items || rsp.Items.length < 1) {
+      throw new NotFound(`table with address ${tableAddr} unknown.`);
+    }
+    return rsp.Items[0];
+  }
+
+  async getHand(tableAddr, handId) {
+    if (handId < 1) {
+      // return the genensis hand
+      return { handId, state: 'showdown', distribution: '0x1234' };
+    }
+
+    const data = await this.dynamo.getItem({
+      Key: { tableAddr, handId },
+    });
+
+    if (!data.Item) {
+      throw new NotFound(`handId ${handId} not found.`);
+    }
+
+    return data.Item;
+  }
+
+  async getHands(tableAddr, fromHandId, toHandId) {
+    if (fromHandId >= toHandId) {
+      return [];
+    }
+
+    const data = await this.dynamo.batchGetItem({
+      RequestItems: {
+        [this.tableName]: range(fromHandId, toHandId).map(i => ({ tableAddr, handId: i })),
+      },
+    });
+
+    if (!data.Responses || !data.Responses[this.tableName]) {
+      throw new NotFound(`ho hands ${fromHandId}-${toHandId} found.`);
+    }
+
+    return data.Responses[this.tableName];
   }
 
   updateLeave(tableAddr, handId, pos, exitHand, sitout, changed) {
     const params = {
-      TableName: this.tableName,
       Key: { tableAddr, handId },
       UpdateExpression: `set lineup[${pos}].#exitHand = :eh, changed = :c`,
       ExpressionAttributeNames: {
@@ -179,13 +118,12 @@ export default class Db {
       params.ExpressionAttributeValues[':so'] = sitout;
     }
 
-    return this.updateItem(params);
+    return this.dynamo.updateItem(params);
   }
 
   updateSeat(tableAddr,
     handId, seat, pos, state, changed, streetMaxBet) {
     const params = {
-      TableName: this.tableName,
       Key: { tableAddr, handId },
       UpdateExpression: `set lineup[${pos}] = :l, #hand_state = :s, changed = :c`,
       ExpressionAttributeValues: {
@@ -211,24 +149,22 @@ export default class Db {
       params.UpdateExpression += `, ${attribute} = :m`;
       params.ExpressionAttributeValues[':m'] = streetMaxBet;
     }
-    return this.updateItem(params);
+    return this.dynamo.updateItem(params);
   }
 
   updateChanged(tableAddr, handId, changed) {
     const params = {
-      TableName: this.tableName,
       Key: { tableAddr, handId },
       UpdateExpression: 'set changed = :c',
       ExpressionAttributeValues: {
         ':c': changed,
       },
     };
-    return this.updateItem(params);
+    return this.dynamo.updateItem(params);
   }
 
   updateNetting(tableAddr, handId, signer, nettingSig) {
     const params = {
-      TableName: this.tableName,
       Key: { tableAddr, handId },
       UpdateExpression: 'set netting.#signer = :s',
       ExpressionAttributeNames: {
@@ -239,7 +175,7 @@ export default class Db {
       },
       ReturnValues: 'ALL_NEW',
     };
-    return this.updateItem(params);
+    return this.dynamo.updateItem(params);
   }
 
   updateSeats(
@@ -257,7 +193,6 @@ export default class Db {
 
     const expression = Object.keys(seats).map(i => `lineup[${i}] = :s${i}`);
     const params = {
-      TableName: this.tableName,
       Key: { tableAddr, handId },
       UpdateExpression: `set ${[...expression, 'changed = :c', 'started = :s', 'dealer = :d', 'sb = :sb'].join(', ')}`,
       ExpressionAttributeValues: Object.keys(seats).reduce((attrs, pos) => ({
@@ -271,37 +206,21 @@ export default class Db {
       }),
     };
 
-    return this.updateItem(params);
+    return this.dynamo.updateItem(params);
   }
 
-  getOpponentCallRequest(tableAddr) {
-    return new Promise((resolve, reject) => {
-      this.sdb.getAttributes({
-        DomainName: this.sdbTableName,
-        ItemName: tableAddr,
-      }, (err, data) => {
-        if (err) {
-          return reject(`Error: ${err}`);
-        }
-        return resolve(data.Attributes && transform(data.Attributes));
-      });
-    });
+  async getOpponentCallRequest(tableAddr) {
+    const data = await this.sdb.getAttributes({ ItemName: tableAddr });
+
+    return data.Attributes && transform(data.Attributes);
   }
 
-  addOpponentCallRequest(tableAddr) {
-    return new Promise((resolve, reject) => {
-      this.sdb.putAttributes({
-        DomainName: this.sdbTableName,
-        ItemName: tableAddr,
-        Attributes: [
-          { Name: 'created', Value: String(Math.round(Date.now() / 1000)) },
-        ],
-      }, (err) => {
-        if (err) {
-          return reject(err);
-        }
-        return resolve();
-      });
+  async addOpponentCallRequest(tableAddr) {
+    await this.sdb.putAttributes({
+      ItemName: tableAddr,
+      Attributes: [
+        { Name: 'created', Value: String(Math.round(Date.now() / 1000)) },
+      ],
     });
   }
 }

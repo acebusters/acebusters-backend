@@ -1,17 +1,15 @@
-import { dbMethod, transform, range } from './utils';
+import { Dynamo, Sdb } from 'ab-backend-common/db';
+import { transform, range } from 'ab-backend-common/utils';
 
-export default class Db {
+export default class WorkerDb {
 
   constructor(dynamo, dynamoTableName = 'sb_cashgame', sdb, sdbTableName) {
-    this.sdb = sdb;
-    this.dynamo = dynamo;
-    this.sdbTableName = sdbTableName;
-    this.dynamoTableName = dynamoTableName;
+    this.dynamo = new Dynamo(dynamo, dynamoTableName);
+    this.sdb = new Sdb(sdb, sdbTableName);
   }
 
   async setAllowance(refCode, allowance) {
-    return this.putAttributes({
-      DomainName: this.sdbTableName,
+    return this.sdb.putAttributes({
       ItemName: refCode,
       Attributes: [{ Name: 'allowance', Value: String(allowance), Replace: true }],
     });
@@ -19,10 +17,7 @@ export default class Db {
 
   async getReferral(refCode) {
     try {
-      const data = await this.getAttributes({
-        DomainName: this.sdbTableName,
-        ItemName: refCode,
-      });
+      const data = await this.sdb.getAttributes({ ItemName: refCode });
 
       if (!data.Attributes) {
         throw new Error(`Referral with ID ${refCode} not found.`);
@@ -43,8 +38,7 @@ export default class Db {
       return { distribution: {} };
     }
 
-    const data = await this.getItem({
-      TableName: this.dynamoTableName,
+    const data = await this.dynamo.getItem({
       Key: { tableAddr, handId },
     });
 
@@ -56,24 +50,23 @@ export default class Db {
   }
 
   async getHandsRange(tableAddr, fromHand, toHand) {
-    const { Responses } = await this.batchGetItem({
+    const { Responses } = await this.dynamo.batchGetItem({
       RequestItems: {
-        [this.dynamoTableName]: {
+        [this.dynamo.tableName]: {
           Keys: range(fromHand, toHand).map(handId => ({ handId, tableAddr })),
         },
       },
     });
 
-    if (!Responses || !Responses[this.dynamoTableName]) {
+    if (!Responses || !Responses[this.dynamo.tableName]) {
       throw new Error(`ho hands ${fromHand}-${toHand} found.`);
     }
 
-    return Responses[this.dynamoTableName];
+    return Responses[this.dynamo.tableName];
   }
 
   async getLastHand(tableAddr, scanForward = false) {
-    const rsp = await this.query({
-      TableName: this.dynamoTableName,
+    const rsp = await this.dynamo.query({
       KeyConditionExpression: 'tableAddr = :a',
       ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
@@ -89,7 +82,6 @@ export default class Db {
 
   async updateSeatLeave(tableAddr, handId, exitHand, pos, time) {
     const params = {
-      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: `set lineup[${pos}].#eh = :h, changed = :t`,
       ExpressionAttributeNames: {
@@ -101,40 +93,37 @@ export default class Db {
       },
     };
 
-    const rsp = await this.updateItem(params);
+    const rsp = await this.dynamo.updateItem(params);
     return rsp.Item;
   }
 
   async emptySeat(tableAddr, handId, pos) {
     const params = {
-      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: `set lineup[${pos}] = :s`,
       ExpressionAttributeValues: {
         ':s': { address: '0x0000000000000000000000000000000000000000' },
       },
     };
-    const rsp = await this.updateItem(params);
+    const rsp = await this.dynamo.updateItem(params);
     return rsp.Item;
   }
 
   async updateNetting(tableAddr, handId, netting) {
     const params = {
-      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: 'set netting = :n',
       ExpressionAttributeValues: {
         ':n': netting,
       },
     };
-    const rsp = await this.updateItem(params);
+    const rsp = await this.dynamo.updateItem(params);
     return rsp.Item;
   }
 
   async putHand(tableAddr, handId, lineup, dealer, deck, sb, changed, started = changed) {
     try {
-      const data = await this.putItem({
-        TableName: this.dynamoTableName,
+      const data = await this.dynamo.putItem({
         Item: {
           tableAddr,
           handId,
@@ -156,27 +145,25 @@ export default class Db {
 
   async updateDistribution(tableAddr, handId, distribution) {
     const params = {
-      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: 'set distribution = :d',
       ExpressionAttributeValues: {
         ':d': distribution,
       },
     };
-    const rsp = await this.updateItem(params);
+    const rsp = await this.dynamo.updateItem(params);
     return rsp.Item;
   }
 
   async markHandAsNetted(tableAddr, handId) {
     const params = {
-      TableName: this.dynamoTableName,
       Key: { tableAddr, handId },
       UpdateExpression: 'set is_netted = :is_n',
       ExpressionAttributeValues: {
         ':is_n': true,
       },
     };
-    const rsp = await this.updateItem(params);
+    const rsp = await this.dynamo.updateItem(params);
     return rsp.Item;
   }
 
@@ -187,8 +174,7 @@ export default class Db {
     }
 
     try {
-      const rsp = await this.deleteItem({
-        TableName: this.dynamoTableName,
+      const rsp = await this.dynamo.deleteItem({
         Key: { tableAddr, handId },
       });
 
@@ -196,50 +182,6 @@ export default class Db {
     } catch (err) {
       throw new Error(`Error: Dynamo failed: ${err}`);
     }
-  }
-
-  query(params) {
-    return dbMethod(this.dynamo, 'query', params);
-  }
-
-  putItem(params) {
-    return dbMethod(this.dynamo, 'putItem', params);
-  }
-
-  getItem(params) {
-    return dbMethod(this.dynamo, 'getItem', params);
-  }
-
-  batchGetItem(params) {
-    return dbMethod(this.dynamo, 'batchGetItem', params);
-  }
-
-  updateItem(params) {
-    return dbMethod(this.dynamo, 'updateItem', params);
-  }
-
-  deleteItem(params) {
-    return dbMethod(this.dynamo, 'deleteItem', params);
-  }
-
-  putAttributes(params) {
-    return dbMethod(this.sdb, 'putAttributes', params);
-  }
-
-  select(params) {
-    return dbMethod(this.sdb, 'select', params);
-  }
-
-  getAttributes(params) {
-    return dbMethod(this.sdb, 'getAttributes', params);
-  }
-
-  deleteAttributes(params) {
-    return dbMethod(this.sdb, 'deleteAttributes', params);
-  }
-
-  createDomain(params) {
-    return dbMethod(this.sdb, 'createDomain', params);
   }
 
 }

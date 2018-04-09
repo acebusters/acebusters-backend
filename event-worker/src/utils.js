@@ -25,14 +25,6 @@ export const shuffle = function shuffle() {
   return array;
 };
 
-export function range(s, e) {
-  return Array.from(new Array((e - s) + 1), (_, i) => i + s);
-}
-
-export function identity(a) {
-  return a;
-}
-
 export function parseMessage(msg) {
   if (!msg.Subject || msg.Subject.split('::').length < 2) {
     throw new Error(`unknown message type: ${msg.Subject}`);
@@ -45,42 +37,4 @@ export function parseMessage(msg) {
   } catch (e) {
     throw new Error(`json parse error: ${JSON.stringify(e)}`);
   }
-}
-
-export function dbMethod(provider, name, params) {
-  return new Promise((resolve, reject) => {
-    provider[name](params, (err, result) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-}
-
-// transform from key/value to list and back
-export function transform(data) {
-  let attributes;
-  if (Array.isArray(data)) {
-    attributes = {};
-    data.forEach((aPair) => {
-      if (!attributes[aPair.Name]) {
-        attributes[aPair.Name] = {};
-      }
-      attributes[aPair.Name] = aPair.Value;
-    });
-  } else {
-    attributes = [];
-    Object.keys(data).forEach((anAttributeName) => {
-      data[anAttributeName].forEach((aValue) => {
-        attributes.push({
-          Name: anAttributeName,
-          Value: aValue,
-          Replace: true,
-        });
-      });
-    });
-  }
-  return attributes;
 }

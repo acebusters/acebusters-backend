@@ -1,29 +1,22 @@
-function Dynamo(dynamo, tableName) {
-  this.dynamo = dynamo;
-  this.tableName = (typeof tableName === 'undefined') ? 'sb_cashgame' : tableName;
-}
+import { Dynamo } from 'ab-backend-common/db';
 
+export default class TablesDb {
+  constructor(dynamo, tableName = 'sb_cashgame') {
+    this.dynamo = new Dynamo(dynamo, tableName);
+  }
 
-Dynamo.prototype.getLastHand = function getLastHand(tableAddr) {
-  return new Promise((fulfill, reject) => {
-    this.dynamo.query({
-      TableName: this.tableName,
+  async getLastHand(tableAddr) {
+    const rsp = await this.dynamo.query({
       KeyConditionExpression: 'tableAddr = :a',
       ExpressionAttributeValues: { ':a': tableAddr },
       Limit: 1,
       ScanIndexForward: false,
-    }, (err, rsp) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      if (!rsp.Items || rsp.Items.length < 1) {
-        reject(`Not Found: table with address ${tableAddr} unknown.`);
-        return;
-      }
-      fulfill(rsp.Items[0]);
     });
-  });
-};
 
-module.exports = Dynamo;
+    if (!rsp.Items || rsp.Items.length < 1) {
+      throw `Not Found: table with address ${tableAddr} unknown.`; // eslint-disable-line no-throw-literal
+    }
+
+    return rsp.Items[0];
+  }
+}
