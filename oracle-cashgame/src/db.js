@@ -88,15 +88,14 @@ export default class Db {
 
     const data = await this.dynamo.batchGetItem({
       RequestItems: {
-        [this.tableName]: range(fromHandId, toHandId).map(i => ({ tableAddr, handId: i })),
+        [this.dynamo.tableName]: range(fromHandId, toHandId).map(i => ({ tableAddr, handId: i })),
       },
     });
-
-    if (!data.Responses || !data.Responses[this.tableName]) {
-      throw new NotFound(`ho hands ${fromHandId}-${toHandId} found.`);
+    if (!data.Responses || !data.Responses[this.dynamo.tableName]) {
+      throw new NotFound(`no hands ${fromHandId}-${toHandId} found.`);
     }
 
-    return data.Responses[this.tableName];
+    return data.Responses[this.dynamo.tableName];
   }
 
   updateLeave(tableAddr, handId, pos, exitHand, sitout, changed) {

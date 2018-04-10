@@ -1,21 +1,39 @@
 
 class ExtendableError extends Error {
-  constructor(message) {
-    super();
-    const prefix = this.constructor.name.replace(/([a-z](?=[A-Z]))/g, '$1 ');
+  constructor(message, prefix) {
+    super(message);
     this.message = `${prefix}: ${message}`;
-    this.errName = this.constructor.name;
   }
 }
 
-class Unauthorized extends ExtendableError {}
+class Unauthorized extends ExtendableError {
+  constructor(message) {
+    super(message, 'Unauthorized');
+  }
+}
 
-class Forbidden extends ExtendableError {}
+class Forbidden extends ExtendableError {
+  constructor(message) {
+    super(message, 'Forbidden');
+  }
+}
 
-class BadRequest extends ExtendableError {}
+class BadRequest extends ExtendableError {
+  constructor(message) {
+    super(message, 'Bad Request');
+  }
+}
 
-class NotFound extends ExtendableError {}
+class NotFound extends ExtendableError {
+  constructor(message) {
+    super(message, 'Not Found');
+  }
+}
 
-class Conflict extends ExtendableError {}
+class Conflict extends ExtendableError {
+  constructor(message) {
+    super(message, 'Conflict');
+  }
+}
 
 export { Unauthorized, NotFound, BadRequest, Forbidden, Conflict };

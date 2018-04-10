@@ -331,7 +331,7 @@ class TableManager {
       // get all old hands
       const hands = await this.db.getHands(
         tableAddr,
-        lastHandNetted.toNumber() + 1,
+        lastHandNetted + 1,
         receipt.handId,
       );
 

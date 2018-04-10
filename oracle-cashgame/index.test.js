@@ -1744,20 +1744,6 @@ describe('Oracle beat', () => {
 });
 
 describe('Oracle info', () => {
-  it('should allow to get uninitialized info.', (done) => {
-    sinon.stub(dynamo, 'query').yields(null, { Items: [] });
-
-    new Oracle(new Db(dynamo), null, rc).info(tableAddr, tableAddr).then((rsp) => {
-      expect(rsp).to.eql({
-        dealer: 0,
-        distribution: '0x1234',
-        handId: 0,
-        state: 'showdown',
-      });
-      done();
-    }).catch(done);
-  });
-
   it('should not return uninitialized info from unknown tables.', (done) => {
     sinon.stub(dynamo, 'query').yields(null, { Items: [] });
 
@@ -1786,6 +1772,7 @@ describe('Oracle info', () => {
         sb: '50000000000000',
         lineup: [],
         changed: 123,
+        started: undefined,
         state: 'preflop',
       });
       done();
@@ -1813,6 +1800,7 @@ describe('Oracle info', () => {
         lineup: [],
         changed: 123,
         preMaxBet: 200,
+        started: undefined,
         state: 'flop',
       });
       done();
@@ -1842,6 +1830,7 @@ describe('Oracle info', () => {
         changed: 123,
         preMaxBet: 200,
         flopMaxBet: 300,
+        started: undefined,
         state: 'turn',
       });
       done();
@@ -1873,6 +1862,7 @@ describe('Oracle info', () => {
         preMaxBet: 200,
         flopMaxBet: 300,
         turnMaxBet: 400,
+        started: undefined,
         state: 'river',
       });
       done();
@@ -1922,6 +1912,7 @@ describe('Oracle info', () => {
         turnMaxBet: 400,
         riverMaxBet: 500,
         distribution: 'dist',
+        started: undefined,
         state: 'showdown',
       });
       done();
@@ -2550,7 +2541,7 @@ describe('Oracle messaging', () => {
     try {
       new Oracle().handleMessage(invalidReceipt);
     } catch (err) {
-      expect(err.message).to.contain('Unauthorized: invalid message');
+      expect(err.message).to.contain('invalid message');
       return;
     }
     throw new Error('should have thrown');
@@ -2561,7 +2552,7 @@ describe('Oracle messaging', () => {
     try {
       new Oracle().handleMessage(bet);
     } catch (err) {
-      expect(err.message).to.contain('Bad Request: receipt type');
+      expect(err.message).to.contain('receipt type');
       return;
     }
     throw new Error('should have thrown');
@@ -2598,13 +2589,15 @@ describe('Oracle lineup', () => {
       [new BigNumber(BALANCE), new BigNumber(0)],
       [new BigNumber(0), new BigNumber(0)],
     ]);
+    sinon.stub(contract.smallBlind, 'call').yields(null, new BigNumber(1));
     sinon.stub(dynamo, 'query').yields(null, { Items: [{
       handId: 3,
       lineup: [{
         address: P1_ADDR,
+        last: new Receipt(tableAddr).bet(0, babz(0)).sign(P1_PRIV),
       }, {
         address: P2_ADDR,
-        last: '0x11',
+        last: new Receipt(tableAddr).bet(0, babz(0)).sign(P2_PRIV),
       }],
     }] });
     sinon.stub(dynamo, 'updateItem').yields(null, {});
