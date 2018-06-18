@@ -1,3 +1,13 @@
+
+/**
+ * Copyright (c) 2017-present, Parsec Labs (parseclabs.org)
+ *
+ * This source code is licensed under the GNU Affero General Public License,
+ * version 3, found in the LICENSE file in the root directory of this source 
+ * tree.
+ */
+
+
 const subject = 'Acebusters Email Verification Request';
 const resetSubject = 'Acebusters Password Recovery Request';
 const welcome = 'Dear customer, \n\nWe have received a request to authorize this email address for Acebusters.com. If you requested this verification, please click the following link:';

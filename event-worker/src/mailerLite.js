@@ -1,4 +1,12 @@
 
+/**
+ * Copyright (c) 2017-present, Parsec Labs (parseclabs.org)
+ *
+ * This source code is licensed under the GNU Affero General Public License,
+ * version 3, found in the LICENSE file in the root directory of this source 
+ * tree.
+ */
+
 // curl -X POST https://api.mailerlite.com/api/v2/groups/1234567/subscribers
 // -d '{"email":"test@mail.com" }'
 // -H "Content-Type: application/json"

@@ -1,3 +1,12 @@
+
+/**
+ * Copyright (c) 2017-present, Parsec Labs (parseclabs.org)
+ *
+ * This source code is licensed under the GNU Affero General Public License,
+ * version 3, found in the LICENSE file in the root directory of this source 
+ * tree.
+ */
+
 import { AttributeValue } from 'dynamodb-data-types';
 import { PokerHelper } from 'poker-helper';
 import { leavesReceived, lineupHasLeave, isHandsComplete } from './utils';
