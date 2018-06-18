@@ -17,11 +17,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@bitbucket.org/johba/ab-account-service.git"
+    "url": "git+ssh://git@github.com:parsec-labs/acebusters-backend.git"
   },
-  "author": "Johann Barbie <johannbarbie@me.com> (http://johba.de/)",
-  "license": "MIT",
-  "homepage": "https://bitbucket.org/johba/ab-account-service#readme",
+  "author": "Parsec Labs (parseclabs.org)",
+  "license": "AGPLv3",
   "devDependencies": {
     "babel-cli": "^6.16.0",
     "babel-core": "^6.17.0",

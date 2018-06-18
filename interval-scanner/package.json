@@ -15,8 +15,12 @@
     "package:pack": "cd dist && zip -r ../lambda.zip * && cd ..",
     "test": "mocha -r babel-register -r babel-polyfill index.test.js"
   },
-  "author": "acebusters",
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com:parsec-labs/acebusters-backend.git"
+  },
+  "author": "Parsec Labs (parseclabs.org)",
+  "license": "AGPLv3",
   "dependencies": {
     "aws-sdk": "^2.22.0",
     "babel-runtime": "^6.11.6",

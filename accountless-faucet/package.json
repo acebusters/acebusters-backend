@@ -17,11 +17,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:parsec-labs/accountless-faucet.git"
+    "url": "git+ssh://git@github.com:parsec-labs/acebusters-backend.git"
   },
+  "license": "AGPLv3",
   "author": "Alex Lunyov <isuntc@gmail.com> (http://sunify.github.io/)",
-  "license": "MIT",
-  "homepage": "https://github.com/parsec-labs/accountless-faucet",
   "devDependencies": {
     "babel-cli": "^6.16.0",
     "babel-core": "^6.17.0",

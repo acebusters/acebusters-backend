@@ -17,10 +17,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@bitbucket.org:johba/ab-contract-scanner.git"
+    "url": "git+ssh://git@github.com:parsec-labs/acebusters-backend.git"
   },
-  "author": "acebusters",
-  "license": "MIT",
+  "author": "Parsec Labs (parseclabs.org)",
+  "license": "AGPLv3",
   "dependencies": {
     "aws-sdk": "^2.22.0",
     "raven": "^1.2.1",
